@@ -1,5 +1,5 @@
-import React from 'react';
-import { Transaction } from '../types';
+import React from "react";
+import { Transaction } from "@/lib/types";
 
 interface CalendarViewProps {
   transactions: Transaction[];
@@ -8,45 +8,61 @@ interface CalendarViewProps {
 const CalendarView: React.FC<CalendarViewProps> = ({ transactions }) => {
   const daysInMonth = new Date(new Date().getFullYear(), new Date().getMonth() + 1, 0).getDate();
   const days = Array.from({ length: daysInMonth }, (_, i) => i + 1);
-  
+
   // Group transactions by category/name for rows
-  const uniqueSources: string[] = Array.from(new Set(transactions.map(t => t.name)));
-  
+  const uniqueSources: string[] = Array.from(new Set(transactions.map((t) => t.name)));
+
   // Define color by type
   const getTypeColor = (name: string) => {
-    const type = transactions.find(t => t.name === name)?.type;
+    const type = transactions.find((t) => t.name === name)?.type;
     switch (type) {
-      case 'income': return 'bg-success';
-      case 'bill': return 'bg-warning';
-      default: return 'bg-danger';
+      case "income":
+        return "bg-success";
+      case "bill":
+        return "bg-warning";
+      default:
+        return "bg-danger";
     }
   };
 
   const getIcon = (name: string) => {
-     const t = transactions.find(t => t.name === name);
-     if(!t) return 'circle';
-     switch(t.category) {
-        case 'Salary': return 'work';
-        case 'Housing': return 'home';
-        case 'Utilities': return 'bolt';
-        case 'Groceries': return 'shopping_cart';
-        case 'Transport': return 'directions_car';
-        case 'Entertainment': return 'movie';
-        default: return 'paid';
-     }
-  }
+    const t = transactions.find((t) => t.name === name);
+    if (!t) return "circle";
+    switch (t.category) {
+      case "Salary":
+        return "work";
+      case "Housing":
+        return "home";
+      case "Utilities":
+        return "bolt";
+      case "Groceries":
+        return "shopping_cart";
+      case "Transport":
+        return "directions_car";
+      case "Entertainment":
+        return "movie";
+      default:
+        return "paid";
+    }
+  };
 
   return (
     <div className="p-6 lg:p-10 h-full flex flex-col animate-fade-in">
       <header className="flex justify-between items-center mb-8">
         <div>
           <h1 className="text-3xl font-bold text-white mb-2">Financial Matrix</h1>
-          <p className="text-gray-400">Visual overview of cash flow across the month (X: Days, Y: Sources).</p>
+          <p className="text-gray-400">
+            Visual overview of cash flow across the month (X: Days, Y: Sources).
+          </p>
         </div>
         <div className="flex items-center gap-4 bg-[#1a2336] p-2 rounded-lg border border-gray-800">
-          <button className="p-1 hover:bg-gray-700 rounded"><span className="material-symbols-outlined text-gray-400">chevron_left</span></button>
+          <button className="p-1 hover:bg-gray-700 rounded">
+            <span className="material-symbols-outlined text-gray-400">chevron_left</span>
+          </button>
           <span className="font-bold text-white">October 2024</span>
-          <button className="p-1 hover:bg-gray-700 rounded"><span className="material-symbols-outlined text-gray-400">chevron_right</span></button>
+          <button className="p-1 hover:bg-gray-700 rounded">
+            <span className="material-symbols-outlined text-gray-400">chevron_right</span>
+          </button>
         </div>
       </header>
 
@@ -74,40 +90,51 @@ const CalendarView: React.FC<CalendarViewProps> = ({ transactions }) => {
               <div className="w-60 shrink-0 p-4 font-bold text-gray-400 border-r border-gray-800 sticky left-0 bg-[#1a2336] z-20 shadow-md">
                 Category / Name
               </div>
-              {days.map(day => (
-                <div key={day} className="flex-1 min-w-[40px] p-2 text-center text-xs text-gray-500 border-r border-gray-800 border-opacity-30">
+              {days.map((day) => (
+                <div
+                  key={day}
+                  className="flex-1 min-w-[40px] p-2 text-center text-xs text-gray-500 border-r border-gray-800 border-opacity-30"
+                >
                   {day}
                 </div>
               ))}
             </div>
 
             {/* Data Rows */}
-            {uniqueSources.map(source => (
-              <div key={source} className="flex border-b border-gray-800 hover:bg-[#1e273b] transition-colors">
+            {uniqueSources.map((source) => (
+              <div
+                key={source}
+                className="flex border-b border-gray-800 hover:bg-[#1e273b] transition-colors"
+              >
                 <div className="w-60 shrink-0 p-4 border-r border-gray-800 flex items-center gap-3 sticky left-0 bg-[#1a2336] z-10">
-                   <span className="material-symbols-outlined text-gray-500 text-lg">{getIcon(source)}</span>
-                   <span className="text-sm font-medium text-gray-200 truncate">{source}</span>
+                  <span className="material-symbols-outlined text-gray-500 text-lg">
+                    {getIcon(source)}
+                  </span>
+                  <span className="text-sm font-medium text-gray-200 truncate">{source}</span>
                 </div>
-                {days.map(day => {
+                {days.map((day) => {
                   // Find transaction for this source on this day
-                  const t = transactions.find(trans => 
-                    trans.name === source && new Date(trans.date).getDate() === day
+                  const t = transactions.find(
+                    (trans) => trans.name === source && new Date(trans.date).getDate() === day
                   );
 
                   return (
-                    <div key={day} className="flex-1 min-w-[40px] border-r border-gray-800 border-opacity-30 flex items-center justify-center relative group">
+                    <div
+                      key={day}
+                      className="flex-1 min-w-[40px] border-r border-gray-800 border-opacity-30 flex items-center justify-center relative group"
+                    >
                       {t && (
                         <>
-                          <div 
+                          <div
                             className={`w-4 h-4 rounded-full ${getTypeColor(source)} cursor-pointer transform transition-transform hover:scale-125`}
                             title={`$${t.amount} - ${t.status}`}
                           ></div>
                           {/* Tooltip */}
                           <div className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 hidden group-hover:block z-30">
-                             <div className="bg-gray-900 text-white text-xs p-2 rounded shadow-lg whitespace-nowrap border border-gray-700">
-                                <p className="font-bold">${t.amount}</p>
-                                <p className="text-gray-400 capitalize">{t.status}</p>
-                             </div>
+                            <div className="bg-gray-900 text-white text-xs p-2 rounded shadow-lg whitespace-nowrap border border-gray-700">
+                              <p className="font-bold">${t.amount}</p>
+                              <p className="text-gray-400 capitalize">{t.status}</p>
+                            </div>
                           </div>
                         </>
                       )}
