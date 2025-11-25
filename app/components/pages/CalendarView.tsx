@@ -1,5 +1,7 @@
 import React from "react";
 import { Transaction } from "@/lib/types";
+import { Button, Card, PageHeader, Icon } from "@/components/common";
+import { cn } from "@/lib/utils/cn";
 
 interface CalendarViewProps {
   transactions: Transaction[];
@@ -48,25 +50,29 @@ const CalendarView: React.FC<CalendarViewProps> = ({ transactions }) => {
 
   return (
     <div className="p-6 lg:p-10 h-full flex flex-col animate-fade-in">
-      <header className="flex justify-between items-center mb-8">
-        <div>
-          <h1 className="text-3xl font-bold text-white mb-2">Financial Matrix</h1>
-          <p className="text-gray-400">
-            Visual overview of cash flow across the month (X: Days, Y: Sources).
-          </p>
-        </div>
-        <div className="flex items-center gap-4 bg-[#1a2336] p-2 rounded-lg border border-gray-800">
-          <button className="p-1 hover:bg-gray-700 rounded">
-            <span className="material-symbols-outlined text-gray-400">chevron_left</span>
-          </button>
-          <span className="font-bold text-white">October 2024</span>
-          <button className="p-1 hover:bg-gray-700 rounded">
-            <span className="material-symbols-outlined text-gray-400">chevron_right</span>
-          </button>
-        </div>
-      </header>
+      <PageHeader
+        title="Financial Matrix"
+        description="Visual overview of cash flow across the month (X: Days, Y: Sources)."
+        actions={
+          <div className="flex items-center gap-4 bg-[#1a2336] p-2 rounded-lg border border-gray-800">
+            <Button
+              variant="icon"
+              size="sm"
+              className="p-1 hover:bg-gray-700 rounded"
+              icon={<Icon name="chevron_left" className="text-gray-400" />}
+            />
+            <span className="font-bold text-white">October 2024</span>
+            <Button
+              variant="icon"
+              size="sm"
+              className="p-1 hover:bg-gray-700 rounded"
+              icon={<Icon name="chevron_right" className="text-gray-400" />}
+            />
+          </div>
+        }
+      />
 
-      <div className="flex-1 overflow-hidden bg-[#1a2336] border border-gray-800 rounded-2xl flex flex-col">
+      <Card padding="none" className="flex-1 overflow-hidden flex flex-col">
         {/* Legend */}
         <div className="p-4 border-b border-gray-800 flex gap-6 text-sm">
           <div className="flex items-center gap-2">
@@ -107,9 +113,7 @@ const CalendarView: React.FC<CalendarViewProps> = ({ transactions }) => {
                 className="flex border-b border-gray-800 hover:bg-[#1e273b] transition-colors"
               >
                 <div className="w-60 shrink-0 p-4 border-r border-gray-800 flex items-center gap-3 sticky left-0 bg-[#1a2336] z-10">
-                  <span className="material-symbols-outlined text-gray-500 text-lg">
-                    {getIcon(source)}
-                  </span>
+                  <Icon name={getIcon(source)} size="lg" className="text-gray-500" />
                   <span className="text-sm font-medium text-gray-200 truncate">{source}</span>
                 </div>
                 {days.map((day) => {
@@ -126,7 +130,10 @@ const CalendarView: React.FC<CalendarViewProps> = ({ transactions }) => {
                       {t && (
                         <>
                           <div
-                            className={`w-4 h-4 rounded-full ${getTypeColor(source)} cursor-pointer transform transition-transform hover:scale-125`}
+                            className={cn(
+                              "w-4 h-4 rounded-full cursor-pointer transform transition-transform hover:scale-125",
+                              getTypeColor(source)
+                            )}
                             title={`$${t.amount} - ${t.status}`}
                           ></div>
                           {/* Tooltip */}
@@ -145,7 +152,7 @@ const CalendarView: React.FC<CalendarViewProps> = ({ transactions }) => {
             ))}
           </div>
         </div>
-      </div>
+      </Card>
     </div>
   );
 };

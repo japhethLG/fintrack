@@ -1,0 +1,369 @@
+---
+alwaysApply: true
+---
+
+# Common Components Rule
+
+## Core Principle
+
+Always use and create common components from `components/common/` instead of base HTML elements. When a new UI pattern is needed, create a reusable common component with complete, abstract functionality.
+
+## Available Common Components
+
+Import from `components/common`:
+
+- `Button` - All interactive buttons (use variants: primary, secondary, icon, danger)
+- `Dropdown` - Dropdown menus (triggers: click, hover)
+- `Select` - Custom dropdown select (replace native `<select>`)
+- `Input` - Form inputs (replace native `<input>`)
+- `Textarea` - Form textareas (replace native `<textarea>`)
+- `CollapsibleSection` - Collapsible containers
+- `VersionsDropdown` - Version history specific
+- `DownloadsDropdown` - Download options specific
+
+## Rules
+
+### 1. Button Usage
+
+NEVER use raw `<button>` HTML tags. ALWAYS use the common `Button` component:
+
+```tsx
+// ✅ CORRECT
+<Button variant="primary" onClick={handler}>
+  Save
+</Button>
+
+// ❌ WRONG
+<button onClick={handler}>Save</button>
+```
+
+### 2. Form Elements
+
+NEVER use native HTML form elements. ALWAYS use common components:
+
+```tsx
+// ✅ CORRECT
+<Input label="Name" value={name} onChange={setName} />
+<Select options={options} value={value} onChange={setValue} />
+<Textarea label="Description" value={desc} onChange={setDesc} />
+
+// ❌ WRONG
+<input value={name} onChange={setName} />
+<select value={value} onChange={setValue}>...</select>
+<textarea value={desc} onChange={setDesc} />
+```
+
+### 3. Creating New Common Components
+
+When new UI patterns are needed, create them in `components/common/` with:
+
+#### Requirements:
+
+- **Abstract and reusable** - Work for any use case, not just specific functionality
+- **Complete functionality** - Include all necessary features (states, validation, accessibility)
+- **TypeScript** - Proper typing with interfaces
+- **Consistent styling** - Follow existing design system (gray-800 backgrounds, cyan-500 accents)
+- **Props-based** - Flexible with props for customization
+- **Export in index.ts** - Make it accessible via `./common` import
+
+#### Example Template:
+
+```tsx
+// components/common/NewComponent.tsx
+interface NewComponentProps {
+	required: string;
+	optional?: string;
+	variant?: 'type1' | 'type2';
+	size?: 'sm' | 'md' | 'lg';
+	className?: string;
+	// ... other standard props
+}
+
+export const NewComponent: React.FC<NewComponentProps> = ({
+	required,
+	optional,
+	variant = 'type1',
+	size = 'md',
+	className = '',
+	...props
+}) => {
+	// Complete functionality implementation
+	return <div>...</div>;
+};
+```
+
+### 4. Component Features Checklist
+
+When creating common components, ensure they have:
+
+- [ ] Multiple variants (primary/secondary/etc)
+- [ ] Size options (sm/md/lg)
+- [ ] Disabled state
+- [ ] Error/validation states
+- [ ] Loading states (if applicable)
+- [ ] Accessibility (ARIA, keyboard navigation)
+- [ ] Responsive design
+- [ ] Custom className override
+- [ ] Proper TypeScript types
+- [ ] Export in common/index.ts
+
+### 5. Refactoring Pattern
+
+When encountering duplicate UI patterns:
+
+1. Identify the pattern across multiple files
+2. Extract to a common component with abstract props
+3. Replace all instances with the new component
+4. Ensure no functionality is lost
+
+### 6. Component Composition
+
+Build complex UI from simple common components:
+
+```tsx
+// ✅ CORRECT - Compose from common components
+<Dropdown button={<Button variant="icon" icon={<Icon />} />}>
+  <Select options={options} value={value} />
+  <Button variant="primary">Apply</Button>
+</Dropdown>
+
+// ❌ WRONG - Custom HTML structure
+<div className="custom-dropdown">
+  <button><Icon /></button>
+  <select>...</select>
+  <button>Apply</button>
+</div>
+```
+
+## Priority Order
+
+1. **Use existing common components first** (Button, Dropdown, Select, Input, Textarea)
+2. **Create new common component** if pattern doesn't exist
+3. **Never use base HTML elements** as a fallback
+
+## Styling Standards
+
+All common components should:
+
+- Use Tailwind CSS utility classes
+- Follow existing color scheme: gray-800/700/600 backgrounds, cyan-400/500/600 accents
+- Include proper hover, focus, and disabled states
+- Have smooth transitions (transition-all duration-200)
+- Support dark theme (current design)
+- Be responsive by default
+
+## When to Create New Common Components
+
+Create a new common component when:
+
+- A UI pattern appears 2+ times across different files
+- The pattern could be useful in other projects
+- Native HTML doesn't provide needed functionality
+- You need consistent styling across the app
+
+## Example: Creating a SearchInput Component
+
+```tsx
+// components/common/SearchInput.tsx
+interface SearchInputProps extends InputHTMLAttributes<HTMLInputElement> {
+	onSearch?: (value: string) => void;
+	debounce?: number;
+	showClearButton?: boolean;
+}
+
+export const SearchInput: React.FC<SearchInputProps> = ({
+	onSearch,
+	debounce = 300,
+	showClearButton = true,
+	...props
+}) => {
+	// Complete implementation with debounce, clear button, keyboard support
+	return <Input {...props} />;
+};
+
+// components/common/index.ts
+export { SearchInput } from './SearchInput';
+```
+
+# Common Components Rule
+
+## Core Principle
+
+Always use and create common components from `components/common/` instead of base HTML elements. When a new UI pattern is needed, create a reusable common component with complete, abstract functionality.
+
+## Available Common Components
+
+Import from `components/common`:
+
+- `Button` - All interactive buttons (use variants: primary, secondary, icon, danger)
+- `Dropdown` - Dropdown menus (triggers: click, hover)
+- `Select` - Custom dropdown select (replace native `<select>`)
+- `Input` - Form inputs (replace native `<input>`)
+- `Textarea` - Form textareas (replace native `<textarea>`)
+- `CollapsibleSection` - Collapsible containers
+- `VersionsDropdown` - Version history specific
+- `DownloadsDropdown` - Download options specific
+
+## Rules
+
+### 1. Button Usage
+
+NEVER use raw `<button>` HTML tags. ALWAYS use the common `Button` component:
+
+```tsx
+// ✅ CORRECT
+<Button variant="primary" onClick={handler}>
+  Save
+</Button>
+
+// ❌ WRONG
+<button onClick={handler}>Save</button>
+```
+
+### 2. Form Elements
+
+NEVER use native HTML form elements. ALWAYS use common components:
+
+```tsx
+// ✅ CORRECT
+<Input label="Name" value={name} onChange={setName} />
+<Select options={options} value={value} onChange={setValue} />
+<Textarea label="Description" value={desc} onChange={setDesc} />
+
+// ❌ WRONG
+<input value={name} onChange={setName} />
+<select value={value} onChange={setValue}>...</select>
+<textarea value={desc} onChange={setDesc} />
+```
+
+### 3. Creating New Common Components
+
+When new UI patterns are needed, create them in `components/common/` with:
+
+#### Requirements:
+
+- **Abstract and reusable** - Work for any use case, not just specific functionality
+- **Complete functionality** - Include all necessary features (states, validation, accessibility)
+- **TypeScript** - Proper typing with interfaces
+- **Consistent styling** - Follow existing design system (gray-800 backgrounds, cyan-500 accents)
+- **Props-based** - Flexible with props for customization
+- **Export in index.ts** - Make it accessible via `./common` import
+
+#### Example Template:
+
+```tsx
+// components/common/NewComponent.tsx
+interface NewComponentProps {
+	required: string;
+	optional?: string;
+	variant?: 'type1' | 'type2';
+	size?: 'sm' | 'md' | 'lg';
+	className?: string;
+	// ... other standard props
+}
+
+export const NewComponent: React.FC<NewComponentProps> = ({
+	required,
+	optional,
+	variant = 'type1',
+	size = 'md',
+	className = '',
+	...props
+}) => {
+	// Complete functionality implementation
+	return <div>...</div>;
+};
+```
+
+### 4. Component Features Checklist
+
+When creating common components, ensure they have:
+
+- [ ] Multiple variants (primary/secondary/etc)
+- [ ] Size options (sm/md/lg)
+- [ ] Disabled state
+- [ ] Error/validation states
+- [ ] Loading states (if applicable)
+- [ ] Accessibility (ARIA, keyboard navigation)
+- [ ] Responsive design
+- [ ] Custom className override
+- [ ] Proper TypeScript types
+- [ ] Export in common/index.ts
+
+### 5. Refactoring Pattern
+
+When encountering duplicate UI patterns:
+
+1. Identify the pattern across multiple files
+2. Extract to a common component with abstract props
+3. Replace all instances with the new component
+4. Ensure no functionality is lost
+
+### 6. Component Composition
+
+Build complex UI from simple common components:
+
+```tsx
+// ✅ CORRECT - Compose from common components
+<Dropdown button={<Button variant="icon" icon={<Icon />} />}>
+  <Select options={options} value={value} />
+  <Button variant="primary">Apply</Button>
+</Dropdown>
+
+// ❌ WRONG - Custom HTML structure
+<div className="custom-dropdown">
+  <button><Icon /></button>
+  <select>...</select>
+  <button>Apply</button>
+</div>
+```
+
+## Priority Order
+
+1. **Use existing common components first** (Button, Dropdown, Select, Input, Textarea)
+2. **Create new common component** if pattern doesn't exist
+3. **Never use base HTML elements** as a fallback
+
+## Styling Standards
+
+All common components should:
+
+- Use Tailwind CSS utility classes
+- Follow existing color scheme: gray-800/700/600 backgrounds, cyan-400/500/600 accents
+- Include proper hover, focus, and disabled states
+- Have smooth transitions (transition-all duration-200)
+- Support dark theme (current design)
+- Be responsive by default
+
+## When to Create New Common Components
+
+Create a new common component when:
+
+- A UI pattern appears 2+ times across different files
+- The pattern could be useful in other projects
+- Native HTML doesn't provide needed functionality
+- You need consistent styling across the app
+
+## Example: Creating a SearchInput Component
+
+```tsx
+// components/common/SearchInput.tsx
+interface SearchInputProps extends InputHTMLAttributes<HTMLInputElement> {
+	onSearch?: (value: string) => void;
+	debounce?: number;
+	showClearButton?: boolean;
+}
+
+export const SearchInput: React.FC<SearchInputProps> = ({
+	onSearch,
+	debounce = 300,
+	showClearButton = true,
+	...props
+}) => {
+	// Complete implementation with debounce, clear button, keyboard support
+	return <Input {...props} />;
+};
+
+// components/common/index.ts
+export { SearchInput } from './SearchInput';
+```

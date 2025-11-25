@@ -3,6 +3,7 @@
 import { useState, FormEvent, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
+import { Button, Input, Alert, Divider, LoadingSpinner, Card, Icon } from "@/components/common";
 
 export default function LoginPage() {
   const [email, setEmail] = useState("");
@@ -51,28 +52,27 @@ export default function LoginPage() {
 
   if (authLoading) {
     return (
-      <div className="bg-[#1a2336] border border-gray-800 rounded-2xl p-8 shadow-2xl">
+      <Card variant="elevated" padding="lg">
         <div className="flex flex-col items-center justify-center py-10">
-          <div className="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin mb-4"></div>
-          <p className="text-gray-400">Loading...</p>
+          <LoadingSpinner size="md" color="primary" text="Loading..." />
         </div>
-      </div>
+      </Card>
     );
   }
 
   return (
-    <div className="bg-[#1a2336] border border-gray-800 rounded-2xl p-8 shadow-2xl">
+    <Card variant="elevated" padding="lg">
       <div className="text-center mb-8">
         <div className="w-16 h-16 bg-primary rounded-2xl mx-auto flex items-center justify-center mb-4 shadow-lg shadow-primary/20">
-          <span className="material-symbols-outlined text-white text-3xl">account_balance</span>
+          <Icon name="account_balance" size={48} className="text-white" />
         </div>
         <h1 className="text-3xl font-bold text-white mb-2">Welcome to FinTrack</h1>
         <p className="text-gray-400">Sign in to manage your finances</p>
       </div>
 
       {error && (
-        <div className="mb-6 p-4 bg-danger/20 border border-danger/30 rounded-lg text-danger text-sm">
-          {error}
+        <div className="mb-6">
+          <Alert variant="error">{error}</Alert>
         </div>
       )}
 
@@ -103,54 +103,40 @@ export default function LoginPage() {
         Sign in with Google
       </button>
 
-      <div className="relative mb-6">
-        <div className="absolute inset-0 flex items-center">
-          <div className="w-full border-t border-gray-700"></div>
-        </div>
-        <div className="relative flex justify-center text-sm">
-          <span className="px-2 bg-[#1a2336] text-gray-400">Or continue with email</span>
-        </div>
-      </div>
+      <Divider text="Or continue with email" className="mb-6" />
 
       {/* Email/Password Form */}
       <form onSubmit={handleEmailLogin} className="space-y-4">
-        <div>
-          <label htmlFor="email" className="block text-sm font-medium text-gray-400 mb-2">
-            Email
-          </label>
-          <input
-            id="email"
-            type="email"
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            required
-            className="w-full bg-[#151c2c] border border-gray-700 rounded-lg p-3 text-white focus:outline-none focus:border-primary transition-colors"
-            placeholder="you@example.com"
-          />
-        </div>
+        <Input
+          id="email"
+          type="email"
+          label="Email"
+          value={email}
+          onChange={(e) => setEmail(e.target.value)}
+          required
+          placeholder="you@example.com"
+        />
 
-        <div>
-          <label htmlFor="password" className="block text-sm font-medium text-gray-400 mb-2">
-            Password
-          </label>
-          <input
-            id="password"
-            type="password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            required
-            className="w-full bg-[#151c2c] border border-gray-700 rounded-lg p-3 text-white focus:outline-none focus:border-primary transition-colors"
-            placeholder="••••••••"
-          />
-        </div>
+        <Input
+          id="password"
+          type="password"
+          label="Password"
+          value={password}
+          onChange={(e) => setPassword(e.target.value)}
+          required
+          placeholder="••••••••"
+        />
 
-        <button
+        <Button
           type="submit"
+          variant="primary"
+          size="lg"
+          fullWidth
+          loading={loading}
           disabled={loading}
-          className="w-full px-4 py-3 bg-primary text-white rounded-lg font-bold hover:bg-primary/90 transition-colors disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-primary/25"
         >
           {loading ? "Signing in..." : "Sign In"}
-        </button>
+        </Button>
       </form>
 
       <p className="mt-6 text-center text-sm text-gray-400">
@@ -159,6 +145,6 @@ export default function LoginPage() {
           Sign up
         </a>
       </p>
-    </div>
+    </Card>
   );
 }

@@ -1,82 +1,90 @@
+"use client";
+
 import { MOCK_TRANSACTIONS } from "@/lib/utils/mockData";
 import { Transaction } from "@/lib/types";
+import { Badge, Table, PageHeader, Card, TableColumn, Icon } from "@/components/common";
+import { cn } from "@/lib/utils/cn";
 
 export default function TransactionsPage() {
+  const tableColumns: TableColumn<Transaction>[] = [
+    {
+      key: "name",
+      label: "Name",
+      render: (value, row) => (
+        <div className="font-medium text-white flex items-center gap-3">
+          <div
+            className={cn(
+              "w-8 h-8 rounded-full flex items-center justify-center bg-opacity-10",
+              row.type === "income" && "bg-success text-success",
+              row.type === "bill" && "bg-warning text-warning",
+              row.type !== "income" && row.type !== "bill" && "bg-danger text-danger"
+            )}
+          >
+            <Icon
+              name={row.type === "income" ? "arrow_downward" : "arrow_upward"}
+              size="sm"
+            />
+          </div>
+          {value}
+        </div>
+      ),
+    },
+    {
+      key: "date",
+      label: "Date",
+      render: (value) => (
+        <span className="text-sm text-gray-400">{new Date(value).toLocaleDateString()}</span>
+      ),
+    },
+    {
+      key: "category",
+      label: "Category",
+      render: (value) => <Badge variant="default">{value}</Badge>,
+    },
+    {
+      key: "type",
+      label: "Type",
+      render: (value) => <span className="capitalize text-gray-400">{value}</span>,
+    },
+    {
+      key: "status",
+      label: "Status",
+      render: (value) => {
+        const variantMap: Record<string, "success" | "warning" | "primary"> = {
+          completed: "success",
+          pending: "warning",
+        };
+        return (
+          <Badge variant={variantMap[value as string] || "primary"} className="capitalize">
+            {value}
+          </Badge>
+        );
+      },
+    },
+    {
+      key: "amount",
+      label: "Amount",
+      align: "right",
+      render: (value, row) => (
+        <span
+          className={cn("font-bold", row.type === "income" ? "text-success" : "text-white")}
+        >
+          {row.type === "income" ? "+" : "-"}${value.toFixed(2)}
+        </span>
+      ),
+    },
+  ];
+
   return (
     <div className="p-6 lg:p-10 max-w-7xl mx-auto animate-fade-in">
-      <header className="mb-8">
-        <h1 className="text-3xl font-bold text-white mb-2">Transactions</h1>
-        <p className="text-gray-400">View and manage all your transactions</p>
-      </header>
+      <PageHeader
+        title="Transactions"
+        description="View and manage all your transactions"
+      />
 
-      <div className="bg-[#1a2336] border border-gray-800 rounded-2xl p-6">
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-gray-300">
-            <thead className="text-xs text-gray-500 uppercase border-b border-gray-700">
-              <tr>
-                <th className="px-4 py-3">Name</th>
-                <th className="px-4 py-3">Date</th>
-                <th className="px-4 py-3">Category</th>
-                <th className="px-4 py-3">Type</th>
-                <th className="px-4 py-3">Status</th>
-                <th className="px-4 py-3 text-right">Amount</th>
-              </tr>
-            </thead>
-            <tbody>
-              {MOCK_TRANSACTIONS.map((t: Transaction) => (
-                <tr
-                  key={t.id}
-                  className="border-b border-gray-800 hover:bg-gray-800/50 transition-colors"
-                >
-                  <td className="px-4 py-4 font-medium text-white flex items-center gap-3">
-                    <div
-                      className={`w-8 h-8 rounded-full flex items-center justify-center bg-opacity-10 ${
-                        t.type === "income"
-                          ? "bg-success text-success"
-                          : t.type === "bill"
-                            ? "bg-warning text-warning"
-                            : "bg-danger text-danger"
-                      }`}
-                    >
-                      <span className="material-symbols-outlined text-[18px]">
-                        {t.type === "income" ? "arrow_downward" : "arrow_upward"}
-                      </span>
-                    </div>
-                    {t.name}
-                  </td>
-                  <td className="px-4 py-4 text-sm text-gray-400">
-                    {new Date(t.date).toLocaleDateString()}
-                  </td>
-                  <td className="px-4 py-4">
-                    <span className="px-2 py-1 rounded text-xs font-medium bg-gray-700 text-gray-300">
-                      {t.category}
-                    </span>
-                  </td>
-                  <td className="px-4 py-4 capitalize text-gray-400">{t.type}</td>
-                  <td className="px-4 py-4">
-                    <span
-                      className={`px-2 py-1 rounded text-xs font-medium capitalize ${
-                        t.status === "completed"
-                          ? "bg-success/20 text-success"
-                          : t.status === "pending"
-                            ? "bg-warning/20 text-warning"
-                            : "bg-primary/20 text-primary"
-                      }`}
-                    >
-                      {t.status}
-                    </span>
-                  </td>
-                  <td
-                    className={`px-4 py-4 text-right font-bold ${t.type === "income" ? "text-success" : "text-white"}`}
-                  >
-                    {t.type === "income" ? "+" : "-"}${t.amount.toFixed(2)}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </div>
+      <Card padding="md">
+        <Table columns={tableColumns} data={MOCK_TRANSACTIONS} />
+      </Card>
     </div>
   );
 }

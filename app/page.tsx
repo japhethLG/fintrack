@@ -3,6 +3,7 @@
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
+import { LoadingSpinner } from "@/components/common";
 
 export default function Page() {
   const { user, loading } = useAuth();
@@ -21,10 +22,7 @@ export default function Page() {
   // Show loading state while checking auth
   return (
     <div className="flex h-screen items-center justify-center bg-[#101622]">
-      <div className="flex flex-col items-center gap-4">
-        <div className="w-12 h-12 border-4 border-primary border-t-transparent rounded-full animate-spin"></div>
-        <p className="text-gray-400">Loading...</p>
-      </div>
+      <LoadingSpinner size="md" color="primary" text="Loading..." />
     </div>
   );
 }

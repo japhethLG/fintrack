@@ -14,6 +14,8 @@ import {
   Pie,
 } from "recharts";
 import { Transaction } from "@/lib/types";
+import { Button, Card, Badge, Table, PageHeader, TableColumn, Icon } from "@/components/common";
+import { cn } from "@/lib/utils/cn";
 
 interface DashboardProps {
   transactions: Transaction[];
@@ -53,49 +55,98 @@ const Dashboard: React.FC<DashboardProps> = ({ transactions }) => {
   const pieData = Object.entries(categoryDataMap).map(([name, value]) => ({ name, value }));
   const COLORS = ["#135bec", "#2ecc71", "#e74c3c", "#f1c40f", "#9b59b6", "#34495e"];
 
+  const tableColumns: TableColumn<Transaction>[] = [
+    {
+      key: "name",
+      label: "Name",
+      render: (value, row) => (
+        <div className="font-medium text-white flex items-center gap-3">
+          <div
+            className={cn(
+              "w-8 h-8 rounded-full flex items-center justify-center bg-opacity-10",
+              row.type === "income" && "bg-success text-success",
+              row.type === "bill" && "bg-warning text-warning",
+              row.type !== "income" && row.type !== "bill" && "bg-danger text-danger"
+            )}
+          >
+            <Icon name={row.type === "income" ? "arrow_downward" : "arrow_upward"} size="sm" />
+          </div>
+          {value}
+        </div>
+      ),
+    },
+    {
+      key: "date",
+      label: "Date",
+      render: (value) => (
+        <span className="text-sm text-gray-400">{new Date(value).toLocaleDateString()}</span>
+      ),
+    },
+    {
+      key: "category",
+      label: "Category",
+      render: (value) => <Badge variant="default">{value}</Badge>,
+    },
+    {
+      key: "amount",
+      label: "Amount",
+      align: "right",
+      render: (value, row) => (
+        <span className={cn("font-bold", row.type === "income" ? "text-success" : "text-white")}>
+          {row.type === "income" ? "+" : "-"}${value.toFixed(2)}
+        </span>
+      ),
+    },
+  ];
+
   return (
     <div className="p-6 lg:p-10 max-w-7xl mx-auto animate-fade-in">
-      <header className="flex justify-between items-end mb-8">
-        <div>
-          <h1 className="text-3xl font-bold text-white mb-2">Dashboard</h1>
-          <p className="text-gray-400">Here&apos;s your financial overview for October.</p>
-        </div>
-        <div className="flex gap-3">
-          <button className="flex items-center gap-2 px-4 py-2 bg-success/20 text-success rounded-lg font-semibold hover:bg-success/30 transition-colors">
-            <span className="material-symbols-outlined">add</span> Income
-          </button>
-          <button className="flex items-center gap-2 px-4 py-2 bg-danger/20 text-danger rounded-lg font-semibold hover:bg-danger/30 transition-colors">
-            <span className="material-symbols-outlined">remove</span> Expense
-          </button>
-        </div>
-      </header>
+      <PageHeader
+        title="Dashboard"
+        description="Here's your financial overview for October."
+        actions={
+          <>
+            <Button
+              variant="secondary"
+              className="bg-success/20 text-success hover:bg-success/30"
+              icon={<Icon name="add" />}
+              iconPosition="left"
+            >
+              Income
+            </Button>
+            <Button variant="danger" icon={<Icon name="remove" />} iconPosition="left">
+              Expense
+            </Button>
+          </>
+        }
+      />
 
       {/* KPI Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-        <div className="bg-[#1a2336] border border-gray-800 rounded-2xl p-6">
+        <Card padding="md">
           <p className="text-gray-400 text-sm font-medium mb-2">Current Balance</p>
           <h2 className="text-3xl font-bold text-white">
             ${balance.toLocaleString("en-US", { minimumFractionDigits: 2 })}
           </h2>
-        </div>
-        <div className="bg-[#1a2336] border border-gray-800 rounded-2xl p-6">
+        </Card>
+        <Card padding="md">
           <p className="text-gray-400 text-sm font-medium mb-2">Total Income</p>
           <h2 className="text-3xl font-bold text-success">
             +${income.toLocaleString("en-US", { minimumFractionDigits: 2 })}
           </h2>
-        </div>
-        <div className="bg-[#1a2336] border border-gray-800 rounded-2xl p-6">
+        </Card>
+        <Card padding="md">
           <p className="text-gray-400 text-sm font-medium mb-2">Total Expenses</p>
           <h2 className="text-3xl font-bold text-danger">
             -${expenses.toLocaleString("en-US", { minimumFractionDigits: 2 })}
           </h2>
-        </div>
+        </Card>
       </div>
 
       {/* Charts Section */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-8">
         {/* Main Line Chart */}
-        <div className="lg:col-span-2 bg-[#1a2336] border border-gray-800 rounded-2xl p-6">
+        <Card className="lg:col-span-2" padding="md">
           <h3 className="text-lg font-bold text-white mb-6">Projected Cash Flow</h3>
           <div className="h-[300px] w-full">
             <ResponsiveContainer width="100%" height="100%">
@@ -134,13 +185,13 @@ const Dashboard: React.FC<DashboardProps> = ({ transactions }) => {
               </AreaChart>
             </ResponsiveContainer>
           </div>
-        </div>
+        </Card>
 
         {/* Donut Chart */}
-        <div className="bg-[#1a2336] border border-gray-800 rounded-2xl p-6 flex flex-col">
+        <Card padding="md" className="flex flex-col">
           <h3 className="text-lg font-bold text-white mb-4">Spending by Category</h3>
           <div className="flex-1 flex items-center justify-center relative">
-            <ResponsiveContainer width="100%" height={250}>
+            <ResponsiveContainer width="100%" height={250} className="z-10">
               <PieChart>
                 <Pie
                   data={pieData}
@@ -156,7 +207,7 @@ const Dashboard: React.FC<DashboardProps> = ({ transactions }) => {
                 </Pie>
                 <Tooltip
                   contentStyle={{
-                    backgroundColor: "#151c2c",
+                    backgroundColor: "#fff",
                     borderColor: "#2d3748",
                     borderRadius: "8px",
                     color: "#fff",
@@ -180,63 +231,14 @@ const Dashboard: React.FC<DashboardProps> = ({ transactions }) => {
               </div>
             ))}
           </div>
-        </div>
+        </Card>
       </div>
 
       {/* Recent Transactions */}
-      <div className="bg-[#1a2336] border border-gray-800 rounded-2xl p-6">
+      <Card padding="md">
         <h3 className="text-lg font-bold text-white mb-4">Recent Activity</h3>
-        <div className="overflow-x-auto">
-          <table className="w-full text-left text-gray-300">
-            <thead className="text-xs text-gray-500 uppercase border-b border-gray-700">
-              <tr>
-                <th className="px-4 py-3">Name</th>
-                <th className="px-4 py-3">Date</th>
-                <th className="px-4 py-3">Category</th>
-                <th className="px-4 py-3 text-right">Amount</th>
-              </tr>
-            </thead>
-            <tbody>
-              {transactions.slice(0, 5).map((t) => (
-                <tr
-                  key={t.id}
-                  className="border-b border-gray-800 hover:bg-gray-800/50 transition-colors"
-                >
-                  <td className="px-4 py-4 font-medium text-white flex items-center gap-3">
-                    <div
-                      className={`w-8 h-8 rounded-full flex items-center justify-center bg-opacity-10 ${
-                        t.type === "income"
-                          ? "bg-success text-success"
-                          : t.type === "bill"
-                            ? "bg-warning text-warning"
-                            : "bg-danger text-danger"
-                      }`}
-                    >
-                      <span className="material-symbols-outlined text-[18px]">
-                        {t.type === "income" ? "arrow_downward" : "arrow_upward"}
-                      </span>
-                    </div>
-                    {t.name}
-                  </td>
-                  <td className="px-4 py-4 text-sm text-gray-400">
-                    {new Date(t.date).toLocaleDateString()}
-                  </td>
-                  <td className="px-4 py-4">
-                    <span className="px-2 py-1 rounded text-xs font-medium bg-gray-700 text-gray-300">
-                      {t.category}
-                    </span>
-                  </td>
-                  <td
-                    className={`px-4 py-4 text-right font-bold ${t.type === "income" ? "text-success" : "text-white"}`}
-                  >
-                    {t.type === "income" ? "+" : "-"}${t.amount.toFixed(2)}
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </div>
+        <Table columns={tableColumns} data={transactions.slice(0, 5)} />
+      </Card>
     </div>
   );
 };
