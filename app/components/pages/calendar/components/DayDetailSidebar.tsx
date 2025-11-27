@@ -65,9 +65,7 @@ const DayDetailSidebar: React.FC<IProps> = ({
               </div>
               <div className="bg-danger/10 rounded-lg p-2 text-center">
                 <p className="text-xs text-gray-400">Expenses</p>
-                <p className="text-danger font-bold">
-                  -{formatCurrency(dayBalance.totalExpenses)}
-                </p>
+                <p className="text-danger font-bold">-{formatCurrency(dayBalance.totalExpenses)}</p>
               </div>
             </div>
           )}

@@ -69,10 +69,7 @@ const PeriodComparison: React.FC<IProps> = ({ transactions, dateRange }) => {
 
     return (
       <span
-        className={cn(
-          "text-xs flex items-center gap-0.5",
-          isGood ? "text-success" : "text-danger"
-        )}
+        className={cn("text-xs flex items-center gap-0.5", isGood ? "text-success" : "text-danger")}
       >
         <Icon
           name={isPositive ? "arrow_upward" : "arrow_downward"}
@@ -150,4 +147,3 @@ const PeriodComparison: React.FC<IProps> = ({ transactions, dateRange }) => {
 };
 
 export default PeriodComparison;
-

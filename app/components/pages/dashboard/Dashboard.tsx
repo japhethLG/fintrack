@@ -4,12 +4,7 @@ import React, { useState, useMemo, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useFinancial } from "@/contexts/FinancialContext";
 import { Transaction } from "@/lib/types";
-import {
-  Button,
-  Icon,
-  LoadingSpinner,
-  DateRangePicker,
-} from "@/components/common";
+import { Button, Icon, LoadingSpinner, DateRangePicker } from "@/components/common";
 import UpcomingActivityWidget from "./components/UpcomingActivityWidget";
 import RecurringSummaryWidget from "./components/RecurringSummaryWidget";
 import ProjectedVsActualWidget from "./components/ProjectedVsActualWidget";
@@ -59,10 +54,7 @@ const Dashboard: React.FC = () => {
   // Expand context date range when user selects dates outside current range
   useEffect(() => {
     if (dateRange[0] && dateRange[1]) {
-      expandDateRange(
-        dateRange[0].format("YYYY-MM-DD"),
-        dateRange[1].format("YYYY-MM-DD")
-      );
+      expandDateRange(dateRange[0].format("YYYY-MM-DD"), dateRange[1].format("YYYY-MM-DD"));
     }
   }, [dateRange, expandDateRange]);
 
@@ -129,10 +121,10 @@ const Dashboard: React.FC = () => {
       const end = dateRange[1];
 
       // Limit to 90 days to prevent performance issues with large ranges
-      const daysDiff = end.diff(current, 'day');
+      const daysDiff = end.diff(current, "day");
       const step = daysDiff > 90 ? Math.ceil(daysDiff / 90) : 1;
 
-      while (current.isBefore(end) || current.isSame(end, 'day')) {
+      while (current.isBefore(end) || current.isSame(end, "day")) {
         const dateKey = current.format("YYYY-MM-DD");
         const dayBalance = dailyBalances.get(dateKey);
 
@@ -143,7 +135,7 @@ const Dashboard: React.FC = () => {
           label: current.format(daysDiff > 31 ? "MMM D" : "D"),
         });
 
-        current = current.add(step, 'day');
+        current = current.add(step, "day");
       }
     }
 
@@ -154,7 +146,7 @@ const Dashboard: React.FC = () => {
   const categoryData = useMemo(() => {
     const { start, end } = dateRangeStr;
     // Filter transactions first
-    const filteredTxns = transactions.filter(t => {
+    const filteredTxns = transactions.filter((t) => {
       const date = t.actualDate || t.scheduledDate;
       return date >= start && date <= end;
     });
@@ -227,7 +219,8 @@ const Dashboard: React.FC = () => {
         <div>
           <h1 className="text-2xl font-bold text-white mb-1">Dashboard</h1>
           <p className="text-gray-400 text-sm">
-            Financial overview for {dateRange[0]?.format("MMM D")} - {dateRange[1]?.format("MMM D, YYYY")}
+            Financial overview for {dateRange[0]?.format("MMM D")} -{" "}
+            {dateRange[1]?.format("MMM D, YYYY")}
           </p>
         </div>
 
@@ -235,9 +228,9 @@ const Dashboard: React.FC = () => {
           <DateRangePicker
             value={dateRange as any} // Cast for dayjs compatibility
             onChange={(dates) => setDateRange(dates as any)}
-            presets={DASHBOARD_PRESETS.map(p => ({
+            presets={DASHBOARD_PRESETS.map((p) => ({
               ...p,
-              range: p.range as any
+              range: p.range as any,
             }))}
             className="w-full sm:w-[300px]"
           />
@@ -267,10 +260,7 @@ const Dashboard: React.FC = () => {
 
       {/* KPI Cards */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-        <KPICards
-          currentBalance={currentBalance}
-          stats={periodStats}
-        />
+        <KPICards currentBalance={currentBalance} stats={periodStats} />
         <FinancialHealthScore healthScore={healthScore} />
       </div>
 
@@ -298,9 +288,7 @@ const Dashboard: React.FC = () => {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-8">
         {/* Upcoming Activity Widget */}
         <div className="lg:col-span-2">
-          <UpcomingActivityWidget
-            onTransactionClick={setSelectedTransaction}
-          />
+          <UpcomingActivityWidget onTransactionClick={setSelectedTransaction} />
         </div>
 
         {/* Side Widgets */}

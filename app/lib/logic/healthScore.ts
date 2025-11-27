@@ -339,7 +339,11 @@ export const calculateHealthScore = (
     endDate
   );
 
-  const { score: trendScore, trend } = calculateBalanceTrendScore(dailyBalances, startDate, endDate);
+  const { score: trendScore, trend } = calculateBalanceTrendScore(
+    dailyBalances,
+    startDate,
+    endDate
+  );
 
   // Calculate weighted average
   // Weights: Runway 30%, Savings 30%, Bill Payment 20%, Trend 20%
@@ -502,7 +506,10 @@ export const getIncomeExpenseChartData = (
 /**
  * Determine the best bucket type based on date range
  */
-export const getBestBucketType = (startDate: string, endDate: string): "daily" | "weekly" | "monthly" => {
+export const getBestBucketType = (
+  startDate: string,
+  endDate: string
+): "daily" | "weekly" | "monthly" => {
   const start = new Date(startDate);
   const end = new Date(endDate);
   const daysDiff = Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
@@ -511,4 +518,3 @@ export const getBestBucketType = (startDate: string, endDate: string): "daily" |
   if (daysDiff <= 90) return "weekly";
   return "monthly";
 };
-

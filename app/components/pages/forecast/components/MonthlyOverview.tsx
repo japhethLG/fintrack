@@ -45,8 +45,7 @@ const MonthlyOverview: React.FC<IProps> = ({
   const surplusVariance = actualSurplus - budgetedSurplus;
   const savingsRateVariance = actualSavingsRate - budgetedSavingsRate;
 
-  const incomeVariancePercent =
-    budgetedIncome > 0 ? (incomeVariance / budgetedIncome) * 100 : 0;
+  const incomeVariancePercent = budgetedIncome > 0 ? (incomeVariance / budgetedIncome) * 100 : 0;
   const expenseVariancePercent =
     budgetedExpenses > 0 ? (expenseVariance / budgetedExpenses) * 100 : 0;
 
@@ -101,9 +100,7 @@ const MonthlyOverview: React.FC<IProps> = ({
               <span
                 className={cn(
                   "text-xs px-2 py-0.5 rounded-full font-medium",
-                  incomeVariance >= 0
-                    ? "bg-success/20 text-success"
-                    : "bg-danger/20 text-danger"
+                  incomeVariance >= 0 ? "bg-success/20 text-success" : "bg-danger/20 text-danger"
                 )}
               >
                 {incomeVariance >= 0 ? "+" : ""}
@@ -133,9 +130,7 @@ const MonthlyOverview: React.FC<IProps> = ({
               <span
                 className={cn(
                   "text-xs px-2 py-0.5 rounded-full font-medium",
-                  expenseVariance <= 0
-                    ? "bg-success/20 text-success"
-                    : "bg-danger/20 text-danger"
+                  expenseVariance <= 0 ? "bg-success/20 text-success" : "bg-danger/20 text-danger"
                 )}
               >
                 {expenseVariance >= 0 ? "+" : ""}
@@ -151,9 +146,7 @@ const MonthlyOverview: React.FC<IProps> = ({
               </div>
               <div>
                 <p className="text-xs text-gray-500 mb-1">Actual/Projected</p>
-                <p className="text-xl font-bold text-danger">
-                  -{formatCurrency(actualExpenses)}
-                </p>
+                <p className="text-xl font-bold text-danger">-{formatCurrency(actualExpenses)}</p>
               </div>
             </div>
           </div>
@@ -165,9 +158,7 @@ const MonthlyOverview: React.FC<IProps> = ({
               <span
                 className={cn(
                   "text-xs px-2 py-0.5 rounded-full font-medium",
-                  surplusVariance >= 0
-                    ? "bg-success/20 text-success"
-                    : "bg-danger/20 text-danger"
+                  surplusVariance >= 0 ? "bg-success/20 text-success" : "bg-danger/20 text-danger"
                 )}
               >
                 {formatCurrencyWithSign(surplusVariance)} vs budget
@@ -249,9 +240,7 @@ const MonthlyOverview: React.FC<IProps> = ({
           </div>
           <div>
             <p className="text-gray-400 text-sm">Expenses</p>
-            <p className="text-2xl font-bold text-danger">
-              -{formatCurrency(actualExpenses)}
-            </p>
+            <p className="text-2xl font-bold text-danger">-{formatCurrency(actualExpenses)}</p>
           </div>
           <div>
             <p className="text-gray-400 text-sm">Net Change</p>
@@ -278,9 +267,7 @@ const MonthlyOverview: React.FC<IProps> = ({
           </div>
           <div>
             <p className="text-gray-400 text-sm">Expected Expenses</p>
-            <p className="text-2xl font-bold text-danger">
-              -{formatCurrency(budgetedExpenses)}
-            </p>
+            <p className="text-2xl font-bold text-danger">-{formatCurrency(budgetedExpenses)}</p>
           </div>
           <div>
             <p className="text-gray-400 text-sm">Expected Net</p>

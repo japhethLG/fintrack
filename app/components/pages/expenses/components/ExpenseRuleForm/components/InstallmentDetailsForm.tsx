@@ -90,7 +90,10 @@ const InstallmentDetailsForm: React.FC = () => {
         <div className="md:col-span-2 bg-gray-800/50 rounded-xl p-6">
           <p className="text-gray-400 text-sm mb-1">Monthly Installment</p>
           <p className="text-3xl font-bold text-danger">
-            {formatCurrency(calculatedAmount, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            {formatCurrency(calculatedAmount, {
+              minimumFractionDigits: 2,
+              maximumFractionDigits: 2,
+            })}
           </p>
           <p className="text-sm text-gray-400 mt-2">{installmentCount} payments</p>
         </div>

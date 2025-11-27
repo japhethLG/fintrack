@@ -68,4 +68,3 @@ export const BillItem: React.FC<BillItemProps> = ({ bill, onPay }) => {
 };
 
 export default BillItem;
-

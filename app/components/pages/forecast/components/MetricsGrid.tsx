@@ -109,9 +109,7 @@ const MetricsGrid: React.FC<IProps> = ({ metrics, budgetedMetrics, actualMetrics
               <span
                 className={cn(
                   "text-xs px-2 py-0.5 rounded-full",
-                  incomeVariance >= 0
-                    ? "bg-success/20 text-success"
-                    : "bg-danger/20 text-danger"
+                  incomeVariance >= 0 ? "bg-success/20 text-success" : "bg-danger/20 text-danger"
                 )}
               >
                 {incomeVariance >= 0 ? "+" : ""}
@@ -142,9 +140,7 @@ const MetricsGrid: React.FC<IProps> = ({ metrics, budgetedMetrics, actualMetrics
               <span
                 className={cn(
                   "text-xs px-2 py-0.5 rounded-full",
-                  expenseVariance <= 0
-                    ? "bg-success/20 text-success"
-                    : "bg-danger/20 text-danger"
+                  expenseVariance <= 0 ? "bg-success/20 text-success" : "bg-danger/20 text-danger"
                 )}
               >
                 {expenseVariance >= 0 ? "+" : ""}

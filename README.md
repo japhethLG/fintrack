@@ -210,8 +210,8 @@
    NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=your_sender_id
    NEXT_PUBLIC_FIREBASE_APP_ID=your_app_id
 
-   # Google Gemini API
-   GEMINI_API_KEY=your_gemini_api_key
+   # Google Gemini API (must be prefixed with NEXT_PUBLIC_ for client-side access)
+   NEXT_PUBLIC_GEMINI_API_KEY=your_gemini_api_key
    ```
 
 4. **Set up Firebase**
@@ -358,8 +358,6 @@ fintrack/
 │   │   ├── forecast/page.tsx
 │   │   ├── settings/page.tsx
 │   │   └── layout.tsx
-│   ├── api/                         # API routes
-│   │   └── analyze-budget/route.ts
 │   ├── components/
 │   │   ├── common/                  # Reusable UI components
 │   │   │   ├── Button.tsx
@@ -451,7 +449,7 @@ FinTrack uses the following Firestore collections:
 | `NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET`      | Firebase storage bucket | ✅       |
 | `NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID` | Firebase sender ID      | ✅       |
 | `NEXT_PUBLIC_FIREBASE_APP_ID`              | Firebase app ID         | ✅       |
-| `GEMINI_API_KEY`                           | Google Gemini API key   | ✅       |
+| `NEXT_PUBLIC_GEMINI_API_KEY`               | Google Gemini API key   | ✅       |
 
 ---
 
@@ -529,21 +527,7 @@ FinTrack uses **Google Gemini 1.5 Flash** for intelligent financial analysis.
 - ⚠️ **Warnings**: Potential risks and issues to address
 - 💰 **Opportunities**: Ways to save money or increase income
 
-### API Endpoint
-
-```typescript
-POST /api/analyze-budget
-Content-Type: application/json
-
-{
-  "transactions": [...],
-  "incomeSources": [...],
-  "expenseRules": [...],
-  "currentBalance": 5000,
-  "billCoverage": {...},
-  "varianceReport": {...}
-}
-```
+**Note**: AI analysis is performed client-side using the Google Gemini API. Make sure to set the `NEXT_PUBLIC_GEMINI_API_KEY` environment variable.
 
 ---
 

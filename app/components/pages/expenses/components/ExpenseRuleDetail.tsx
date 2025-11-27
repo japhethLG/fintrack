@@ -97,10 +97,8 @@ const ExpenseRuleDetail: React.FC<IProps> = ({ rule, onEdit, onDelete, onToggleA
             <div className="flex justify-between text-sm mb-2">
               <span className="text-gray-400">Payoff Progress</span>
               <span className="text-white">
-                {formatCurrency(
-                  rule.loanConfig.principalAmount - rule.loanConfig.currentBalance
-                )}{" "}
-                / {formatCurrency(rule.loanConfig.principalAmount)}
+                {formatCurrency(rule.loanConfig.principalAmount - rule.loanConfig.currentBalance)} /{" "}
+                {formatCurrency(rule.loanConfig.principalAmount)}
               </span>
             </div>
             <div className="h-3 bg-gray-700 rounded-full overflow-hidden">
@@ -206,7 +204,7 @@ const ExpenseRuleDetail: React.FC<IProps> = ({ rule, onEdit, onDelete, onToggleA
               <p className="text-xs text-gray-400">Payment Strategy</p>
               <p className="text-white font-medium capitalize">
                 {rule.creditConfig.paymentStrategy === "fixed"
-                  ? `Fixed ${formatCurrency(rule.creditConfig.fixedPaymentAmount)}`
+                  ? `Fixed ${formatCurrency(rule.creditConfig.fixedPaymentAmount || 0)}`
                   : rule.creditConfig.paymentStrategy.replace("_", " ")}
               </p>
             </div>

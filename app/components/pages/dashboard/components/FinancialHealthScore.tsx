@@ -72,7 +72,15 @@ const FinancialHealthScore: React.FC<IProps> = ({ healthScore }) => {
           <div className="h-1.5 w-full bg-gray-800 rounded-full overflow-hidden">
             <div
               className="h-full rounded-full transition-all duration-500"
-              style={{ width: `${components.runway}%`, backgroundColor: components.runway >= 60 ? "#22c55e" : components.runway >= 30 ? "#eab308" : "#ef4444" }}
+              style={{
+                width: `${components.runway}%`,
+                backgroundColor:
+                  components.runway >= 60
+                    ? "#22c55e"
+                    : components.runway >= 30
+                      ? "#eab308"
+                      : "#ef4444",
+              }}
             />
           </div>
         </div>
@@ -85,7 +93,15 @@ const FinancialHealthScore: React.FC<IProps> = ({ healthScore }) => {
           <div className="h-1.5 w-full bg-gray-800 rounded-full overflow-hidden">
             <div
               className="h-full rounded-full transition-all duration-500"
-              style={{ width: `${components.savingsRate}%`, backgroundColor: components.savingsRate >= 60 ? "#22c55e" : components.savingsRate >= 30 ? "#eab308" : "#ef4444" }}
+              style={{
+                width: `${components.savingsRate}%`,
+                backgroundColor:
+                  components.savingsRate >= 60
+                    ? "#22c55e"
+                    : components.savingsRate >= 30
+                      ? "#eab308"
+                      : "#ef4444",
+              }}
             />
           </div>
         </div>
@@ -105,4 +121,3 @@ const FinancialHealthScore: React.FC<IProps> = ({ healthScore }) => {
 };
 
 export default FinancialHealthScore;
-

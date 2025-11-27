@@ -261,8 +261,6 @@ app/
 │   ├── transactions/page.tsx
 │   ├── forecast/page.tsx
 │   └── layout.tsx
-├── api/
-│   └── analyze-budget/route.ts
 ├── components/
 │   ├── common/           # Reusable UI components
 │   ├── forms/            # Form components
@@ -359,7 +357,7 @@ NEXT_PUBLIC_FIREBASE_PROJECT_ID=
 NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET=
 NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID=
 NEXT_PUBLIC_FIREBASE_APP_ID=
-GEMINI_API_KEY=
+NEXT_PUBLIC_GEMINI_API_KEY=
 ```
 
 ## 7. Getting Started

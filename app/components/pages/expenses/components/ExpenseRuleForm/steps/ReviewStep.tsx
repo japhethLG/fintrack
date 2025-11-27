@@ -152,9 +152,7 @@ const ReviewStep: React.FC<IProps> = ({ error }) => {
           <div className="mt-4 pt-4 border-t border-gray-700 grid grid-cols-2 gap-4">
             <div>
               <p className="text-xs text-gray-400">Principal</p>
-              <p className="text-white font-medium">
-                {formatCurrency(parseFloat(loanPrincipal))}
-              </p>
+              <p className="text-white font-medium">{formatCurrency(parseFloat(loanPrincipal))}</p>
             </div>
             <div>
               <p className="text-xs text-gray-400">Interest Rate</p>
@@ -180,9 +178,7 @@ const ReviewStep: React.FC<IProps> = ({ error }) => {
           <div className="mt-4 pt-4 border-t border-gray-700 grid grid-cols-2 gap-4">
             <div>
               <p className="text-xs text-gray-400">Current Balance</p>
-              <p className="text-white font-medium">
-                {formatCurrency(parseFloat(creditBalance))}
-              </p>
+              <p className="text-white font-medium">{formatCurrency(parseFloat(creditBalance))}</p>
             </div>
             <div>
               <p className="text-xs text-gray-400">APR</p>

@@ -15,12 +15,7 @@ interface IProps {
   onTransactionClick?: (transaction: Transaction) => void;
 }
 
-const WeekDayCell: React.FC<IProps> = ({
-  day,
-  isSelected,
-  onClick,
-  onTransactionClick,
-}) => {
+const WeekDayCell: React.FC<IProps> = ({ day, isSelected, onClick, onTransactionClick }) => {
   const { formatCurrency, formatCurrencyWithSign } = useCurrency();
   const { date, isToday, dayBalance } = day;
   const transactions = dayBalance?.transactions || [];
@@ -164,4 +159,3 @@ const WeekDayCell: React.FC<IProps> = ({
 };
 
 export default WeekDayCell;
-

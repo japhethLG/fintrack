@@ -110,5 +110,3 @@ export default {
   formatCurrency,
   formatCurrencyWithSign,
 };
-
-

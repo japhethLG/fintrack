@@ -121,7 +121,11 @@ const CalendarView: React.FC = () => {
     const start = calendarWeekDays[0].date;
     const end = calendarWeekDays[6].date;
     const startStr = start.toLocaleDateString("en-US", { month: "short", day: "numeric" });
-    const endStr = end.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+    const endStr = end.toLocaleDateString("en-US", {
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+    });
     return `${startStr} - ${endStr}`;
   }, [calendarWeekDays]);
 
@@ -289,82 +293,82 @@ const CalendarView: React.FC = () => {
             <Card padding="none">
               {/* Header */}
               <div className="p-4 border-b border-gray-800 flex items-center justify-between">
-              <Button
-                variant="icon"
-                size="sm"
-                icon={<Icon name="chevron_left" />}
-                onClick={viewMode === "week" ? goToPrevWeek : goToPrevMonth}
-              />
-              <h2 className="text-xl font-bold text-white">
-                {viewMode === "week"
-                  ? weekDateRange
-                  : currentDate.toLocaleDateString("en-US", { month: "long", year: "numeric" })}
-              </h2>
-              <Button
-                variant="icon"
-                size="sm"
-                icon={<Icon name="chevron_right" />}
-                onClick={viewMode === "week" ? goToNextWeek : goToNextMonth}
-              />
-            </div>
+                <Button
+                  variant="icon"
+                  size="sm"
+                  icon={<Icon name="chevron_left" />}
+                  onClick={viewMode === "week" ? goToPrevWeek : goToPrevMonth}
+                />
+                <h2 className="text-xl font-bold text-white">
+                  {viewMode === "week"
+                    ? weekDateRange
+                    : currentDate.toLocaleDateString("en-US", { month: "long", year: "numeric" })}
+                </h2>
+                <Button
+                  variant="icon"
+                  size="sm"
+                  icon={<Icon name="chevron_right" />}
+                  onClick={viewMode === "week" ? goToNextWeek : goToNextMonth}
+                />
+              </div>
 
-            {/* Month View */}
-            {viewMode === "month" && (
-              <>
-                {/* Weekday headers */}
-                <div className="grid grid-cols-7 border-b border-gray-800">
-                  {WEEKDAYS.map((day) => (
-                    <div key={day} className="p-2 text-center text-sm font-medium text-gray-400">
-                      {day}
-                    </div>
-                  ))}
-                </div>
+              {/* Month View */}
+              {viewMode === "month" && (
+                <>
+                  {/* Weekday headers */}
+                  <div className="grid grid-cols-7 border-b border-gray-800">
+                    {WEEKDAYS.map((day) => (
+                      <div key={day} className="p-2 text-center text-sm font-medium text-gray-400">
+                        {day}
+                      </div>
+                    ))}
+                  </div>
 
-                {/* Calendar grid */}
+                  {/* Calendar grid */}
+                  <div className="grid grid-cols-7">
+                    {calendarDays.map((day, i) => (
+                      <DayCell
+                        key={i}
+                        day={day}
+                        isSelected={selectedDate?.toDateString() === day.date.toDateString()}
+                        onClick={() => setSelectedDate(day.date)}
+                      />
+                    ))}
+                  </div>
+                </>
+              )}
+
+              {/* Week View */}
+              {viewMode === "week" && (
                 <div className="grid grid-cols-7">
-                  {calendarDays.map((day, i) => (
-                    <DayCell
+                  {calendarWeekDays.map((day, i) => (
+                    <WeekDayCell
                       key={i}
                       day={day}
                       isSelected={selectedDate?.toDateString() === day.date.toDateString()}
                       onClick={() => setSelectedDate(day.date)}
+                      onTransactionClick={setSelectedTransaction}
                     />
                   ))}
                 </div>
-              </>
-            )}
+              )}
 
-            {/* Week View */}
-            {viewMode === "week" && (
-              <div className="grid grid-cols-7">
-                {calendarWeekDays.map((day, i) => (
-                  <WeekDayCell
-                    key={i}
-                    day={day}
-                    isSelected={selectedDate?.toDateString() === day.date.toDateString()}
-                    onClick={() => setSelectedDate(day.date)}
-                    onTransactionClick={setSelectedTransaction}
-                  />
-                ))}
+              {/* Legend */}
+              <div className="p-4 border-t border-gray-800 flex gap-6 text-sm">
+                <div className="flex items-center gap-2">
+                  <div className="w-3 h-3 rounded-full bg-success" />
+                  <span className="text-gray-300">Income</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="w-3 h-3 rounded-full bg-danger" />
+                  <span className="text-gray-300">Expense</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="w-3 h-3 rounded bg-primary" />
+                  <span className="text-gray-300">Today</span>
+                </div>
               </div>
-            )}
-
-            {/* Legend */}
-            <div className="p-4 border-t border-gray-800 flex gap-6 text-sm">
-              <div className="flex items-center gap-2">
-                <div className="w-3 h-3 rounded-full bg-success" />
-                <span className="text-gray-300">Income</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <div className="w-3 h-3 rounded-full bg-danger" />
-                <span className="text-gray-300">Expense</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <div className="w-3 h-3 rounded bg-primary" />
-                <span className="text-gray-300">Today</span>
-              </div>
-            </div>
-          </Card>
+            </Card>
           </div>
         </div>
 

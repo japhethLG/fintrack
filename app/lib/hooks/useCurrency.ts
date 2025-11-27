@@ -54,5 +54,3 @@ export const useCurrency = () => {
 };
 
 export default useCurrency;
-
-

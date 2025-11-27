@@ -38,10 +38,7 @@ const UpcomingActivityWidget: React.FC<IProps> = ({ onTransactionClick }) => {
       .filter((t) => {
         const date = t.actualDate || t.scheduledDate;
         return (
-          date >= today &&
-          date <= endDateStr &&
-          t.status !== "completed" &&
-          t.status !== "skipped"
+          date >= today && date <= endDateStr && t.status !== "completed" && t.status !== "skipped"
         );
       })
       .sort((a, b) =>
@@ -66,10 +63,7 @@ const UpcomingActivityWidget: React.FC<IProps> = ({ onTransactionClick }) => {
 
   // Overview Stats
   const stats = useMemo(() => {
-    const totalIncome = upcomingData.income.reduce(
-      (sum, t) => sum + (t.projectedAmount || 0),
-      0
-    );
+    const totalIncome = upcomingData.income.reduce((sum, t) => sum + (t.projectedAmount || 0), 0);
     const totalExpenses = upcomingData.expenses.reduce(
       (sum, t) => sum + (t.projectedAmount || 0),
       0
@@ -90,18 +84,11 @@ const UpcomingActivityWidget: React.FC<IProps> = ({ onTransactionClick }) => {
         </div>
         <div className="bg-dark-800 p-3 rounded-lg border border-gray-800">
           <p className="text-xs text-gray-400 mb-1">Expenses</p>
-          <p className="text-danger font-bold text-sm">
-            -{formatCurrency(stats.totalExpenses)}
-          </p>
+          <p className="text-danger font-bold text-sm">-{formatCurrency(stats.totalExpenses)}</p>
         </div>
         <div className="bg-dark-800 p-3 rounded-lg border border-gray-800">
           <p className="text-xs text-gray-400 mb-1">Net Change</p>
-          <p
-            className={cn(
-              "font-bold text-sm",
-              stats.net >= 0 ? "text-success" : "text-danger"
-            )}
-          >
+          <p className={cn("font-bold text-sm", stats.net >= 0 ? "text-success" : "text-danger")}>
             {formatCurrencyWithSign(stats.net)}
           </p>
         </div>
@@ -111,11 +98,7 @@ const UpcomingActivityWidget: React.FC<IProps> = ({ onTransactionClick }) => {
       <div className="space-y-2 max-h-[400px] overflow-y-auto">
         {upcomingData.all.length > 0 ? (
           upcomingData.all.map((t) => (
-            <QuickTransaction
-              key={t.id}
-              transaction={t}
-              onClick={() => onTransactionClick(t)}
-            />
+            <QuickTransaction key={t.id} transaction={t} onClick={() => onTransactionClick(t)} />
           ))
         ) : (
           <div className="py-8 text-center">
@@ -194,11 +177,7 @@ const UpcomingActivityWidget: React.FC<IProps> = ({ onTransactionClick }) => {
     <div className="space-y-2 max-h-[500px] overflow-y-auto animate-fade-in">
       {upcomingData.income.length > 0 ? (
         upcomingData.income.map((t) => (
-          <QuickTransaction
-            key={t.id}
-            transaction={t}
-            onClick={() => onTransactionClick(t)}
-          />
+          <QuickTransaction key={t.id} transaction={t} onClick={() => onTransactionClick(t)} />
         ))
       ) : (
         <div className="py-8 text-center">
@@ -254,4 +233,3 @@ const UpcomingActivityWidget: React.FC<IProps> = ({ onTransactionClick }) => {
 };
 
 export default UpcomingActivityWidget;
-

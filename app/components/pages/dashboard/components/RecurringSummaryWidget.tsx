@@ -125,12 +125,7 @@ const RecurringSummaryWidget: React.FC = () => {
         {/* Net Row */}
         <div className="pt-2 border-t border-gray-800 flex justify-between items-center">
           <span className="text-sm text-gray-400">Net Recurring</span>
-          <span
-            className={cn(
-              "font-bold",
-              stats.net >= 0 ? "text-success" : "text-danger"
-            )}
-          >
+          <span className={cn("font-bold", stats.net >= 0 ? "text-success" : "text-danger")}>
             {formatCurrencyWithSign(stats.net, { maximumFractionDigits: 0 })}
             <span className="text-xs font-normal text-gray-500 ml-1">/mo</span>
           </span>
@@ -141,4 +136,3 @@ const RecurringSummaryWidget: React.FC = () => {
 };
 
 export default RecurringSummaryWidget;
-

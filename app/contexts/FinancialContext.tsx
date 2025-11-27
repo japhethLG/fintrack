@@ -177,8 +177,7 @@ export const FinancialProvider: React.FC<FinancialProviderProps> = ({ children }
   // Generate projections when date range expands
   useEffect(() => {
     const prevRange = prevDateRangeRef.current;
-    const hasExpanded =
-      dateRange.start < prevRange.start || dateRange.end > prevRange.end;
+    const hasExpanded = dateRange.start < prevRange.start || dateRange.end > prevRange.end;
 
     // Update ref immediately
     prevDateRangeRef.current = dateRange;

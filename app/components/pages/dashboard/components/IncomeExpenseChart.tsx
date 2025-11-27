@@ -119,10 +119,7 @@ const IncomeExpenseChart: React.FC<IProps> = ({ transactions, dateRange }) => {
       <div className="h-[300px] w-full">
         {hasData ? (
           <ResponsiveContainer width="100%" height="100%">
-            <BarChart
-              data={data}
-              margin={{ top: 10, right: 10, left: 0, bottom: 0 }}
-            >
+            <BarChart data={data} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="#2d3748" vertical={false} />
               <XAxis
                 dataKey="label"

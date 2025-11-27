@@ -136,7 +136,10 @@ const LoanDetailsForm: React.FC = () => {
         <div className="md:col-span-2 bg-gray-800/50 rounded-xl p-6">
           <p className="text-gray-400 text-sm mb-1">Calculated Monthly Payment</p>
           <p className="text-3xl font-bold text-danger">
-            {formatCurrency(calculatedPayment, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            {formatCurrency(calculatedPayment, {
+              minimumFractionDigits: 2,
+              maximumFractionDigits: 2,
+            })}
           </p>
           <p className="text-sm text-gray-400 mt-2">
             Total Interest:{" "}
@@ -169,10 +172,16 @@ const LoanDetailsForm: React.FC = () => {
                     <td className="py-2 text-white">#{i + 1}</td>
                     <td className="py-2 text-gray-300">{row.date.toLocaleDateString()}</td>
                     <td className="py-2 text-right text-white">
-                      {formatCurrency(row.principal, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      {formatCurrency(row.principal, {
+                        minimumFractionDigits: 2,
+                        maximumFractionDigits: 2,
+                      })}
                     </td>
                     <td className="py-2 text-right text-danger">
-                      {formatCurrency(row.interest, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                      {formatCurrency(row.interest, {
+                        minimumFractionDigits: 2,
+                        maximumFractionDigits: 2,
+                      })}
                     </td>
                     <td className="py-2 text-right text-gray-300">
                       {formatCurrency(row.remainingBalance, {

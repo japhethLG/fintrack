@@ -100,30 +100,30 @@ const AIAnalysisPanel: React.FC<IProps> = ({
                 strong: ({ children }) => (
                   <strong className="font-semibold text-white">{children}</strong>
                 ),
-                em: ({ children }) => (
-                  <em className="italic text-gray-200">{children}</em>
-                ),
+                em: ({ children }) => <em className="italic text-gray-200">{children}</em>,
                 ul: ({ children }) => (
                   <ul className="list-disc list-inside space-y-2 mb-4 text-gray-300">{children}</ul>
                 ),
                 ol: ({ children }) => (
-                  <ol className="list-decimal list-inside space-y-2 mb-4 text-gray-300">{children}</ol>
+                  <ol className="list-decimal list-inside space-y-2 mb-4 text-gray-300">
+                    {children}
+                  </ol>
                 ),
-                li: ({ children }) => (
-                  <li className="text-gray-300 leading-relaxed">{children}</li>
-                ),
+                li: ({ children }) => <li className="text-gray-300 leading-relaxed">{children}</li>,
                 blockquote: ({ children }) => (
                   <blockquote className="border-l-4 border-primary pl-4 py-2 my-4 bg-gray-800/50 rounded-r-lg">
                     {children}
                   </blockquote>
                 ),
                 code: ({ children }) => (
-                  <code className="bg-gray-800 px-1.5 py-0.5 rounded text-primary text-sm">{children}</code>
+                  <code className="bg-gray-800 px-1.5 py-0.5 rounded text-primary text-sm">
+                    {children}
+                  </code>
                 ),
                 hr: () => <hr className="border-gray-700 my-6" />,
               }}
             >
-            {analysis}
+              {analysis}
             </ReactMarkdown>
           </div>
 

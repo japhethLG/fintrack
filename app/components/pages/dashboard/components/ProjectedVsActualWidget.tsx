@@ -82,12 +82,8 @@ const ProjectedVsActualWidget: React.FC<IProps> = ({ dateRange }) => {
           <div className="flex justify-between text-sm mb-2">
             <span className="text-gray-400">Income</span>
             <div className="flex gap-2">
-              <span className="text-white font-medium">
-                {formatCurrency(stats.income.actual)}
-              </span>
-              <span className="text-gray-500">
-                / {formatCurrency(stats.income.projected)}
-              </span>
+              <span className="text-white font-medium">{formatCurrency(stats.income.actual)}</span>
+              <span className="text-gray-500">/ {formatCurrency(stats.income.projected)}</span>
             </div>
           </div>
           <div className="h-2 bg-gray-800 rounded-full overflow-hidden">
@@ -100,7 +96,8 @@ const ProjectedVsActualWidget: React.FC<IProps> = ({ dateRange }) => {
           </div>
           <div className="mt-1 flex justify-end">
             <span className="text-xs text-gray-500">
-              {Math.round(calculateProgress(stats.income.actual, stats.income.projected))}% collected
+              {Math.round(calculateProgress(stats.income.actual, stats.income.projected))}%
+              collected
             </span>
           </div>
         </div>
@@ -110,12 +107,8 @@ const ProjectedVsActualWidget: React.FC<IProps> = ({ dateRange }) => {
           <div className="flex justify-between text-sm mb-2">
             <span className="text-gray-400">Expenses</span>
             <div className="flex gap-2">
-              <span className="text-white font-medium">
-                {formatCurrency(stats.expense.actual)}
-              </span>
-              <span className="text-gray-500">
-                / {formatCurrency(stats.expense.projected)}
-              </span>
+              <span className="text-white font-medium">{formatCurrency(stats.expense.actual)}</span>
+              <span className="text-gray-500">/ {formatCurrency(stats.expense.projected)}</span>
             </div>
           </div>
           <div className="h-2 bg-gray-800 rounded-full overflow-hidden">
@@ -141,4 +134,3 @@ const ProjectedVsActualWidget: React.FC<IProps> = ({ dateRange }) => {
 };
 
 export default ProjectedVsActualWidget;
-

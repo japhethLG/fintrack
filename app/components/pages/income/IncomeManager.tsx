@@ -65,11 +65,11 @@ const IncomeManager: React.FC = () => {
   const activeSources = incomeSources.filter((s) => s.isActive);
 
   const recurringMonthly = activeSources.reduce((sum, source) => {
-    return sum + (source.amount * getMonthlyMultiplier(source.frequency));
+    return sum + source.amount * getMonthlyMultiplier(source.frequency);
   }, 0);
 
   const oneTimeTotal = activeSources
-    .filter(s => s.frequency === "one-time")
+    .filter((s) => s.frequency === "one-time")
     .reduce((sum, source) => sum + source.amount, 0);
 
   if (isLoading) {

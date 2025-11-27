@@ -72,11 +72,11 @@ const ExpenseManager: React.FC = () => {
   const activeRules = expenseRules.filter((r) => r.isActive);
 
   const recurringMonthly = activeRules.reduce((sum, rule) => {
-    return sum + (rule.amount * getMonthlyExpenseMultiplier(rule.frequency));
+    return sum + rule.amount * getMonthlyExpenseMultiplier(rule.frequency);
   }, 0);
 
   const oneTimeTotal = activeRules
-    .filter(r => r.frequency === "one-time")
+    .filter((r) => r.frequency === "one-time")
     .reduce((sum, rule) => sum + rule.amount, 0);
 
   const totalDebt = activeRules.reduce((sum, rule) => {
