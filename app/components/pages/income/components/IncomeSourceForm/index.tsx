@@ -3,7 +3,7 @@
 import React, { useState, useMemo, useCallback } from "react";
 import { useForm, Resolver } from "react-hook-form";
 import { yupResolver } from "@hookform/resolvers/yup";
-import { Button, Card } from "@/components/common";
+import { Button, Card, Icon, Input } from "@/components/common";
 import { Form, FormInput, FormSelect, FormCheckbox } from "@/components/formElements";
 import { IncomeSourceFormData } from "@/lib/types";
 import { INCOME_CATEGORIES } from "@/lib/constants";
@@ -66,6 +66,7 @@ const IncomeSourceForm: React.FC<IProps> = ({
   const [step, setStep] = useState(1);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [newSpecificDay, setNewSpecificDay] = useState("");
 
   const methods = useForm<IncomeSourceFormValues>({
     defaultValues: getDefaultValues(initialData),
@@ -129,6 +130,26 @@ const IncomeSourceForm: React.FC<IProps> = ({
       setStep(step + 1);
     }
   }, [trigger, currentStepFields, step, totalSteps]);
+
+  // Handle adding specific day for semi-monthly
+  const handleAddSpecificDay = () => {
+    const day = parseInt(newSpecificDay);
+    if (day >= 1 && day <= 31 && !specificDays?.includes(day)) {
+      setValue(
+        "specificDays",
+        [...(specificDays || []), day].sort((a, b) => a - b)
+      );
+      setNewSpecificDay("");
+    }
+  };
+
+  // Handle removing specific day
+  const handleRemoveSpecificDay = (day: number) => {
+    setValue(
+      "specificDays",
+      (specificDays || []).filter((d: number) => d !== day)
+    );
+  };
 
   const handleSubmit = async (values: IncomeSourceFormValues) => {
     setError(null);
@@ -288,6 +309,53 @@ const IncomeSourceForm: React.FC<IProps> = ({
                     min={1}
                     max={31}
                   />
+                </div>
+              )}
+
+              {frequency === "semi-monthly" && (
+                <div className="md:col-span-2">
+                  <label className="block text-sm font-medium text-gray-400 mb-2">
+                    Specific Dates
+                  </label>
+                  <div className="flex flex-wrap gap-2 mb-3">
+                    {(specificDays || []).map((day: number) => (
+                      <div
+                        key={day}
+                        className="bg-primary/20 text-primary px-3 py-1 rounded-lg border border-primary/30 flex items-center gap-2"
+                      >
+                        {day}th
+                        <Icon
+                          name="close"
+                          size="sm"
+                          className="cursor-pointer hover:text-white"
+                          onClick={() => handleRemoveSpecificDay(day)}
+                        />
+                      </div>
+                    ))}
+                  </div>
+                  <div className="flex gap-2">
+                    <Input
+                      type="number"
+                      placeholder="Day (1-31)"
+                      value={newSpecificDay}
+                      onChange={(e) => setNewSpecificDay(e.target.value)}
+                      min={1}
+                      max={31}
+                      className="w-32"
+                    />
+                    <Button
+                      variant="secondary"
+                      onClick={handleAddSpecificDay}
+                      disabled={!newSpecificDay}
+                      type="button"
+                    >
+                      Add Date
+                    </Button>
+                  </div>
+                  <p className="text-xs text-gray-500 mt-2">
+                    Add the specific days of the month when you receive this income (e.g., 15th and
+                    30th)
+                  </p>
                 </div>
               )}
 

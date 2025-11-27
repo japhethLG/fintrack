@@ -28,7 +28,7 @@ export const Input: React.FC<InputProps> = ({
   const inputId = id || (label ? `input-${label.toLowerCase().replace(/\s+/g, "-")}` : undefined);
 
   const baseInputStyles =
-    "w-full bg-[#151c2c] border rounded-lg text-white focus:outline-none transition-colors duration-200 placeholder:text-gray-500";
+    "h-11 w-full bg-[#151c2c] border rounded-lg text-white focus:outline-none transition-colors duration-200 placeholder:text-gray-500";
 
   const combinedInputClassName = cn(
     baseInputStyles,
@@ -43,7 +43,7 @@ export const Input: React.FC<InputProps> = ({
   );
 
   return (
-    <div className="w-full">
+    <div className="">
       {label && (
         <div className="flex items-center gap-1 mb-2">
           <label htmlFor={inputId} className="text-sm font-medium text-gray-400">

@@ -24,7 +24,7 @@ const FinancialHealthScore: React.FC<IProps> = ({ healthScore }) => {
       <div className="flex items-start justify-between">
         <div>
           <p className="text-gray-400 text-sm font-medium mb-1">Financial Health</p>
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-2 flex-wrap">
             <h2 className="text-3xl font-bold text-white">{score}/100</h2>
             <div
               className="px-2 py-0.5 rounded text-xs font-bold border"
