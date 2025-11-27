@@ -470,7 +470,12 @@ const IncomeSourceForm: React.FC<IProps> = ({
           </Button>
 
           {step === totalSteps ? (
-            <Button variant="primary" type="submit" disabled={!canProceed || isSubmitting}>
+            <Button
+              variant="primary"
+              type="button"
+              disabled={!canProceed || isSubmitting}
+              onClick={() => handleSubmit(methods.getValues())}
+            >
               {isSubmitting ? "Saving..." : isEditing ? "Save Changes" : "Create Income Source"}
             </Button>
           ) : (
