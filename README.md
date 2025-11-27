@@ -11,6 +11,8 @@
 [![Firebase](https://img.shields.io/badge/Firebase-12.6-orange?style=flat&logo=firebase)](https://firebase.google.com/)
 [![Tailwind CSS](https://img.shields.io/badge/Tailwind-3.4-38B2AC?style=flat&logo=tailwind-css)](https://tailwindcss.com/)
 
+🚀 **[Live Demo](https://japhethlg.github.io/fintrack)**
+
 </div>
 
 ---
