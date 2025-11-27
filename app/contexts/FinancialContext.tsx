@@ -7,6 +7,7 @@ import React, {
   useEffect,
   useCallback,
   useMemo,
+  useRef,
   ReactNode,
 } from "react";
 import { useAuth } from "./AuthContext";
@@ -66,6 +67,7 @@ interface FinancialContextValue {
   // Loading states
   isLoading: boolean;
   isInitialized: boolean;
+  isExpandingRange: boolean;
 
   // User data
   userProfile: UserProfile | null;
@@ -113,6 +115,7 @@ interface FinancialContextValue {
   // Actions
   regenerateProjections: () => Promise<void>;
   refreshData: () => Promise<void>;
+  expandDateRange: (requestedStart: string, requestedEnd: string) => void;
 }
 
 const FinancialContext = createContext<FinancialContextValue | null>(null);
@@ -135,14 +138,15 @@ export const FinancialProvider: React.FC<FinancialProviderProps> = ({ children }
   // State
   const [isLoading, setIsLoading] = useState(true);
   const [isInitialized, setIsInitialized] = useState(false);
+  const [isExpandingRange, setIsExpandingRange] = useState(false);
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [incomeSources, setIncomeSources] = useState<IncomeSource[]>([]);
   const [expenseRules, setExpenseRules] = useState<ExpenseRule[]>([]);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [alerts, setAlerts] = useState<Alert[]>([]);
 
-  // Date range for projections (current month + 3 months)
-  const dateRange = useMemo(() => {
+  // Date range for projections (expandable, starts with current month + 4 months)
+  const [dateRange, setDateRange] = useState(() => {
     const today = new Date();
     const startDate = new Date(today.getFullYear(), today.getMonth(), 1);
     const endDate = new Date(today.getFullYear(), today.getMonth() + 4, 0);
@@ -150,7 +154,94 @@ export const FinancialProvider: React.FC<FinancialProviderProps> = ({ children }
       start: startDate.toISOString().split("T")[0],
       end: endDate.toISOString().split("T")[0],
     };
+  });
+
+  // Track previous date range to detect expansion
+  const prevDateRangeRef = useRef(dateRange);
+
+  // Expand date range when calendar navigates outside current range
+  const expandDateRange = useCallback((requestedStart: string, requestedEnd: string) => {
+    setDateRange((current) => {
+      const newStart = requestedStart < current.start ? requestedStart : current.start;
+      const newEnd = requestedEnd > current.end ? requestedEnd : current.end;
+
+      // Only update if range actually expanded
+      if (newStart === current.start && newEnd === current.end) {
+        return current;
+      }
+
+      return { start: newStart, end: newEnd };
+    });
   }, []);
+
+  // Generate projections when date range expands
+  useEffect(() => {
+    const prevRange = prevDateRangeRef.current;
+    const hasExpanded =
+      dateRange.start < prevRange.start || dateRange.end > prevRange.end;
+
+    // Update ref immediately
+    prevDateRangeRef.current = dateRange;
+
+    // Skip if not expanded or not initialized
+    if (!hasExpanded || !isInitialized || !user) return;
+
+    const generateProjectionsForExpandedRange = async () => {
+      setIsExpandingRange(true);
+
+      try {
+        const activeIncomeSources = incomeSources.filter((s) => s.isActive);
+        const activeExpenseRules = expenseRules.filter((r) => r.isActive);
+
+        // Get existing transaction dates to avoid duplicates
+        const existingDates = new Set(
+          transactions
+            .filter((t) => t.status === "projected")
+            .map((t) => `${t.sourceId}-${t.scheduledDate}`)
+        );
+
+        // Generate projections for expanded range portions
+        const newProjections: Omit<Transaction, "id" | "userId" | "createdAt" | "updatedAt">[] = [];
+
+        // If expanded backward (new start < old start)
+        if (dateRange.start < prevRange.start) {
+          const backwardProjections = generateProjections(
+            activeIncomeSources,
+            activeExpenseRules,
+            new Date(dateRange.start),
+            new Date(prevRange.start)
+          );
+          newProjections.push(...backwardProjections);
+        }
+
+        // If expanded forward (new end > old end)
+        if (dateRange.end > prevRange.end) {
+          const forwardProjections = generateProjections(
+            activeIncomeSources,
+            activeExpenseRules,
+            new Date(prevRange.end),
+            new Date(dateRange.end)
+          );
+          newProjections.push(...forwardProjections);
+        }
+
+        // Filter out duplicates
+        const uniqueProjections = newProjections.filter(
+          (p) => !existingDates.has(`${p.sourceId}-${p.scheduledDate}`)
+        );
+
+        if (uniqueProjections.length > 0) {
+          await addTransactionsBatch(user.uid, uniqueProjections);
+        }
+      } catch (error) {
+        console.error("Error generating projections for expanded range:", error);
+      } finally {
+        setIsExpandingRange(false);
+      }
+    };
+
+    generateProjectionsForExpandedRange();
+  }, [dateRange, isInitialized, user, incomeSources, expenseRules, transactions]);
 
   // Subscribe to real-time updates when user is authenticated
   useEffect(() => {
@@ -166,7 +257,10 @@ export const FinancialProvider: React.FC<FinancialProviderProps> = ({ children }
       return;
     }
 
-    setIsLoading(true);
+    // Only show full page loading on initial load, not on date range expansion
+    if (!isInitialized) {
+      setIsLoading(true);
+    }
     const unsubscribers: (() => void)[] = [];
 
     // Subscribe to user profile
@@ -552,6 +646,7 @@ export const FinancialProvider: React.FC<FinancialProviderProps> = ({ children }
   const value: FinancialContextValue = {
     isLoading,
     isInitialized,
+    isExpandingRange,
     userProfile,
     updateProfile,
     setCurrentBalance,
@@ -579,6 +674,7 @@ export const FinancialProvider: React.FC<FinancialProviderProps> = ({ children }
     dismissAlertById,
     regenerateProjections,
     refreshData,
+    expandDateRange,
   };
 
   return <FinancialContext.Provider value={value}>{children}</FinancialContext.Provider>;

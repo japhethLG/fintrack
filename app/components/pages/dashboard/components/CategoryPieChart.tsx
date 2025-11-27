@@ -3,6 +3,7 @@
 import React from "react";
 import { ResponsiveContainer, PieChart, Pie, Cell, Tooltip } from "recharts";
 import { Card } from "@/components/common";
+import { useCurrency } from "@/lib/hooks/useCurrency";
 
 interface CategoryData {
   name: string;
@@ -20,6 +21,7 @@ interface IProps {
 const PLACEHOLDER_DATA = [{ name: "placeholder", value: 1, color: "#374151" }];
 
 const CategoryPieChart: React.FC<IProps> = ({ data, totalExpenses }) => {
+  const { formatCurrency } = useCurrency();
   const hasData = data.length > 0;
   const chartData = hasData ? data : PLACEHOLDER_DATA;
 
@@ -49,7 +51,7 @@ const CategoryPieChart: React.FC<IProps> = ({ data, totalExpenses }) => {
                   borderRadius: "8px",
                   color: "#000",
                 }}
-                formatter={(value: number) => [`$${value.toLocaleString()}`, "Expenses"]}
+                formatter={(value: number) => [formatCurrency(value), "Expenses"]}
               />
             )}
           </PieChart>
@@ -59,13 +61,13 @@ const CategoryPieChart: React.FC<IProps> = ({ data, totalExpenses }) => {
             <>
               <span className="text-gray-400 text-xs">Total</span>
               <span className="text-white font-bold text-lg">
-                ${totalExpenses.toLocaleString(undefined, { maximumFractionDigits: 0 })}
+                {formatCurrency(totalExpenses, { maximumFractionDigits: 0 })}
               </span>
             </>
           ) : (
             <>
               <span className="text-gray-400 text-xs">Total</span>
-              <span className="text-gray-500 font-bold text-lg">$0</span>
+              <span className="text-gray-500 font-bold text-lg">{formatCurrency(0)}</span>
             </>
           )}
         </div>

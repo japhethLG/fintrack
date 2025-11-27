@@ -64,7 +64,13 @@ const Sidebar: React.FC = () => {
       </nav>
 
       <div className="p-4 border-t border-gray-800">
-        <div className="flex items-center gap-3 p-2 rounded-xl hover:bg-gray-800 cursor-pointer transition-colors mb-2">
+        <div
+          className="flex items-center gap-3 p-2 rounded-xl hover:bg-gray-800 cursor-pointer transition-colors mb-2"
+          onClick={() => router.push("/settings")}
+          role="button"
+          tabIndex={0}
+          onKeyDown={(e) => e.key === "Enter" && router.push("/settings")}
+        >
           <Image
             src={user?.photoURL || "https://picsum.photos/40/40"}
             alt="User"

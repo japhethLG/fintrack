@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useCallback } from "react";
 import {
   ResponsiveContainer,
   BarChart,
@@ -14,6 +14,7 @@ import {
 } from "recharts";
 import { Card, Select } from "@/components/common";
 import { Transaction } from "@/lib/types";
+import { useCurrency } from "@/lib/hooks/useCurrency";
 import { getIncomeExpenseChartData, getBestBucketType } from "@/lib/logic/healthScore";
 import dayjs from "dayjs";
 
@@ -25,24 +26,6 @@ interface IProps {
   };
 }
 
-/**
- * Formats a value for Y-axis display, choosing the appropriate scale
- */
-const formatYAxisValue = (value: number): string => {
-  const absValue = Math.abs(value);
-
-  // For values >= 10k, show in "k" format
-  if (absValue >= 10000) {
-    return `$${(value / 1000).toFixed(0)}k`;
-  }
-  // For values >= 1k, show in "k" format with one decimal
-  if (absValue >= 1000) {
-    return `$${(value / 1000).toFixed(1)}k`;
-  }
-  // For smaller values, show the full number
-  return `$${value.toLocaleString()}`;
-};
-
 const CHART_RANGE_OPTIONS = [
   { value: "global", label: "Selected Range" },
   { value: "last7", label: "Last 7 days" },
@@ -52,7 +35,29 @@ const CHART_RANGE_OPTIONS = [
 ];
 
 const IncomeExpenseChart: React.FC<IProps> = ({ transactions, dateRange }) => {
+  const { currencySymbol, formatCurrency } = useCurrency();
   const [selectedRange, setSelectedRange] = useState("global");
+
+  /**
+   * Formats a value for Y-axis display, choosing the appropriate scale
+   */
+  const formatYAxisValue = useCallback(
+    (value: number): string => {
+      const absValue = Math.abs(value);
+
+      // For values >= 10k, show in "k" format
+      if (absValue >= 10000) {
+        return `${currencySymbol}${(value / 1000).toFixed(0)}k`;
+      }
+      // For values >= 1k, show in "k" format with one decimal
+      if (absValue >= 1000) {
+        return `${currencySymbol}${(value / 1000).toFixed(1)}k`;
+      }
+      // For smaller values, show the full number
+      return formatCurrency(value);
+    },
+    [currencySymbol, formatCurrency]
+  );
 
   // Determine the actual range to use
   const activeRange = useMemo(() => {
@@ -141,7 +146,7 @@ const IncomeExpenseChart: React.FC<IProps> = ({ transactions, dateRange }) => {
                   borderRadius: "8px",
                   color: "#fff",
                 }}
-                formatter={(value: number) => [`$${value.toLocaleString()}`, undefined]}
+                formatter={(value: number) => [formatCurrency(value), undefined]}
                 labelStyle={{ color: "#9ca3af", marginBottom: "0.5rem" }}
                 cursor={{ fill: "rgba(255, 255, 255, 0.05)" }}
               />

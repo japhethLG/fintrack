@@ -4,6 +4,7 @@ import React from "react";
 import { IncomeSource } from "@/lib/types";
 import { Icon, Badge } from "@/components/common";
 import { cn } from "@/lib/utils/cn";
+import { useCurrency } from "@/lib/hooks/useCurrency";
 import { SOURCE_TYPE_ICONS, FREQUENCY_LABELS } from "../constants";
 
 interface IProps {
@@ -13,6 +14,7 @@ interface IProps {
 }
 
 const IncomeSourceCard: React.FC<IProps> = ({ source, isSelected, onClick }) => {
+  const { formatCurrency } = useCurrency();
   return (
     <div
       className={cn(
@@ -44,7 +46,7 @@ const IncomeSourceCard: React.FC<IProps> = ({ source, isSelected, onClick }) => 
       </div>
       <div className="mt-3 flex items-center justify-between">
         <p className="text-success font-bold">
-          ${source.amount.toLocaleString()}
+          {formatCurrency(source.amount)}
           {source.isVariableAmount && (
             <span className="text-xs text-gray-400 font-normal ml-1">~</span>
           )}

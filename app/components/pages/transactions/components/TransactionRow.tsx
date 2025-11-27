@@ -4,6 +4,7 @@ import React from "react";
 import { Transaction } from "@/lib/types";
 import { Button, Icon, Badge } from "@/components/common";
 import { cn } from "@/lib/utils/cn";
+import { useCurrency } from "@/lib/hooks/useCurrency";
 import { STATUS_VARIANTS } from "../constants";
 
 interface IProps {
@@ -12,6 +13,7 @@ interface IProps {
 }
 
 const TransactionRow: React.FC<IProps> = ({ transaction, onAction }) => {
+  const { formatCurrency, currencySymbol } = useCurrency();
   const isIncome = transaction.type === "income";
   const amount = transaction.actualAmount ?? transaction.projectedAmount;
   const hasVariance = transaction.variance && transaction.variance !== 0;
@@ -74,11 +76,8 @@ const TransactionRow: React.FC<IProps> = ({ transaction, onAction }) => {
           {/* Amount */}
           <div className="text-right min-w-[100px]">
             <p className={cn("font-bold", isIncome ? "text-success" : "text-white")}>
-              {isIncome ? "+" : "-"}$
-              {amount.toLocaleString(undefined, {
-                minimumFractionDigits: 2,
-                maximumFractionDigits: 2,
-              })}
+              {isIncome ? "+" : "-"}
+              {formatCurrency(amount, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
             </p>
             {hasVariance && (
               <p
@@ -93,7 +92,9 @@ const TransactionRow: React.FC<IProps> = ({ transaction, onAction }) => {
                       : "text-success"
                 )}
               >
-                {transaction.variance! > 0 ? "+" : ""}${transaction.variance?.toFixed(2)}
+                {transaction.variance! > 0 ? "+" : ""}
+                {currencySymbol}
+                {transaction.variance?.toFixed(2)}
               </p>
             )}
           </div>

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useFinancial } from "@/contexts/FinancialContext";
 import { Transaction } from "@/lib/types";
@@ -34,8 +34,10 @@ const Dashboard: React.FC = () => {
     transactions,
     dailyBalances,
     isLoading,
+    isExpandingRange,
     markTransactionComplete,
     markTransactionSkipped,
+    expandDateRange,
   } = useFinancial();
 
   const [selectedTransaction, setSelectedTransaction] = useState<Transaction | null>(null);
@@ -53,6 +55,16 @@ const Dashboard: React.FC = () => {
       end: dateRange[1]?.format("YYYY-MM-DD") || formatDate(new Date()),
     };
   }, [dateRange]);
+
+  // Expand context date range when user selects dates outside current range
+  useEffect(() => {
+    if (dateRange[0] && dateRange[1]) {
+      expandDateRange(
+        dateRange[0].format("YYYY-MM-DD"),
+        dateRange[1].format("YYYY-MM-DD")
+      );
+    }
+  }, [dateRange, expandDateRange]);
 
   // Calculate stats for selected period
   const periodStats = useMemo(() => {
@@ -201,7 +213,16 @@ const Dashboard: React.FC = () => {
   const currentBalance = userProfile?.currentBalance || 0;
 
   return (
-    <div className="p-6 lg:p-10 max-w-7xl mx-auto animate-fade-in">
+    <div className="p-6 lg:p-10 max-w-7xl mx-auto animate-fade-in relative">
+      {/* Loading overlay when expanding date range */}
+      {isExpandingRange && (
+        <div className="absolute inset-0 bg-gray-900/50 backdrop-blur-sm z-20 flex items-center justify-center rounded-xl">
+          <div className="flex flex-col items-center gap-3 bg-gray-800 p-6 rounded-xl shadow-xl">
+            <LoadingSpinner size="md" />
+            <span className="text-sm text-gray-300">Loading data for selected period...</span>
+          </div>
+        </div>
+      )}
       <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4 mb-8">
         <div>
           <h1 className="text-2xl font-bold text-white mb-1">Dashboard</h1>

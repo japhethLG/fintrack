@@ -4,6 +4,7 @@ import React from "react";
 import { ExpenseRule } from "@/lib/types";
 import { Icon, Badge } from "@/components/common";
 import { cn } from "@/lib/utils/cn";
+import { useCurrency } from "@/lib/hooks/useCurrency";
 import { EXPENSE_TYPE_ICONS, EXPENSE_TYPE_LABELS, FREQUENCY_LABELS } from "../constants";
 
 interface IProps {
@@ -13,6 +14,7 @@ interface IProps {
 }
 
 const ExpenseRuleCard: React.FC<IProps> = ({ rule, isSelected, onClick }) => {
+  const { formatCurrency } = useCurrency();
   const getProgress = () => {
     if (rule.loanConfig) {
       const paid = rule.loanConfig.principalAmount - rule.loanConfig.currentBalance;
@@ -67,8 +69,7 @@ const ExpenseRuleCard: React.FC<IProps> = ({ rule, isSelected, onClick }) => {
 
       <div className="mt-3 flex items-center justify-between">
         <p className="text-danger font-bold">
-          $
-          {rule.amount.toLocaleString(undefined, {
+          {formatCurrency(rule.amount, {
             minimumFractionDigits: 2,
             maximumFractionDigits: 2,
           })}

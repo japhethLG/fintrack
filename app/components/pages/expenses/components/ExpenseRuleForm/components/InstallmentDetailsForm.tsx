@@ -4,9 +4,11 @@ import React, { useMemo } from "react";
 import { useFormContext, useWatch } from "react-hook-form";
 import { FormInput, FormSelect, FormCheckbox } from "@/components/formElements";
 import { EXPENSE_CATEGORY_LABELS } from "@/lib/constants";
+import { useCurrency } from "@/lib/hooks/useCurrency";
 import { calculateInstallmentAmount, type ExpenseRuleFormValues } from "../formHelpers";
 
 const InstallmentDetailsForm: React.FC = () => {
+  const { formatCurrency, currencySymbol } = useCurrency();
   const { control } = useFormContext<ExpenseRuleFormValues>();
 
   const installmentTotal = useWatch({ control, name: "installmentTotal" });
@@ -47,7 +49,7 @@ const InstallmentDetailsForm: React.FC = () => {
           label="Total Amount"
           tooltip="The full purchase price of the item"
           placeholder="0.00"
-          prefix="$"
+          prefix={currencySymbol}
           isRequired
         />
       </div>
@@ -87,7 +89,9 @@ const InstallmentDetailsForm: React.FC = () => {
       {calculatedAmount && (
         <div className="md:col-span-2 bg-gray-800/50 rounded-xl p-6">
           <p className="text-gray-400 text-sm mb-1">Monthly Installment</p>
-          <p className="text-3xl font-bold text-danger">${calculatedAmount.toFixed(2)}</p>
+          <p className="text-3xl font-bold text-danger">
+            {formatCurrency(calculatedAmount, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+          </p>
           <p className="text-sm text-gray-400 mt-2">{installmentCount} payments</p>
         </div>
       )}

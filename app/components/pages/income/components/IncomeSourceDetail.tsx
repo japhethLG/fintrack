@@ -4,6 +4,7 @@ import React, { useState } from "react";
 import { IncomeSource } from "@/lib/types";
 import { Button, Card, Icon, Badge } from "@/components/common";
 import { cn } from "@/lib/utils/cn";
+import { useCurrency } from "@/lib/hooks/useCurrency";
 import { SOURCE_TYPE_ICONS, FREQUENCY_LABELS } from "../constants";
 
 interface IProps {
@@ -25,6 +26,7 @@ const getDayName = (day: number) => {
 
 const IncomeSourceDetail: React.FC<IProps> = ({ source, onEdit, onDelete, onToggleActive }) => {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const { formatCurrency } = useCurrency();
 
   const getScheduleDescription = () => {
     switch (source.frequency) {
@@ -75,8 +77,7 @@ const IncomeSourceDetail: React.FC<IProps> = ({ source, onEdit, onDelete, onTogg
       <div className="bg-gray-800/50 rounded-xl p-6 mb-6">
         <p className="text-gray-400 text-sm mb-1">Amount</p>
         <p className="text-4xl font-bold text-success">
-          $
-          {source.amount.toLocaleString(undefined, {
+          {formatCurrency(source.amount, {
             minimumFractionDigits: 2,
             maximumFractionDigits: 2,
           })}

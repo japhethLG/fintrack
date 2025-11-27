@@ -5,6 +5,7 @@ import { useFormContext, useWatch } from "react-hook-form";
 import { Card, Badge } from "@/components/common";
 import { FormInput } from "@/components/formElements";
 import { EXPENSE_CATEGORY_LABELS } from "@/lib/constants";
+import { useCurrency } from "@/lib/hooks/useCurrency";
 import {
   calculateLoanPayment,
   calculateInstallmentAmount,
@@ -17,6 +18,7 @@ interface IProps {
 }
 
 const ReviewStep: React.FC<IProps> = ({ error }) => {
+  const { formatCurrency } = useCurrency();
   const { control } = useFormContext<ExpenseRuleFormValues>();
 
   const expenseType = useWatch({ control, name: "expenseType" });
@@ -124,8 +126,7 @@ const ReviewStep: React.FC<IProps> = ({ error }) => {
                   : "Amount"}
             </p>
             <p className="text-danger font-bold text-xl">
-              $
-              {displayAmount.toLocaleString(undefined, {
+              {formatCurrency(displayAmount, {
                 minimumFractionDigits: 2,
                 maximumFractionDigits: 2,
               })}
@@ -152,7 +153,7 @@ const ReviewStep: React.FC<IProps> = ({ error }) => {
             <div>
               <p className="text-xs text-gray-400">Principal</p>
               <p className="text-white font-medium">
-                ${parseFloat(loanPrincipal).toLocaleString()}
+                {formatCurrency(parseFloat(loanPrincipal))}
               </p>
             </div>
             <div>
@@ -166,11 +167,10 @@ const ReviewStep: React.FC<IProps> = ({ error }) => {
             <div>
               <p className="text-xs text-gray-400">Total Interest</p>
               <p className="text-danger font-medium">
-                $
-                {(
-                  calculatedLoanPayment * parseInt(loanTermMonths) -
-                  parseFloat(loanPrincipal)
-                ).toFixed(2)}
+                {formatCurrency(
+                  calculatedLoanPayment * parseInt(loanTermMonths) - parseFloat(loanPrincipal),
+                  { minimumFractionDigits: 2, maximumFractionDigits: 2 }
+                )}
               </p>
             </div>
           </div>
@@ -181,7 +181,7 @@ const ReviewStep: React.FC<IProps> = ({ error }) => {
             <div>
               <p className="text-xs text-gray-400">Current Balance</p>
               <p className="text-white font-medium">
-                ${parseFloat(creditBalance).toLocaleString()}
+                {formatCurrency(parseFloat(creditBalance))}
               </p>
             </div>
             <div>

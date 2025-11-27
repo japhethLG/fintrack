@@ -5,6 +5,7 @@ import { Card, Icon } from "@/components/common";
 import { Transaction } from "@/lib/types";
 import { getPeriodStats } from "@/lib/logic/healthScore";
 import { cn } from "@/lib/utils/cn";
+import { useCurrency } from "@/lib/hooks/useCurrency";
 import { formatDate } from "@/lib/utils/dateUtils";
 
 interface IProps {
@@ -16,6 +17,8 @@ interface IProps {
 }
 
 const PeriodComparison: React.FC<IProps> = ({ transactions, dateRange }) => {
+  const { formatCurrency, formatCurrencyWithSign } = useCurrency();
+
   // Calculate previous period stats
   const comparisonData = useMemo(() => {
     const start = new Date(dateRange.start);
@@ -97,10 +100,10 @@ const PeriodComparison: React.FC<IProps> = ({ transactions, dateRange }) => {
           </div>
           <div className="flex items-baseline justify-between">
             <span className="text-xl font-bold text-success">
-              +${comparisonData.current.income.toLocaleString()}
+              {formatCurrencyWithSign(comparisonData.current.income)}
             </span>
             <span className="text-xs text-gray-500">
-              was ${comparisonData.prev.income.toLocaleString()}
+              was {formatCurrency(comparisonData.prev.income)}
             </span>
           </div>
         </div>
@@ -113,10 +116,10 @@ const PeriodComparison: React.FC<IProps> = ({ transactions, dateRange }) => {
           </div>
           <div className="flex items-baseline justify-between">
             <span className="text-xl font-bold text-danger">
-              -${comparisonData.current.expenses.toLocaleString()}
+              -{formatCurrency(comparisonData.current.expenses)}
             </span>
             <span className="text-xs text-gray-500">
-              was ${comparisonData.prev.expenses.toLocaleString()}
+              was {formatCurrency(comparisonData.prev.expenses)}
             </span>
           </div>
         </div>
@@ -134,11 +137,10 @@ const PeriodComparison: React.FC<IProps> = ({ transactions, dateRange }) => {
                 comparisonData.current.net >= 0 ? "text-success" : "text-danger"
               )}
             >
-              {comparisonData.current.net >= 0 ? "+" : ""}
-              ${comparisonData.current.net.toLocaleString()}
+              {formatCurrencyWithSign(comparisonData.current.net)}
             </span>
             <span className="text-xs text-gray-500">
-              was ${comparisonData.prev.net.toLocaleString()}
+              was {formatCurrency(comparisonData.prev.net)}
             </span>
           </div>
         </div>

@@ -5,6 +5,7 @@ import { ExpenseRule } from "@/lib/types";
 import { EXPENSE_CATEGORY_LABELS } from "@/lib/constants";
 import { Button, Card, Icon, Badge } from "@/components/common";
 import { cn } from "@/lib/utils/cn";
+import { useCurrency } from "@/lib/hooks/useCurrency";
 import { EXPENSE_TYPE_ICONS, EXPENSE_TYPE_LABELS, FREQUENCY_LABELS } from "../constants";
 
 interface IProps {
@@ -26,6 +27,7 @@ const getDayName = (day: number) => {
 
 const ExpenseRuleDetail: React.FC<IProps> = ({ rule, onEdit, onDelete, onToggleActive }) => {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const { formatCurrency } = useCurrency();
 
   const getScheduleDescription = () => {
     switch (rule.frequency) {
@@ -77,8 +79,7 @@ const ExpenseRuleDetail: React.FC<IProps> = ({ rule, onEdit, onDelete, onToggleA
           {rule.expenseType === "cash_loan" ? "Monthly Payment" : "Amount"}
         </p>
         <p className="text-4xl font-bold text-danger">
-          $
-          {rule.amount.toLocaleString(undefined, {
+          {formatCurrency(rule.amount, {
             minimumFractionDigits: 2,
             maximumFractionDigits: 2,
           })}
@@ -96,11 +97,10 @@ const ExpenseRuleDetail: React.FC<IProps> = ({ rule, onEdit, onDelete, onToggleA
             <div className="flex justify-between text-sm mb-2">
               <span className="text-gray-400">Payoff Progress</span>
               <span className="text-white">
-                $
-                {(
+                {formatCurrency(
                   rule.loanConfig.principalAmount - rule.loanConfig.currentBalance
-                ).toLocaleString()}{" "}
-                / ${rule.loanConfig.principalAmount.toLocaleString()}
+                )}{" "}
+                / {formatCurrency(rule.loanConfig.principalAmount)}
               </span>
             </div>
             <div className="h-3 bg-gray-700 rounded-full overflow-hidden">
@@ -117,13 +117,13 @@ const ExpenseRuleDetail: React.FC<IProps> = ({ rule, onEdit, onDelete, onToggleA
             <div>
               <p className="text-xs text-gray-400">Original Principal</p>
               <p className="text-white font-medium">
-                ${rule.loanConfig.principalAmount.toLocaleString()}
+                {formatCurrency(rule.loanConfig.principalAmount)}
               </p>
             </div>
             <div>
               <p className="text-xs text-gray-400">Current Balance</p>
               <p className="text-danger font-medium">
-                ${rule.loanConfig.currentBalance.toLocaleString()}
+                {formatCurrency(rule.loanConfig.currentBalance)}
               </p>
             </div>
             <div>
@@ -182,13 +182,13 @@ const ExpenseRuleDetail: React.FC<IProps> = ({ rule, onEdit, onDelete, onToggleA
             <div>
               <p className="text-xs text-gray-400">Credit Limit</p>
               <p className="text-white font-medium">
-                ${rule.creditConfig.creditLimit.toLocaleString()}
+                {formatCurrency(rule.creditConfig.creditLimit)}
               </p>
             </div>
             <div>
               <p className="text-xs text-gray-400">Current Balance</p>
               <p className="text-danger font-medium">
-                ${rule.creditConfig.currentBalance.toLocaleString()}
+                {formatCurrency(rule.creditConfig.currentBalance)}
               </p>
             </div>
             <div>
@@ -206,7 +206,7 @@ const ExpenseRuleDetail: React.FC<IProps> = ({ rule, onEdit, onDelete, onToggleA
               <p className="text-xs text-gray-400">Payment Strategy</p>
               <p className="text-white font-medium capitalize">
                 {rule.creditConfig.paymentStrategy === "fixed"
-                  ? `Fixed $${rule.creditConfig.fixedPaymentAmount}`
+                  ? `Fixed ${formatCurrency(rule.creditConfig.fixedPaymentAmount)}`
                   : rule.creditConfig.paymentStrategy.replace("_", " ")}
               </p>
             </div>
@@ -242,24 +242,26 @@ const ExpenseRuleDetail: React.FC<IProps> = ({ rule, onEdit, onDelete, onToggleA
             <div>
               <p className="text-xs text-gray-400">Total Amount</p>
               <p className="text-white font-medium">
-                ${rule.installmentConfig.totalAmount.toLocaleString()}
+                {formatCurrency(rule.installmentConfig.totalAmount)}
               </p>
             </div>
             <div>
               <p className="text-xs text-gray-400">Remaining</p>
               <p className="text-danger font-medium">
-                $
-                {(
+                {formatCurrency(
                   (rule.installmentConfig.installmentCount -
                     rule.installmentConfig.installmentsPaid) *
-                  rule.installmentConfig.installmentAmount
-                ).toLocaleString()}
+                    rule.installmentConfig.installmentAmount
+                )}
               </p>
             </div>
             <div>
               <p className="text-xs text-gray-400">Each Payment</p>
               <p className="text-white font-medium">
-                ${rule.installmentConfig.installmentAmount.toFixed(2)}
+                {formatCurrency(rule.installmentConfig.installmentAmount, {
+                  minimumFractionDigits: 2,
+                  maximumFractionDigits: 2,
+                })}
               </p>
             </div>
             <div>

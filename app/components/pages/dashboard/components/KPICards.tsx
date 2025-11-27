@@ -3,6 +3,7 @@
 import React from "react";
 import { Card, Icon } from "@/components/common";
 import { cn } from "@/lib/utils/cn";
+import { useCurrency } from "@/lib/hooks/useCurrency";
 
 interface PeriodStats {
   income: number;
@@ -21,6 +22,8 @@ interface IProps {
 }
 
 const KPICards: React.FC<IProps> = ({ currentBalance, stats }) => {
+  const { formatCurrency } = useCurrency();
+
   return (
     <>
       <Card padding="md" className="relative overflow-hidden">
@@ -29,10 +32,7 @@ const KPICards: React.FC<IProps> = ({ currentBalance, stats }) => {
           <h2
             className={cn("text-3xl font-bold", currentBalance >= 0 ? "text-white" : "text-danger")}
           >
-            $
-            {Math.abs(currentBalance).toLocaleString("en-US", {
-              minimumFractionDigits: 2,
-            })}
+            {formatCurrency(currentBalance, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
           </h2>
           {currentBalance < 0 && <p className="text-danger text-xs mt-1">Negative balance!</p>}
         </div>
@@ -44,7 +44,7 @@ const KPICards: React.FC<IProps> = ({ currentBalance, stats }) => {
       <Card padding="md">
         <p className="text-gray-400 text-sm font-medium mb-2">Total Income</p>
         <h2 className="text-3xl font-bold text-success">
-          +${stats.income.toLocaleString("en-US", { minimumFractionDigits: 2 })}
+          +{formatCurrency(stats.income, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
         </h2>
         <p className="text-xs text-gray-500 mt-1">
           {stats.completedIncomeCount} completed, {stats.pendingIncomeCount} pending
@@ -55,7 +55,7 @@ const KPICards: React.FC<IProps> = ({ currentBalance, stats }) => {
       <Card padding="md">
         <p className="text-gray-400 text-sm font-medium mb-2">Total Expenses</p>
         <h2 className="text-3xl font-bold text-danger">
-          -${stats.expenses.toLocaleString("en-US", { minimumFractionDigits: 2 })}
+          -{formatCurrency(stats.expenses, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
         </h2>
         <p className="text-xs text-gray-500 mt-1">
           {stats.completedExpenseCount} completed, {stats.pendingExpenseCount} pending

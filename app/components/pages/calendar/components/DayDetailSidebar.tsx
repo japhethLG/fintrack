@@ -4,6 +4,7 @@ import React from "react";
 import { Transaction, DayBalance } from "@/lib/types";
 import { Card, Icon } from "@/components/common";
 import { cn } from "@/lib/utils/cn";
+import { useCurrency } from "@/lib/hooks/useCurrency";
 import { STATUS_COLORS, STATUS_BG_COLORS } from "../constants";
 import TransactionItem from "./TransactionItem";
 
@@ -20,6 +21,7 @@ const DayDetailSidebar: React.FC<IProps> = ({
   transactions,
   onTransactionClick,
 }) => {
+  const { formatCurrency, formatCurrencyWithSign } = useCurrency();
   return (
     <Card padding="md" className="sticky top-6">
       {selectedDate ? (
@@ -39,13 +41,13 @@ const DayDetailSidebar: React.FC<IProps> = ({
                 <div className="flex justify-between items-center mb-2">
                   <span className="text-sm text-gray-400">Opening</span>
                   <span className="text-white font-medium">
-                    ${dayBalance.openingBalance.toLocaleString()}
+                    {formatCurrency(dayBalance.openingBalance)}
                   </span>
                 </div>
                 <div className="flex justify-between items-center">
                   <span className="text-sm text-gray-400">Closing</span>
                   <span className={cn("font-bold", STATUS_COLORS[dayBalance.status])}>
-                    ${dayBalance.closingBalance.toLocaleString()}
+                    {formatCurrency(dayBalance.closingBalance)}
                   </span>
                 </div>
               </div>
@@ -58,13 +60,13 @@ const DayDetailSidebar: React.FC<IProps> = ({
               <div className="bg-success/10 rounded-lg p-2 text-center">
                 <p className="text-xs text-gray-400">Income</p>
                 <p className="text-success font-bold">
-                  +${dayBalance.totalIncome.toLocaleString()}
+                  {formatCurrencyWithSign(dayBalance.totalIncome)}
                 </p>
               </div>
               <div className="bg-danger/10 rounded-lg p-2 text-center">
                 <p className="text-xs text-gray-400">Expenses</p>
                 <p className="text-danger font-bold">
-                  -${dayBalance.totalExpenses.toLocaleString()}
+                  -{formatCurrency(dayBalance.totalExpenses)}
                 </p>
               </div>
             </div>

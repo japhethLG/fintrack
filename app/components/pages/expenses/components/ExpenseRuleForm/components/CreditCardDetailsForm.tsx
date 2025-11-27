@@ -4,10 +4,12 @@ import React from "react";
 import { useFormContext, useWatch } from "react-hook-form";
 import { FormInput, FormSelect } from "@/components/formElements";
 import { EXPENSE_CATEGORY_LABELS } from "@/lib/constants";
+import { useCurrency } from "@/lib/hooks/useCurrency";
 import { PAYMENT_STRATEGIES, MINIMUM_PAYMENT_METHODS } from "../constants";
 import type { ExpenseRuleFormValues } from "../formHelpers";
 
 const CreditCardDetailsForm: React.FC = () => {
+  const { currencySymbol } = useCurrency();
   const { control } = useFormContext<ExpenseRuleFormValues>();
   const creditPaymentStrategy = useWatch({ control, name: "creditPaymentStrategy" });
 
@@ -34,7 +36,7 @@ const CreditCardDetailsForm: React.FC = () => {
           label="Credit Limit"
           tooltip="The maximum amount you can borrow on this card"
           placeholder="0.00"
-          prefix="$"
+          prefix={currencySymbol}
         />
       </div>
 
@@ -45,7 +47,7 @@ const CreditCardDetailsForm: React.FC = () => {
           label="Current Balance"
           tooltip="The amount currently owed on this card"
           placeholder="0.00"
-          prefix="$"
+          prefix={currencySymbol}
           isRequired
         />
       </div>
@@ -80,7 +82,7 @@ const CreditCardDetailsForm: React.FC = () => {
           label="Min Payment Floor"
           tooltip="Minimum payment amount regardless of balance percentage"
           placeholder="25"
-          prefix="$"
+          prefix={currencySymbol}
         />
       </div>
 
@@ -131,7 +133,7 @@ const CreditCardDetailsForm: React.FC = () => {
             type="number"
             label="Fixed Payment Amount"
             placeholder="0.00"
-            prefix="$"
+            prefix={currencySymbol}
           />
         </div>
       )}

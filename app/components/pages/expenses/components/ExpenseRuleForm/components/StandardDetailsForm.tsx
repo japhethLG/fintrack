@@ -3,8 +3,10 @@
 import React from "react";
 import { FormInput, FormSelect, FormCheckbox } from "@/components/formElements";
 import { EXPENSE_CATEGORY_LABELS } from "@/lib/constants";
+import { useCurrency } from "@/lib/hooks/useCurrency";
 
 const StandardDetailsForm: React.FC = () => {
+  const { currencySymbol } = useCurrency();
   const categoryOptions = Object.entries(EXPENSE_CATEGORY_LABELS).map(([value, label]) => ({
     value,
     label,
@@ -27,7 +29,7 @@ const StandardDetailsForm: React.FC = () => {
           type="number"
           label="Amount"
           placeholder="0.00"
-          prefix="$"
+          prefix={currencySymbol}
           isRequired
         />
       </div>

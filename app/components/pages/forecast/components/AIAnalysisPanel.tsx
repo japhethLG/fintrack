@@ -1,6 +1,7 @@
 "use client";
 
 import React from "react";
+import ReactMarkdown from "react-markdown";
 import { Button, Card, Alert, Icon, LoadingSpinner } from "@/components/common";
 
 interface IProps {
@@ -52,7 +53,7 @@ const AIAnalysisPanel: React.FC<IProps> = ({
       )}
 
       {analysis && (
-        <div className="prose prose-invert max-w-none">
+        <div>
           <div className="flex items-center justify-between mb-6 pb-6 border-b border-gray-800">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-600 rounded-lg flex items-center justify-center">
@@ -78,8 +79,52 @@ const AIAnalysisPanel: React.FC<IProps> = ({
             </div>
           </div>
 
-          <div className="space-y-4 text-gray-300 leading-relaxed whitespace-pre-line">
+          <div className="ai-analysis-content">
+            <ReactMarkdown
+              components={{
+                h1: ({ children }) => (
+                  <h1 className="text-2xl font-bold text-white mt-6 mb-3 first:mt-0">{children}</h1>
+                ),
+                h2: ({ children }) => (
+                  <h2 className="text-xl font-bold text-white mt-6 mb-3 first:mt-0">{children}</h2>
+                ),
+                h3: ({ children }) => (
+                  <h3 className="text-lg font-semibold text-white mt-5 mb-2">{children}</h3>
+                ),
+                h4: ({ children }) => (
+                  <h4 className="text-base font-semibold text-white mt-4 mb-2">{children}</h4>
+                ),
+                p: ({ children }) => (
+                  <p className="text-gray-300 leading-relaxed mb-4">{children}</p>
+                ),
+                strong: ({ children }) => (
+                  <strong className="font-semibold text-white">{children}</strong>
+                ),
+                em: ({ children }) => (
+                  <em className="italic text-gray-200">{children}</em>
+                ),
+                ul: ({ children }) => (
+                  <ul className="list-disc list-inside space-y-2 mb-4 text-gray-300">{children}</ul>
+                ),
+                ol: ({ children }) => (
+                  <ol className="list-decimal list-inside space-y-2 mb-4 text-gray-300">{children}</ol>
+                ),
+                li: ({ children }) => (
+                  <li className="text-gray-300 leading-relaxed">{children}</li>
+                ),
+                blockquote: ({ children }) => (
+                  <blockquote className="border-l-4 border-primary pl-4 py-2 my-4 bg-gray-800/50 rounded-r-lg">
+                    {children}
+                  </blockquote>
+                ),
+                code: ({ children }) => (
+                  <code className="bg-gray-800 px-1.5 py-0.5 rounded text-primary text-sm">{children}</code>
+                ),
+                hr: () => <hr className="border-gray-700 my-6" />,
+              }}
+            >
             {analysis}
+            </ReactMarkdown>
           </div>
 
           <Alert

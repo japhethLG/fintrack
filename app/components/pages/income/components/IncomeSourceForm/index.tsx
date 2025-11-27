@@ -7,6 +7,7 @@ import { Button, Card } from "@/components/common";
 import { Form, FormInput, FormSelect, FormCheckbox } from "@/components/formElements";
 import { IncomeSourceFormData } from "@/lib/types";
 import { INCOME_CATEGORIES } from "@/lib/constants";
+import { useCurrency } from "@/lib/hooks/useCurrency";
 import FormStepIndicator from "../../../expenses/components/ExpenseRuleForm/components/FormStepIndicator";
 import SchedulePreview from "../../../expenses/components/ExpenseRuleForm/components/SchedulePreview";
 import {
@@ -61,6 +62,7 @@ const IncomeSourceForm: React.FC<IProps> = ({
   onCancel,
   isEditing = false,
 }) => {
+  const { currencySymbol } = useCurrency();
   const [step, setStep] = useState(1);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -219,7 +221,7 @@ const IncomeSourceForm: React.FC<IProps> = ({
                   type="number"
                   label="Amount"
                   placeholder="0.00"
-                  prefix="$"
+                  prefix={currencySymbol}
                   isRequired
                 />
               </div>

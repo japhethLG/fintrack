@@ -9,6 +9,7 @@ import { getBillCoverageReport } from "@/lib/logic/balanceCalculator";
 import { BillItem } from "@/components/widgets/BillItem";
 import QuickTransaction from "./QuickTransaction";
 import { cn } from "@/lib/utils/cn";
+import { useCurrency } from "@/lib/hooks/useCurrency";
 
 interface IProps {
   onTransactionClick: (transaction: Transaction) => void;
@@ -23,6 +24,7 @@ const RANGE_OPTIONS = [
 
 const UpcomingActivityWidget: React.FC<IProps> = ({ onTransactionClick }) => {
   const { transactions, userProfile } = useFinancial();
+  const { formatCurrency, formatCurrencyWithSign } = useCurrency();
   const [selectedDays, setSelectedDays] = useState("14");
   const [activeTab, setActiveTab] = useState("overview");
 
@@ -83,13 +85,13 @@ const UpcomingActivityWidget: React.FC<IProps> = ({ onTransactionClick }) => {
         <div className="bg-dark-800 p-3 rounded-lg border border-gray-800">
           <p className="text-xs text-gray-400 mb-1">Income</p>
           <p className="text-success font-bold text-sm">
-            +${stats.totalIncome.toLocaleString()}
+            {formatCurrencyWithSign(stats.totalIncome)}
           </p>
         </div>
         <div className="bg-dark-800 p-3 rounded-lg border border-gray-800">
           <p className="text-xs text-gray-400 mb-1">Expenses</p>
           <p className="text-danger font-bold text-sm">
-            -${stats.totalExpenses.toLocaleString()}
+            -{formatCurrency(stats.totalExpenses)}
           </p>
         </div>
         <div className="bg-dark-800 p-3 rounded-lg border border-gray-800">
@@ -100,8 +102,7 @@ const UpcomingActivityWidget: React.FC<IProps> = ({ onTransactionClick }) => {
               stats.net >= 0 ? "text-success" : "text-danger"
             )}
           >
-            {stats.net >= 0 ? "+" : ""}
-            ${stats.net.toLocaleString()}
+            {formatCurrencyWithSign(stats.net)}
           </p>
         </div>
       </div>
@@ -148,7 +149,7 @@ const UpcomingActivityWidget: React.FC<IProps> = ({ onTransactionClick }) => {
                   billReport.projectedBalance >= 0 ? "text-success" : "text-danger"
                 )}
               >
-                ${billReport.projectedBalance.toLocaleString()}
+                {formatCurrency(billReport.projectedBalance)}
               </span>
             </div>
             <div className="h-1.5 bg-gray-700 rounded-full overflow-hidden">

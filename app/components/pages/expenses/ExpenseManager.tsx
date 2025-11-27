@@ -4,6 +4,7 @@ import React, { useState } from "react";
 import { useFinancial } from "@/contexts/FinancialContext";
 import { ExpenseRule, ExpenseRuleFormData } from "@/lib/types";
 import { Button, Card, PageHeader, Icon, LoadingSpinner } from "@/components/common";
+import { useCurrency } from "@/lib/hooks/useCurrency";
 import ExpenseRuleForm from "./components/ExpenseRuleForm";
 import ExpenseRuleCard from "./components/ExpenseRuleCard";
 import ExpenseRuleDetail from "./components/ExpenseRuleDetail";
@@ -11,6 +12,7 @@ import { getMonthlyExpenseMultiplier } from "./constants";
 import UpcomingBillsWidget from "./components/UpcomingBillsWidget";
 
 const ExpenseManager: React.FC = () => {
+  const { formatCurrency } = useCurrency();
   const {
     expenseRules,
     isLoading,
@@ -128,19 +130,19 @@ const ExpenseManager: React.FC = () => {
           <Card padding="md">
             <p className="text-gray-400 text-sm mb-1">Monthly Recurring</p>
             <p className="text-3xl font-bold text-danger">
-              ${recurringMonthly.toLocaleString(undefined, { maximumFractionDigits: 0 })}
+              {formatCurrency(recurringMonthly, { maximumFractionDigits: 0 })}
             </p>
           </Card>
           <Card padding="md">
             <p className="text-gray-400 text-sm mb-1">One-time Expenses</p>
             <p className="text-3xl font-bold text-warning">
-              ${oneTimeTotal.toLocaleString(undefined, { maximumFractionDigits: 0 })}
+              {formatCurrency(oneTimeTotal, { maximumFractionDigits: 0 })}
             </p>
           </Card>
           <Card padding="md">
             <p className="text-gray-400 text-sm mb-1">Total Debt</p>
             <p className="text-3xl font-bold text-danger">
-              ${totalDebt.toLocaleString(undefined, { maximumFractionDigits: 0 })}
+              {formatCurrency(totalDebt, { maximumFractionDigits: 0 })}
             </p>
           </Card>
           <Card padding="md">

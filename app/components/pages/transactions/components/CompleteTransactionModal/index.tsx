@@ -7,6 +7,7 @@ import { Transaction, CompleteTransactionData } from "@/lib/types";
 import { Button, Card, Icon } from "@/components/common";
 import { Form, FormInput } from "@/components/formElements";
 import { cn } from "@/lib/utils/cn";
+import { useCurrency } from "@/lib/hooks/useCurrency";
 import {
   completeTransactionSchema,
   getDefaultValues,
@@ -28,6 +29,7 @@ const CompleteTransactionModal: React.FC<IProps> = ({
   onPartial,
   onClose,
 }) => {
+  const { formatCurrency, formatCurrencyWithSign, currencySymbol } = useCurrency();
   const methods = useForm<CompleteTransactionFormValues>({
     defaultValues: getDefaultValues(
       transaction.projectedAmount,
@@ -108,7 +110,8 @@ const CompleteTransactionModal: React.FC<IProps> = ({
             <div>
               <p className="text-xs text-gray-400">Expected Amount</p>
               <p className={cn("font-bold", isIncome ? "text-success" : "text-danger")}>
-                {isIncome ? "+" : "-"}${transaction.projectedAmount.toLocaleString()}
+                {isIncome ? "+" : "-"}
+                {formatCurrency(transaction.projectedAmount)}
               </p>
             </div>
           </div>
@@ -155,7 +158,7 @@ const CompleteTransactionModal: React.FC<IProps> = ({
                 inputName="actualAmount"
                 type="number"
                 label="Actual Amount"
-                prefix="$"
+                prefix={currencySymbol}
                 placeholder="0.00"
               />
 
@@ -172,7 +175,7 @@ const CompleteTransactionModal: React.FC<IProps> = ({
                         : "bg-success/20 text-success"
                   )}
                 >
-                  {variance > 0 ? "+" : ""}${variance.toLocaleString()} variance from expected
+                  {formatCurrencyWithSign(variance)} variance from expected
                 </div>
               )}
 
@@ -202,12 +205,12 @@ const CompleteTransactionModal: React.FC<IProps> = ({
                 inputName="actualAmount"
                 type="number"
                 label="Amount Paid"
-                prefix="$"
+                prefix={currencySymbol}
                 placeholder="0.00"
               />
               <div className="text-sm text-gray-400">
-                Remaining: $
-                {(transaction.projectedAmount - parseFloat(actualAmount || "0")).toLocaleString()}
+                Remaining:{" "}
+                {formatCurrency(transaction.projectedAmount - parseFloat(actualAmount || "0"))}
               </div>
             </div>
           )}

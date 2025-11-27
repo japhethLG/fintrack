@@ -5,6 +5,7 @@ import { useFinancial } from "@/contexts/FinancialContext";
 import { Transaction } from "@/lib/types";
 import { Card, Icon } from "@/components/common";
 import { cn } from "@/lib/utils/cn";
+import { useCurrency } from "@/lib/hooks/useCurrency";
 
 interface IProps {
   dateRange: { start: string; end: string };
@@ -12,6 +13,7 @@ interface IProps {
 
 const ProjectedVsActualWidget: React.FC<IProps> = ({ dateRange }) => {
   const { transactions } = useFinancial();
+  const { formatCurrency } = useCurrency();
 
   const stats = useMemo(() => {
     const { start, end } = dateRange;
@@ -81,10 +83,10 @@ const ProjectedVsActualWidget: React.FC<IProps> = ({ dateRange }) => {
             <span className="text-gray-400">Income</span>
             <div className="flex gap-2">
               <span className="text-white font-medium">
-                ${stats.income.actual.toLocaleString()}
+                {formatCurrency(stats.income.actual)}
               </span>
               <span className="text-gray-500">
-                / ${stats.income.projected.toLocaleString()}
+                / {formatCurrency(stats.income.projected)}
               </span>
             </div>
           </div>
@@ -109,10 +111,10 @@ const ProjectedVsActualWidget: React.FC<IProps> = ({ dateRange }) => {
             <span className="text-gray-400">Expenses</span>
             <div className="flex gap-2">
               <span className="text-white font-medium">
-                ${stats.expense.actual.toLocaleString()}
+                {formatCurrency(stats.expense.actual)}
               </span>
               <span className="text-gray-500">
-                / ${stats.expense.projected.toLocaleString()}
+                / {formatCurrency(stats.expense.projected)}
               </span>
             </div>
           </div>

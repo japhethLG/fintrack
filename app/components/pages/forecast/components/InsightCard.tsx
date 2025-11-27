@@ -12,7 +12,13 @@ interface IProps {
   status?: "success" | "warning" | "danger" | "info";
 }
 
-const InsightCard: React.FC<IProps> = ({ icon, title, value, subtitle, status = "info" }) => {
+const InsightCard: React.FC<IProps> = ({
+  icon,
+  title,
+  value,
+  subtitle,
+  status = "info",
+}) => {
   const statusColors = {
     success: "bg-success/20 text-success border-success/20",
     warning: "bg-warning/20 text-warning border-warning/20",

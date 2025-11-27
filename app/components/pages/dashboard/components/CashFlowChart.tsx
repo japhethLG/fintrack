@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useMemo } from "react";
+import React, { useMemo, useCallback } from "react";
 import {
   ResponsiveContainer,
   AreaChart,
@@ -11,6 +11,7 @@ import {
   Tooltip,
 } from "recharts";
 import { Card } from "@/components/common";
+import { useCurrency } from "@/lib/hooks/useCurrency";
 
 interface ChartDataPoint {
   date: string;
@@ -23,26 +24,29 @@ interface IProps {
   data: ChartDataPoint[];
 }
 
-/**
- * Formats a value for Y-axis display, choosing the appropriate scale
- */
-const formatYAxisValue = (value: number, maxValue: number): string => {
-  const absValue = Math.abs(value);
-  const absMax = Math.abs(maxValue);
-
-  // For values >= 10k, show in "k" format
-  if (absMax >= 10000) {
-    return `$${(value / 1000).toFixed(0)}k`;
-  }
-  // For values >= 1k, show in "k" format with one decimal
-  if (absMax >= 1000) {
-    return `$${(value / 1000).toFixed(1)}k`;
-  }
-  // For smaller values, show the full number
-  return `$${value.toLocaleString()}`;
-};
-
 const CashFlowChart: React.FC<IProps> = ({ data }) => {
+  const { currencySymbol, formatCurrency } = useCurrency();
+
+  /**
+   * Formats a value for Y-axis display, choosing the appropriate scale
+   */
+  const formatYAxisValue = useCallback(
+    (value: number, maxValue: number): string => {
+      const absMax = Math.abs(maxValue);
+
+      // For values >= 10k, show in "k" format
+      if (absMax >= 10000) {
+        return `${currencySymbol}${(value / 1000).toFixed(0)}k`;
+      }
+      // For values >= 1k, show in "k" format with one decimal
+      if (absMax >= 1000) {
+        return `${currencySymbol}${(value / 1000).toFixed(1)}k`;
+      }
+      // For smaller values, show the full number
+      return formatCurrency(value);
+    },
+    [currencySymbol, formatCurrency]
+  );
   // Calculate the max value for smart formatting
   const maxBalance = useMemo(() => {
     if (data.length === 0) return 0;
@@ -89,7 +93,7 @@ const CashFlowChart: React.FC<IProps> = ({ data }) => {
                   borderRadius: "8px",
                   color: "#fff",
                 }}
-                formatter={(value: number) => [`$${value.toLocaleString()}`, "Balance"]}
+                formatter={(value: number) => [formatCurrency(value), "Balance"]}
                 labelFormatter={(label) => label}
               />
               <Area

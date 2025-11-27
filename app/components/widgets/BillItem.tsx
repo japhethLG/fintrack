@@ -4,6 +4,7 @@ import React from "react";
 import { UpcomingBill } from "@/lib/types";
 import { Button, Icon } from "@/components/common";
 import { cn } from "@/lib/utils/cn";
+import { useCurrency } from "@/lib/hooks/useCurrency";
 
 export interface BillItemProps {
   bill: UpcomingBill;
@@ -11,6 +12,7 @@ export interface BillItemProps {
 }
 
 export const BillItem: React.FC<BillItemProps> = ({ bill, onPay }) => {
+  const { formatCurrency } = useCurrency();
   const { transaction, canCover, shortfall } = bill;
   const date = new Date(transaction.scheduledDate);
 
@@ -41,7 +43,7 @@ export const BillItem: React.FC<BillItemProps> = ({ bill, onPay }) => {
 
       <div className="flex items-center gap-3">
         <div className="text-right">
-          <p className="font-bold text-white">${transaction.projectedAmount.toLocaleString()}</p>
+          <p className="font-bold text-white">{formatCurrency(transaction.projectedAmount)}</p>
           {canCover ? (
             <span className="text-xs text-success flex items-center gap-1">
               <Icon name="check_circle" size={12} />
@@ -50,7 +52,7 @@ export const BillItem: React.FC<BillItemProps> = ({ bill, onPay }) => {
           ) : (
             <span className="text-xs text-danger flex items-center gap-1">
               <Icon name="warning" size={12} />
-              Need ${shortfall?.toLocaleString()}
+              Need {shortfall ? formatCurrency(shortfall) : ""}
             </span>
           )}
         </div>

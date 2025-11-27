@@ -4,11 +4,13 @@ import React, { useMemo } from "react";
 import { useFormContext, useWatch } from "react-hook-form";
 import { FormInput, FormSelect } from "@/components/formElements";
 import { EXPENSE_CATEGORY_LABELS } from "@/lib/constants";
+import { useCurrency } from "@/lib/hooks/useCurrency";
 import { calculateAmortizationSchedule } from "@/lib/logic/amortization";
 import { LOAN_CALCULATION_TYPES } from "../constants";
 import { calculateLoanPayment, type ExpenseRuleFormValues } from "../formHelpers";
 
 const LoanDetailsForm: React.FC = () => {
+  const { formatCurrency, currencySymbol } = useCurrency();
   const { control } = useFormContext<ExpenseRuleFormValues>();
 
   const loanPrincipal = useWatch({ control, name: "loanPrincipal" });
@@ -69,7 +71,7 @@ const LoanDetailsForm: React.FC = () => {
           label="Original Principal"
           tooltip="The total amount borrowed (original loan amount)"
           placeholder="0.00"
-          prefix="$"
+          prefix={currencySymbol}
           isRequired
         />
       </div>
@@ -81,7 +83,7 @@ const LoanDetailsForm: React.FC = () => {
           label="Current Balance"
           tooltip="How much you still owe. Leave empty if this is a new loan."
           placeholder="Same as principal if new"
-          prefix="$"
+          prefix={currencySymbol}
         />
       </div>
 
@@ -133,10 +135,15 @@ const LoanDetailsForm: React.FC = () => {
       {calculatedPayment && (
         <div className="md:col-span-2 bg-gray-800/50 rounded-xl p-6">
           <p className="text-gray-400 text-sm mb-1">Calculated Monthly Payment</p>
-          <p className="text-3xl font-bold text-danger">${calculatedPayment.toFixed(2)}</p>
+          <p className="text-3xl font-bold text-danger">
+            {formatCurrency(calculatedPayment, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+          </p>
           <p className="text-sm text-gray-400 mt-2">
-            Total Interest: $
-            {(calculatedPayment * parseInt(loanTermMonths) - parseFloat(loanPrincipal)).toFixed(2)}
+            Total Interest:{" "}
+            {formatCurrency(
+              calculatedPayment * parseInt(loanTermMonths) - parseFloat(loanPrincipal),
+              { minimumFractionDigits: 2, maximumFractionDigits: 2 }
+            )}
           </p>
         </div>
       )}
@@ -161,10 +168,17 @@ const LoanDetailsForm: React.FC = () => {
                   <tr key={i} className="border-t border-gray-800">
                     <td className="py-2 text-white">#{i + 1}</td>
                     <td className="py-2 text-gray-300">{row.date.toLocaleDateString()}</td>
-                    <td className="py-2 text-right text-white">${row.principal.toFixed(2)}</td>
-                    <td className="py-2 text-right text-danger">${row.interest.toFixed(2)}</td>
+                    <td className="py-2 text-right text-white">
+                      {formatCurrency(row.principal, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    </td>
+                    <td className="py-2 text-right text-danger">
+                      {formatCurrency(row.interest, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    </td>
                     <td className="py-2 text-right text-gray-300">
-                      ${row.remainingBalance.toFixed(2)}
+                      {formatCurrency(row.remainingBalance, {
+                        minimumFractionDigits: 2,
+                        maximumFractionDigits: 2,
+                      })}
                     </td>
                   </tr>
                 ))}

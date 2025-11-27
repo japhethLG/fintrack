@@ -6,6 +6,7 @@ import { Transaction } from "@/lib/types";
 import { Card, Icon, Select, Badge } from "@/components/common";
 import { formatDate, addDays } from "@/lib/utils/dateUtils";
 import { cn } from "@/lib/utils/cn";
+import { useCurrency } from "@/lib/hooks/useCurrency";
 
 interface IProps {
   onSelectRule: (ruleId: string) => void;
@@ -19,6 +20,7 @@ const RANGE_OPTIONS = [
 
 const UpcomingBillsWidget: React.FC<IProps> = ({ onSelectRule }) => {
   const { transactions } = useFinancial();
+  const { formatCurrency } = useCurrency();
   const [selectedDays, setSelectedDays] = useState("30");
 
   const upcomingBills = useMemo(() => {
@@ -76,7 +78,7 @@ const UpcomingBillsWidget: React.FC<IProps> = ({ onSelectRule }) => {
         <div className="flex justify-between items-center">
              <span className="text-gray-400">Total Due</span>
              <span className="text-2xl font-bold text-danger">
-                ${totalExpected.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                {formatCurrency(totalExpected, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
              </span>
         </div>
       </div>
@@ -115,7 +117,7 @@ const UpcomingBillsWidget: React.FC<IProps> = ({ onSelectRule }) => {
                                     </div>
                                 </div>
                                 <div className="text-right">
-                                     <p className="font-bold text-danger">-${t.projectedAmount.toLocaleString()}</p>
+                                     <p className="font-bold text-danger">-{formatCurrency(t.projectedAmount)}</p>
                                      <Badge variant="warning" className="text-xs">{t.status}</Badge>
                                 </div>
                             </div>

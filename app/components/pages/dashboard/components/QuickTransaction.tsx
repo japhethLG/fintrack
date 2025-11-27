@@ -4,6 +4,7 @@ import React from "react";
 import { Transaction } from "@/lib/types";
 import { Icon, Badge } from "@/components/common";
 import { cn } from "@/lib/utils/cn";
+import { useCurrency } from "@/lib/hooks/useCurrency";
 import { formatDate } from "@/lib/utils/dateUtils";
 
 interface IProps {
@@ -12,6 +13,7 @@ interface IProps {
 }
 
 const QuickTransaction: React.FC<IProps> = ({ transaction, onClick }) => {
+  const { formatCurrency } = useCurrency();
   const isIncome = transaction.type === "income";
   const today = formatDate(new Date()); // YYYY-MM-DD
   const isPast = transaction.scheduledDate < today; // String comparison (today is NOT past)
@@ -49,7 +51,8 @@ const QuickTransaction: React.FC<IProps> = ({ transaction, onClick }) => {
       </div>
       <div className="text-right">
         <p className={cn("font-bold", isIncome ? "text-success" : "text-white")}>
-          {isIncome ? "+" : "-"}${transaction.projectedAmount.toLocaleString()}
+          {isIncome ? "+" : "-"}
+          {formatCurrency(transaction.projectedAmount)}
         </p>
         <Badge
           variant={transaction.status === "completed" ? "success" : isPast ? "danger" : "warning"}

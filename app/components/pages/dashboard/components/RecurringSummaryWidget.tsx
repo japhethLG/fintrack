@@ -6,6 +6,7 @@ import { useFinancial } from "@/contexts/FinancialContext";
 import { IncomeSource, ExpenseRule, IncomeFrequency } from "@/lib/types";
 import { Card, Button, Icon } from "@/components/common";
 import { cn } from "@/lib/utils/cn";
+import { useCurrency } from "@/lib/hooks/useCurrency";
 
 const getMonthlyMultiplier = (frequency: IncomeFrequency): number => {
   switch (frequency) {
@@ -31,6 +32,7 @@ const getMonthlyMultiplier = (frequency: IncomeFrequency): number => {
 const RecurringSummaryWidget: React.FC = () => {
   const router = useRouter();
   const { incomeSources, expenseRules } = useFinancial();
+  const { formatCurrency, formatCurrencyWithSign } = useCurrency();
 
   const stats = useMemo(() => {
     const activeIncome = incomeSources.filter((s) => s.isActive);
@@ -84,7 +86,7 @@ const RecurringSummaryWidget: React.FC = () => {
             <p className="text-xs text-gray-400 mb-0.5">Monthly Income</p>
             <div className="flex items-center gap-2">
               <span className="font-bold text-white">
-                ${stats.monthlyIncome.toLocaleString(undefined, { maximumFractionDigits: 0 })}
+                {formatCurrency(stats.monthlyIncome, { maximumFractionDigits: 0 })}
               </span>
               <span className="text-xs bg-dark-700 px-1.5 py-0.5 rounded text-gray-400">
                 {stats.activeIncomeCount} sources
@@ -105,7 +107,7 @@ const RecurringSummaryWidget: React.FC = () => {
             <p className="text-xs text-gray-400 mb-0.5">Monthly Expenses</p>
             <div className="flex items-center gap-2">
               <span className="font-bold text-white">
-                ${stats.monthlyExpenses.toLocaleString(undefined, { maximumFractionDigits: 0 })}
+                {formatCurrency(stats.monthlyExpenses, { maximumFractionDigits: 0 })}
               </span>
               <span className="text-xs bg-dark-700 px-1.5 py-0.5 rounded text-gray-400">
                 {stats.activeExpenseCount} rules
@@ -129,8 +131,7 @@ const RecurringSummaryWidget: React.FC = () => {
               stats.net >= 0 ? "text-success" : "text-danger"
             )}
           >
-            {stats.net >= 0 ? "+" : "-"}$
-            {Math.abs(stats.net).toLocaleString(undefined, { maximumFractionDigits: 0 })}
+            {formatCurrencyWithSign(stats.net, { maximumFractionDigits: 0 })}
             <span className="text-xs font-normal text-gray-500 ml-1">/mo</span>
           </span>
         </div>

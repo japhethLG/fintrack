@@ -21,15 +21,8 @@ const Forecast: React.FC = () => {
   const [analysis, setAnalysis] = useState<string | null>(null);
   const [analyzing, setAnalyzing] = useState(false);
 
-  // Calculate financial metrics
-  const metrics = useMemo(() => {
-    if (!userProfile) return null;
-
-    const balance = userProfile.currentBalance;
-    const runway = getRunway(balance, transactions);
-    const nextCrunch = getNextCrunch(balance, transactions);
-
-    // Get date range for variance
+  // Get current month date range
+  const dateRange = useMemo(() => {
     const today = new Date();
     const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1)
       .toISOString()
@@ -37,12 +30,45 @@ const Forecast: React.FC = () => {
     const endOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0)
       .toISOString()
       .split("T")[0];
-    const variance = calculateVarianceReport(transactions, startOfMonth, endOfMonth);
+    return { start: startOfMonth, end: endOfMonth };
+  }, []);
 
-    // Category breakdown
-    const categoryBreakdown = getCategoryBreakdown(transactions, "expense");
+  // Calculate ACTUAL metrics from transactions (same logic as dashboard)
+  const actualMetrics = useMemo(() => {
+    const { start, end } = dateRange;
 
-    // Calculate totals
+    let income = 0;
+    let expenses = 0;
+
+    transactions.forEach((t) => {
+      const date = t.actualDate || t.scheduledDate;
+      if (date >= start && date <= end) {
+        // Skip skipped transactions
+        if (t.status === "skipped") return;
+
+        const amount = t.actualAmount ?? t.projectedAmount;
+
+        if (t.type === "income") {
+          income += amount;
+        } else {
+          expenses += amount;
+        }
+      }
+    });
+
+    const surplus = income - expenses;
+    const savingsRate = income > 0 ? ((income - expenses) / income) * 100 : 0;
+
+    return {
+      monthlyIncome: income,
+      monthlyExpenses: expenses,
+      monthlySurplus: surplus,
+      savingsRate,
+    };
+  }, [transactions, dateRange]);
+
+  // Calculate BUDGETED metrics from income sources and expense rules
+  const budgetedMetrics = useMemo(() => {
     const activeIncome = incomeSources.filter((s) => s.isActive);
     const activeExpenses = expenseRules.filter((r) => r.isActive);
 
@@ -51,10 +77,10 @@ const Forecast: React.FC = () => {
       let monthly = s.amount;
       switch (s.frequency) {
         case "weekly":
-          monthly *= 4;
+          monthly *= 4.33; // More accurate weeks per month
           break;
         case "bi-weekly":
-          monthly *= 2;
+          monthly *= 2.17; // More accurate bi-weekly per month
           break;
         case "semi-monthly":
           monthly *= s.scheduleConfig.specificDays?.length || 2;
@@ -74,10 +100,10 @@ const Forecast: React.FC = () => {
       let monthly = r.amount;
       switch (r.frequency) {
         case "weekly":
-          monthly *= 4;
+          monthly *= 4.33;
           break;
         case "bi-weekly":
-          monthly *= 2;
+          monthly *= 2.17;
           break;
         case "semi-monthly":
           monthly *= r.scheduleConfig.specificDays?.length || 2;
@@ -95,7 +121,33 @@ const Forecast: React.FC = () => {
     const savingsRate =
       monthlyIncome > 0 ? ((monthlyIncome - monthlyExpenses) / monthlyIncome) * 100 : 0;
 
+    return {
+      monthlyIncome,
+      monthlyExpenses,
+      monthlySurplus: monthlyIncome - monthlyExpenses,
+      savingsRate,
+    };
+  }, [incomeSources, expenseRules]);
+
+  // Calculate financial metrics for MetricsGrid
+  const metrics = useMemo(() => {
+    if (!userProfile) return null;
+
+    const balance = userProfile.currentBalance;
+    const runway = getRunway(balance, transactions);
+    const nextCrunch = getNextCrunch(balance, transactions);
+
+    const variance = calculateVarianceReport(transactions, dateRange.start, dateRange.end);
+
+    // Category breakdown from actual transactions
+    const filteredTxns = transactions.filter((t) => {
+      const date = t.actualDate || t.scheduledDate;
+      return date >= dateRange.start && date <= dateRange.end;
+    });
+    const categoryBreakdown = getCategoryBreakdown(filteredTxns, "expense");
+
     // Debt total
+    const activeExpenses = expenseRules.filter((r) => r.isActive);
     let totalDebt = 0;
     activeExpenses.forEach((r) => {
       if (r.loanConfig) totalDebt += r.loanConfig.currentBalance;
@@ -108,14 +160,15 @@ const Forecast: React.FC = () => {
       nextCrunch,
       variance,
       categoryBreakdown,
-      monthlyIncome,
-      monthlyExpenses,
-      monthlySurplus: monthlyIncome - monthlyExpenses,
-      savingsRate,
+      // Use actual metrics for display
+      monthlyIncome: actualMetrics.monthlyIncome,
+      monthlyExpenses: actualMetrics.monthlyExpenses,
+      monthlySurplus: actualMetrics.monthlySurplus,
+      savingsRate: actualMetrics.savingsRate,
       totalDebt,
       billsAtRisk: billCoverage?.upcomingBills.filter((b) => !b.canCover).length || 0,
     };
-  }, [userProfile, transactions, incomeSources, expenseRules, billCoverage]);
+  }, [userProfile, transactions, expenseRules, billCoverage, dateRange, actualMetrics]);
 
   const handleAnalyze = async () => {
     if (!userProfile) return;
@@ -163,15 +216,25 @@ const Forecast: React.FC = () => {
       </div>
 
       {/* Quick Metrics */}
-      {metrics && <MetricsGrid metrics={metrics} />}
+      {metrics && (
+        <MetricsGrid
+          metrics={metrics}
+          budgetedMetrics={budgetedMetrics}
+          actualMetrics={actualMetrics}
+        />
+      )}
 
       {/* Financial Summary */}
       {metrics && (
         <MonthlyOverview
-          monthlyIncome={metrics.monthlyIncome}
-          monthlyExpenses={metrics.monthlyExpenses}
-          monthlySurplus={metrics.monthlySurplus}
-          savingsRate={metrics.savingsRate}
+          actualIncome={actualMetrics.monthlyIncome}
+          actualExpenses={actualMetrics.monthlyExpenses}
+          actualSurplus={actualMetrics.monthlySurplus}
+          actualSavingsRate={actualMetrics.savingsRate}
+          budgetedIncome={budgetedMetrics.monthlyIncome}
+          budgetedExpenses={budgetedMetrics.monthlyExpenses}
+          budgetedSurplus={budgetedMetrics.monthlySurplus}
+          budgetedSavingsRate={budgetedMetrics.savingsRate}
           billsAtRisk={metrics.billsAtRisk}
           categoryBreakdown={metrics.categoryBreakdown}
         />

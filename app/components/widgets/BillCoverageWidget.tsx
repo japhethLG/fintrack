@@ -6,6 +6,7 @@ import { Transaction } from "@/lib/types";
 import { getBillCoverageReport } from "@/lib/logic/balanceCalculator";
 import { Card, Icon, Badge, Select } from "@/components/common";
 import { cn } from "@/lib/utils/cn";
+import { useCurrency } from "@/lib/hooks/useCurrency";
 import { BillItem } from "./BillItem";
 
 // ============================================================================
@@ -41,6 +42,7 @@ const BillCoverageWidget: React.FC<BillCoverageWidgetProps> = ({
     userProfile,
     transactions: contextTransactions,
   } = useFinancial();
+  const { formatCurrency } = useCurrency();
 
   const [selectedDays, setSelectedDays] = useState(days.toString());
 
@@ -123,11 +125,11 @@ const BillCoverageWidget: React.FC<BillCoverageWidgetProps> = ({
         <div className="grid grid-cols-2 gap-4 text-sm">
           <div>
             <p className="text-gray-400">Current Balance</p>
-            <p className="text-white font-bold text-lg">${currentBalance.toLocaleString()}</p>
+            <p className="text-white font-bold text-lg">{formatCurrency(currentBalance)}</p>
           </div>
           <div>
             <p className="text-gray-400">Total Bills</p>
-            <p className="text-danger font-bold text-lg">-${totalUpcoming.toLocaleString()}</p>
+            <p className="text-danger font-bold text-lg">-{formatCurrency(totalUpcoming)}</p>
           </div>
           <div>
             <p className="text-gray-400">Bills Count</p>
@@ -141,7 +143,7 @@ const BillCoverageWidget: React.FC<BillCoverageWidgetProps> = ({
                 projectedBalance >= 0 ? "text-success" : "text-danger"
               )}
             >
-              ${projectedBalance.toLocaleString()}
+              {formatCurrency(projectedBalance)}
             </p>
           </div>
         </div>
