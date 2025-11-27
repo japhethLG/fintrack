@@ -26,6 +26,7 @@
 - [Configuration](#-configuration)
 - [Usage Guide](#-usage-guide)
 - [AI Integration](#-ai-integration)
+- [Deployment](#-deployment)
 - [Contributing](#-contributing)
 - [License](#-license)
 
@@ -667,6 +668,32 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 - **Vercel** - Hosting and deployment
 - **Radix UI** - Accessible component primitives
 - **Tailwind CSS** - Utility-first CSS framework
+
+---
+
+## 🚀 Deployment
+
+### GitHub Pages
+
+FinTrack can be deployed to GitHub Pages for free hosting. See the [Deployment Guide](./DEPLOYMENT.md) for detailed instructions.
+
+**Quick Setup:**
+
+1. Enable GitHub Pages in repository settings (Source: GitHub Actions)
+2. Add required secrets (Firebase config, Gemini API key)
+3. Push to `main` branch - automatic deployment via GitHub Actions
+
+Your app will be available at: `https://your-username.github.io/fintrack/`
+
+### Other Platforms
+
+FinTrack can also be deployed to:
+
+- **Vercel**: One-click deployment with automatic previews
+- **Netlify**: Easy setup with continuous deployment
+- **Self-hosted**: Build and serve the static output from the `out` directory
+
+For detailed deployment instructions, see [DEPLOYMENT.md](./DEPLOYMENT.md).
 
 ---
 
