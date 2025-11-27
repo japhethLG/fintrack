@@ -3,7 +3,7 @@
 import React from "react";
 import { cn } from "@/lib/utils/cn";
 
-export interface CardProps {
+export interface CardProps extends React.HTMLAttributes<HTMLDivElement> {
   variant?: "default" | "elevated";
   padding?: "sm" | "md" | "lg" | "none";
   header?: React.ReactNode;
@@ -21,6 +21,7 @@ export const Card: React.FC<CardProps> = ({
   hover = false,
   className = "",
   children,
+  ...rest
 }) => {
   const baseStyles = "bg-[#1a2336] border border-gray-800 rounded-2xl";
 
@@ -36,16 +37,16 @@ export const Card: React.FC<CardProps> = ({
     lg: "p-8",
   };
 
-	const combinedClassName = cn(
-		baseStyles,
-		variantStyles[variant],
-		paddingStyles[padding],
-		hover && "transition-all duration-200 hover:border-gray-700",
-		className
-	);
+  const combinedClassName = cn(
+    baseStyles,
+    variantStyles[variant],
+    paddingStyles[padding],
+    hover && "transition-all duration-200 hover:border-gray-700",
+    className
+  );
 
   return (
-    <div className={combinedClassName}>
+    <div className={combinedClassName} {...rest}>
       {header && <div className="border-b border-gray-800 bg-[#1e273b] p-4 md:p-6">{header}</div>}
       <div className={header || footer ? (header && footer ? "" : header ? "" : "") : ""}>
         {children}

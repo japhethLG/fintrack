@@ -34,12 +34,7 @@ export const Badge: React.FC<BadgeProps> = ({
     lg: "px-3 py-1.5 text-sm",
   };
 
-	const combinedClassName = cn(
-		baseStyles,
-		variantStyles[variant],
-		sizeStyles[size],
-		className
-	);
+  const combinedClassName = cn(baseStyles, variantStyles[variant], sizeStyles[size], className);
 
   return (
     <span className={combinedClassName}>

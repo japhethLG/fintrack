@@ -1,0 +1,491 @@
+---
+alwaysApply: true
+---
+
+# Context & State Management Patterns
+
+## Core Principle
+
+Use React Context for global state that needs to be accessed across multiple components. Keep context providers focused on a single domain. Use custom hooks to expose context values.
+
+## Context Structure
+
+### File Organization
+
+```
+contexts/
+├── AuthContext.tsx      # Authentication state
+└── FinancialContext.tsx # Financial data & operations
+```
+
+### Context Pattern
+
+```tsx
+// contexts/FinancialContext.tsx
+"use client";
+
+import React, {
+  createContext,
+  useContext,
+  useState,
+  useEffect,
+  useCallback,
+  useMemo,
+  ReactNode,
+} from "react";
+import { useAuth } from "./AuthContext";
+import { EntityType, FormData } from "@/lib/types";
+import {
+  // Firebase operations
+  subscribeToEntities,
+  addEntity,
+  updateEntity,
+  deleteEntity,
+} from "@/lib/firebase/firestore";
+
+// ============================================================================
+// CONTEXT VALUE INTERFACE
+// ============================================================================
+
+interface ContextValue {
+  // Loading states
+  isLoading: boolean;
+  isInitialized: boolean;
+
+  // Data
+  entities: Entity[];
+  computedData: ComputedType;
+
+  // Actions
+  createEntity: (data: FormData) => Promise<Entity>;
+  editEntity: (id: string, data: Partial<FormData>) => Promise<void>;
+  removeEntity: (id: string) => Promise<void>;
+
+  // Utilities
+  refreshData: () => Promise<void>;
+}
+
+// ============================================================================
+// CONTEXT CREATION
+// ============================================================================
+
+const FinancialContext = createContext<ContextValue | null>(null);
+
+// ============================================================================
+// CUSTOM HOOK
+// ============================================================================
+
+export const useFinancial = (): ContextValue => {
+  const context = useContext(FinancialContext);
+  if (!context) {
+    throw new Error("useFinancial must be used within a FinancialProvider");
+  }
+  return context;
+};
+
+// ============================================================================
+// PROVIDER COMPONENT
+// ============================================================================
+
+interface ProviderProps {
+  children: ReactNode;
+}
+
+export const FinancialProvider: React.FC<ProviderProps> = ({ children }) => {
+  const { user, loading: authLoading } = useAuth();
+
+  // State
+  const [isLoading, setIsLoading] = useState(true);
+  const [isInitialized, setIsInitialized] = useState(false);
+  const [entities, setEntities] = useState<Entity[]>([]);
+
+  // Real-time subscriptions
+  useEffect(() => {
+    if (authLoading) return;
+    if (!user) {
+      // Reset state on logout
+      setEntities([]);
+      setIsLoading(false);
+      setIsInitialized(true);
+      return;
+    }
+
+    setIsLoading(true);
+    const unsubscribers: (() => void)[] = [];
+
+    // Subscribe to data
+    const unsubEntities = subscribeToEntities(user.uid, (data) => {
+      setEntities(data);
+    });
+    unsubscribers.push(unsubEntities);
+
+    // Mark as loaded
+    const timer = setTimeout(() => {
+      setIsLoading(false);
+      setIsInitialized(true);
+    }, 1000);
+
+    return () => {
+      unsubscribers.forEach((unsub) => unsub());
+      clearTimeout(timer);
+    };
+  }, [user, authLoading]);
+
+  // Computed values
+  const computedData = useMemo(() => {
+    // Expensive calculations
+    return calculateSomething(entities);
+  }, [entities]);
+
+  // Actions (wrapped in useCallback for stability)
+  const createEntity = useCallback(
+    async (data: FormData): Promise<Entity> => {
+      if (!user) throw new Error("User not authenticated");
+      return addEntity(user.uid, data);
+    },
+    [user]
+  );
+
+  const editEntity = useCallback(
+    async (id: string, data: Partial<FormData>) => {
+      await updateEntity(id, data);
+    },
+    []
+  );
+
+  const removeEntity = useCallback(async (id: string) => {
+    await deleteEntity(id);
+  }, []);
+
+  const refreshData = useCallback(async () => {
+    if (!user) return;
+    setIsLoading(true);
+    try {
+      const data = await getEntities(user.uid);
+      setEntities(data);
+    } finally {
+      setIsLoading(false);
+    }
+  }, [user]);
+
+  // Context value
+  const value: ContextValue = {
+    isLoading,
+    isInitialized,
+    entities,
+    computedData,
+    createEntity,
+    editEntity,
+    removeEntity,
+    refreshData,
+  };
+
+  return (
+    <FinancialContext.Provider value={value}>
+      {children}
+    </FinancialContext.Provider>
+  );
+};
+
+export default FinancialContext;
+```
+
+## Provider Composition
+
+```tsx
+// providers.tsx
+"use client";
+
+import { AuthProvider } from "./contexts/AuthContext";
+import { FinancialProvider } from "./contexts/FinancialContext";
+
+export function Providers({ children }: { children: React.ReactNode }) {
+  return (
+    <AuthProvider>
+      <FinancialProvider>
+        {children}
+      </FinancialProvider>
+    </AuthProvider>
+  );
+}
+```
+
+```tsx
+// layout.tsx
+import { Providers } from "./providers";
+
+export default function RootLayout({ children }) {
+  return (
+    <html>
+      <body>
+        <Providers>{children}</Providers>
+      </body>
+    </html>
+  );
+}
+```
+
+## Context Value Interface Guidelines
+
+### Loading States
+
+```tsx
+interface ContextValue {
+  isLoading: boolean;      // Currently fetching/updating data
+  isInitialized: boolean;  // Initial load complete
+}
+```
+
+### Data
+
+```tsx
+interface ContextValue {
+  // Raw data from database
+  entities: Entity[];
+  userProfile: UserProfile | null;
+
+  // Computed/derived data
+  computedData: ComputedType;
+  filteredEntities: Entity[];
+}
+```
+
+### Actions
+
+```tsx
+interface ContextValue {
+  // CRUD operations (return Promise)
+  createEntity: (data: FormData) => Promise<Entity>;
+  editEntity: (id: string, data: Partial<FormData>) => Promise<void>;
+  removeEntity: (id: string) => Promise<void>;
+
+  // Toggle operations
+  toggleEntityActive: (id: string, isActive: boolean) => Promise<void>;
+
+  // Utility actions
+  refreshData: () => Promise<void>;
+}
+```
+
+## Using Context in Components
+
+```tsx
+"use client";
+
+import React from "react";
+import { useFinancial } from "@/contexts/FinancialContext";
+import { LoadingSpinner } from "@/components/common";
+
+const MyComponent: React.FC = () => {
+  const {
+    entities,
+    isLoading,
+    createEntity,
+    removeEntity,
+  } = useFinancial();
+
+  const handleCreate = async (data: FormData) => {
+    const entity = await createEntity(data);
+    // Do something with new entity
+  };
+
+  if (isLoading) {
+    return <LoadingSpinner size="lg" text="Loading..." />;
+  }
+
+  return (
+    <div>
+      {entities.map((entity) => (
+        <EntityCard
+          key={entity.id}
+          entity={entity}
+          onDelete={() => removeEntity(entity.id)}
+        />
+      ))}
+    </div>
+  );
+};
+```
+
+## Real-Time Subscriptions Pattern
+
+```tsx
+useEffect(() => {
+  if (!user) return;
+
+  const unsubscribers: (() => void)[] = [];
+
+  // Subscribe to multiple collections
+  const unsubEntities = subscribeToEntities(user.uid, setEntities);
+  unsubscribers.push(unsubEntities);
+
+  const unsubAlerts = subscribeToAlerts(user.uid, setAlerts);
+  unsubscribers.push(unsubAlerts);
+
+  // Cleanup all subscriptions
+  return () => {
+    unsubscribers.forEach((unsub) => unsub());
+  };
+}, [user]);
+```
+
+## Computed Values Pattern
+
+Use `useMemo` for expensive computations:
+
+```tsx
+// Date range computed once
+const dateRange = useMemo(() => {
+  const today = new Date();
+  const startDate = new Date(today.getFullYear(), today.getMonth(), 1);
+  const endDate = new Date(today.getFullYear(), today.getMonth() + 4, 0);
+  return {
+    start: startDate.toISOString().split("T")[0],
+    end: endDate.toISOString().split("T")[0],
+  };
+}, []);
+
+// Computed from multiple data sources
+const dailyBalances = useMemo(() => {
+  if (!userProfile || transactions.length === 0) {
+    return new Map<string, DayBalance>();
+  }
+  return calculateDailyBalances(
+    userProfile.currentBalance,
+    transactions,
+    new Date(dateRange.start),
+    new Date(dateRange.end)
+  );
+}, [userProfile, transactions, dateRange]);
+```
+
+## Action Pattern with Side Effects
+
+```tsx
+const createEntity = useCallback(
+  async (data: FormData): Promise<Entity> => {
+    if (!user) throw new Error("User not authenticated");
+
+    // 1. Create entity
+    const entity = await addEntity(user.uid, data);
+
+    // 2. Side effects (e.g., generate related data)
+    const projections = generateProjections(entity);
+    if (projections.length > 0) {
+      await addProjectionsBatch(user.uid, projections);
+    }
+
+    return entity;
+  },
+  [user, dateRange]
+);
+```
+
+## Auth Context Pattern
+
+```tsx
+// contexts/AuthContext.tsx
+"use client";
+
+import React, { createContext, useContext, useState, useEffect, ReactNode } from "react";
+import {
+  User,
+  onAuthStateChanged,
+  signInWithEmailAndPassword,
+  signOut,
+} from "firebase/auth";
+import { auth } from "@/lib/firebase/config";
+import { createUserProfile } from "@/lib/firebase/firestore";
+
+interface AuthContextValue {
+  user: User | null;
+  loading: boolean;
+  login: (email: string, password: string) => Promise<void>;
+  logout: () => Promise<void>;
+}
+
+const AuthContext = createContext<AuthContextValue | null>(null);
+
+export const useAuth = (): AuthContextValue => {
+  const context = useContext(AuthContext);
+  if (!context) {
+    throw new Error("useAuth must be used within an AuthProvider");
+  }
+  return context;
+};
+
+export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
+  const [user, setUser] = useState<User | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, async (user) => {
+      if (user) {
+        // Create profile if new user
+        await createUserProfile(user.uid, user.email!, user.displayName || "User");
+      }
+      setUser(user);
+      setLoading(false);
+    });
+
+    return unsubscribe;
+  }, []);
+
+  const login = async (email: string, password: string) => {
+    await signInWithEmailAndPassword(auth, email, password);
+  };
+
+  const logout = async () => {
+    await signOut(auth);
+  };
+
+  return (
+    <AuthContext.Provider value={{ user, loading, login, logout }}>
+      {children}
+    </AuthContext.Provider>
+  );
+};
+```
+
+## Protected Route Pattern
+
+```tsx
+// components/ProtectedRoute.tsx
+"use client";
+
+import { useAuth } from "@/contexts/AuthContext";
+import { useRouter } from "next/navigation";
+import { useEffect } from "react";
+import { LoadingSpinner } from "@/components/common";
+
+interface Props {
+  children: React.ReactNode;
+}
+
+const ProtectedRoute: React.FC<Props> = ({ children }) => {
+  const { user, loading } = useAuth();
+  const router = useRouter();
+
+  useEffect(() => {
+    if (!loading && !user) {
+      router.push("/login");
+    }
+  }, [user, loading, router]);
+
+  if (loading) {
+    return (
+      <div className="flex h-screen items-center justify-center bg-[#101622]">
+        <LoadingSpinner size="lg" text="Loading..." />
+      </div>
+    );
+  }
+
+  if (!user) {
+    return null;
+  }
+
+  return <>{children}</>;
+};
+
+export default ProtectedRoute;
+```

@@ -10,14 +10,16 @@ import { cn } from "@/lib/utils/cn";
 const Sidebar: React.FC = () => {
   const router = useRouter();
   const pathname = usePathname();
-  const { user, logout } = useAuth();
+  const { user, userProfile, logout } = useAuth();
 
   const menuItems = [
     { id: "dashboard", path: "/dashboard", label: "Dashboard", icon: "dashboard" },
     { id: "calendar", path: "/calendar", label: "Financial Calendar", icon: "calendar_month" },
     { id: "income", path: "/income", label: "Income Manager", icon: "account_balance_wallet" },
-    { id: "forecast", path: "/forecast", label: "AI Forecast", icon: "smart_toy" },
+    { id: "expenses", path: "/expenses", label: "Expense Manager", icon: "payments" },
     { id: "transactions", path: "/transactions", label: "Transactions", icon: "receipt_long" },
+    { id: "forecast", path: "/forecast", label: "AI Forecast", icon: "smart_toy" },
+    { id: "settings", path: "/settings", label: "Settings", icon: "settings" },
   ];
 
   const handleLogout = async () => {
@@ -72,7 +74,9 @@ const Sidebar: React.FC = () => {
             unoptimized
           />
           <div className="hidden lg:block overflow-hidden flex-1">
-            <p className="text-sm font-bold text-white truncate">{user?.displayName || "User"}</p>
+            <p className="text-sm font-bold text-white truncate">
+              {userProfile?.displayName || user?.displayName || "User"}
+            </p>
             <p className="text-xs text-gray-500 truncate">{user?.email || ""}</p>
           </div>
         </div>

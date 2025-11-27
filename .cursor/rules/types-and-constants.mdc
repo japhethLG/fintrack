@@ -1,0 +1,370 @@
+---
+alwaysApply: true
+---
+
+# Types & Constants Patterns
+
+## Core Principle
+
+Centralize global types in `lib/types.ts`. Keep feature-specific constants in their component folder. Use TypeScript strictly with well-defined interfaces and type unions.
+
+## Global Types (`lib/types.ts`)
+
+### File Organization
+
+Organize types with section comments:
+
+```tsx
+import { Timestamp } from "firebase/firestore";
+
+// ============================================================================
+// USER PROFILE
+// ============================================================================
+
+export interface UserProfile {
+  uid: string;
+  email: string;
+  // ...
+}
+
+// ============================================================================
+// INCOME SOURCES
+// ============================================================================
+
+export type IncomeSourceType = "salary" | "freelance" | "business" | "other";
+
+export interface IncomeSource {
+  id: string;
+  userId: string;
+  // ...
+}
+
+// ============================================================================
+// FORM DATA TYPES
+// ============================================================================
+
+export type IncomeSourceFormData = Omit<IncomeSource, "id" | "userId" | "createdAt" | "updatedAt">;
+```
+
+### Type Patterns
+
+#### Entity Interface
+
+```tsx
+export interface Entity {
+  // System fields
+  id: string;
+  userId: string;
+  createdAt: Timestamp;
+  updatedAt: Timestamp;
+
+  // Required fields
+  name: string;
+  type: EntityType;
+  amount: number;
+
+  // Optional fields
+  notes?: string;
+  endDate?: string;
+
+  // Boolean flags
+  isActive: boolean;
+  isPriority: boolean;
+
+  // Nested config (optional)
+  config?: EntityConfig;
+}
+```
+
+#### Type Unions (Enums Alternative)
+
+```tsx
+// Use string literal unions instead of enums
+export type TransactionStatus = "projected" | "pending" | "completed" | "skipped" | "partial";
+
+export type ExpenseCategory =
+  | "housing"
+  | "utilities"
+  | "transportation"
+  | "groceries"
+  | "other";
+```
+
+#### Config Interfaces
+
+```tsx
+export interface LoanConfig {
+  principalAmount: number;
+  currentBalance: number;
+  interestRate: number;
+  termMonths: number;
+  monthlyPayment: number;
+  calculationType: LoanCalculationType;
+}
+
+export interface ScheduleConfig {
+  specificDays?: number[];
+  dayOfWeek?: number;
+  dayOfMonth?: number;
+  intervalWeeks?: number;
+}
+```
+
+#### Form Data Types
+
+Derive form data types from entity types:
+
+```tsx
+// Omit system fields for form submission
+export type IncomeSourceFormData = Omit<
+  IncomeSource,
+  "id" | "userId" | "createdAt" | "updatedAt"
+>;
+
+// Specific form data interface
+export interface CompleteTransactionData {
+  actualAmount: number;
+  actualDate?: string;
+  notes?: string;
+}
+```
+
+#### Computed/Derived Types
+
+```tsx
+// Computed data structures for UI
+export interface DayBalance {
+  date: string;
+  openingBalance: number;
+  closingBalance: number;
+  transactions: Transaction[];
+  status: BalanceStatus;
+}
+
+export interface UpcomingBill {
+  transaction: Transaction;
+  daysUntilDue: number;
+  canCover: boolean;
+  shortfall?: number;
+}
+```
+
+## Feature-Specific Types
+
+When types are only used within a single feature:
+
+```tsx
+// components/pages/calendar/types.ts
+import { DayBalance } from "@/lib/types";
+
+export interface CalendarDay {
+  date: Date;
+  isCurrentMonth: boolean;
+  isToday: boolean;
+  isPast: boolean;
+  dayBalance: DayBalance | null;
+}
+```
+
+## Constants Patterns
+
+### Global Constants (`lib/constants.ts`)
+
+Application-wide constants:
+
+```tsx
+export const APP_NAME = "FinTrack";
+
+export const DATE_FORMATS = {
+  display: "MMM d, yyyy",
+  input: "yyyy-MM-dd",
+  full: "MMMM d, yyyy",
+};
+
+export const CURRENCY_SYMBOL = "$";
+
+export const DEFAULT_PREFERENCES = {
+  currency: "USD",
+  dateFormat: "MM/DD/YYYY",
+  theme: "dark" as const,
+};
+```
+
+### Feature-Specific Constants
+
+Each feature has its own `constants.ts`:
+
+```tsx
+// components/pages/transactions/constants.ts
+import { TransactionStatus } from "@/lib/types";
+
+// Select options for dropdowns
+export const STATUS_OPTIONS = [
+  { value: "all", label: "All Status" },
+  { value: "projected", label: "Projected" },
+  { value: "pending", label: "Pending" },
+  { value: "completed", label: "Completed" },
+  { value: "skipped", label: "Skipped" },
+];
+
+export const TYPE_OPTIONS = [
+  { value: "all", label: "All Types" },
+  { value: "income", label: "Income" },
+  { value: "expense", label: "Expenses" },
+];
+
+export const SORT_OPTIONS = [
+  { value: "date", label: "Date" },
+  { value: "amount", label: "Amount" },
+];
+
+// Variant mappings
+export const STATUS_VARIANTS: Record<
+  TransactionStatus,
+  "success" | "warning" | "danger" | "default" | "primary"
+> = {
+  completed: "success",
+  pending: "warning",
+  projected: "default",
+  skipped: "danger",
+  partial: "primary",
+};
+
+// Icon mappings
+export const STATUS_ICONS: Record<TransactionStatus, string> = {
+  completed: "check_circle",
+  pending: "schedule",
+  projected: "event",
+  skipped: "cancel",
+  partial: "pie_chart",
+};
+```
+
+### Form Constants
+
+```tsx
+// components/pages/expenses/components/ExpenseRuleForm/constants.ts
+export const EXPENSE_TYPE_OPTIONS = [
+  { value: "fixed", label: "Fixed Expense", description: "Regular, predictable bills" },
+  { value: "variable", label: "Variable Expense", description: "Fluctuating costs" },
+  { value: "cash_loan", label: "Cash Loan", description: "Amortized loan payments" },
+  { value: "credit_card", label: "Credit Card", description: "Credit card payments" },
+  { value: "installment", label: "Installment", description: "Fixed payment plans" },
+  { value: "one-time", label: "One-Time", description: "Single occurrence" },
+];
+
+export const CATEGORY_OPTIONS = [
+  { value: "housing", label: "Housing" },
+  { value: "utilities", label: "Utilities" },
+  { value: "transportation", label: "Transportation" },
+  // ...
+];
+
+export const FREQUENCY_OPTIONS = [
+  { value: "weekly", label: "Weekly" },
+  { value: "bi-weekly", label: "Bi-Weekly" },
+  { value: "semi-monthly", label: "Semi-Monthly" },
+  { value: "monthly", label: "Monthly" },
+  { value: "quarterly", label: "Quarterly" },
+  { value: "yearly", label: "Yearly" },
+];
+```
+
+### Chart/UI Constants
+
+```tsx
+// components/pages/dashboard/constants.ts
+export const CHART_COLORS = [
+  "#06b6d4", // cyan
+  "#f59e0b", // amber
+  "#10b981", // emerald
+  "#ef4444", // red
+  "#8b5cf6", // violet
+  "#ec4899", // pink
+];
+
+export const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+
+export const MONTHS = [
+  "January", "February", "March", "April", "May", "June",
+  "July", "August", "September", "October", "November", "December"
+];
+```
+
+## Type Usage Patterns
+
+### Importing Types
+
+```tsx
+// Import types separately
+import { Transaction, TransactionStatus, TransactionType } from "@/lib/types";
+import type { CalendarDay } from "./types";
+```
+
+### Type Guards
+
+```tsx
+export const isLoanExpense = (rule: ExpenseRule): rule is ExpenseRule & { loanConfig: LoanConfig } => {
+  return rule.expenseType === "cash_loan" && !!rule.loanConfig;
+};
+
+// Usage
+if (isLoanExpense(rule)) {
+  // TypeScript knows rule.loanConfig exists
+  console.log(rule.loanConfig.currentBalance);
+}
+```
+
+### Generic Types
+
+```tsx
+// For API responses
+export interface ApiResponse<T> {
+  data: T;
+  error?: string;
+  success: boolean;
+}
+
+// For paginated data
+export interface PaginatedData<T> {
+  items: T[];
+  total: number;
+  page: number;
+  pageSize: number;
+}
+```
+
+## Constant Usage in Components
+
+```tsx
+import { STATUS_OPTIONS, STATUS_VARIANTS, STATUS_ICONS } from "./constants";
+
+// In Select component
+<Select
+  label="Status"
+  options={STATUS_OPTIONS}
+  value={filterStatus}
+  onChange={setFilterStatus}
+/>
+
+// For dynamic styling
+<Badge variant={STATUS_VARIANTS[transaction.status]}>
+  {transaction.status}
+</Badge>
+
+// For dynamic icons
+<Icon name={STATUS_ICONS[transaction.status]} />
+```
+
+## Naming Conventions
+
+| Type | Convention | Example |
+|------|------------|---------|
+| Interfaces | PascalCase | `UserProfile`, `Transaction` |
+| Type aliases | PascalCase | `TransactionStatus`, `ExpenseType` |
+| Constants | SCREAMING_SNAKE_CASE | `STATUS_OPTIONS`, `CHART_COLORS` |
+| Option arrays | _OPTIONS suffix | `TYPE_OPTIONS`, `CATEGORY_OPTIONS` |
+| Variant maps | _VARIANTS suffix | `STATUS_VARIANTS` |
+| Icon maps | _ICONS suffix | `STATUS_ICONS` |
+| Config types | Config suffix | `LoanConfig`, `ScheduleConfig` |
+| Form data | FormData suffix | `IncomeSourceFormData` |

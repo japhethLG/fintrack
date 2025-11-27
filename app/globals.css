@@ -8,6 +8,15 @@
 :root {
   --background: #101622;
   --foreground: #e2e8f0;
+  --primary: #135bec;
+  --primary-hover: #1d6af5;
+  --success: #2ecc71;
+  --warning: #f1c40f;
+  --danger: #e74c3c;
+  --dark-900: #101622;
+  --dark-800: #151c2c;
+  --dark-700: #1e273b;
+  --dark-600: #2d3748;
 }
 
 body {
@@ -32,4 +41,202 @@ body {
 
 ::-webkit-scrollbar-thumb:hover {
   background: #4a5568;
+}
+
+/* ============================================================================
+   ANT DESIGN DARK THEME OVERRIDES
+   ============================================================================ */
+
+/* DatePicker & RangePicker Base Styles */
+.fintrack-datepicker.ant-picker {
+  background-color: var(--dark-800) !important;
+  border-color: #374151 !important;
+  color: #e2e8f0 !important;
+  border-radius: 0.5rem;
+}
+
+.fintrack-datepicker.ant-picker:hover {
+  border-color: var(--primary) !important;
+}
+
+.fintrack-datepicker.ant-picker-focused {
+  border-color: var(--primary) !important;
+  box-shadow: 0 0 0 2px rgba(19, 91, 236, 0.2) !important;
+}
+
+.fintrack-datepicker.ant-picker .ant-picker-input > input {
+  color: #e2e8f0 !important;
+}
+
+.fintrack-datepicker.ant-picker .ant-picker-input > input::placeholder {
+  color: #6b7280 !important;
+}
+
+.fintrack-datepicker.ant-picker .ant-picker-suffix,
+.fintrack-datepicker.ant-picker .ant-picker-clear {
+  color: #9ca3af !important;
+}
+
+.fintrack-datepicker.ant-picker .ant-picker-clear:hover {
+  color: #d1d5db !important;
+}
+
+.fintrack-datepicker.ant-picker .ant-picker-separator {
+  color: #6b7280 !important;
+}
+
+/* Error State */
+.fintrack-datepicker-error.ant-picker {
+  border-color: var(--danger) !important;
+}
+
+.fintrack-datepicker-error.ant-picker-focused {
+  border-color: var(--danger) !important;
+  box-shadow: 0 0 0 2px rgba(231, 76, 60, 0.2) !important;
+}
+
+/* DatePicker Dropdown Panel */
+.ant-picker-dropdown {
+  z-index: 1050;
+}
+
+.ant-picker-dropdown .ant-picker-panel-container {
+  background-color: var(--dark-800) !important;
+  border: 1px solid #374151 !important;
+  border-radius: 0.5rem !important;
+  box-shadow:
+    0 20px 25px -5px rgba(0, 0, 0, 0.5),
+    0 10px 10px -5px rgba(0, 0, 0, 0.2) !important;
+}
+
+.ant-picker-dropdown .ant-picker-panel {
+  background-color: var(--dark-800) !important;
+  border: none !important;
+}
+
+.ant-picker-dropdown .ant-picker-header {
+  color: #e2e8f0 !important;
+  border-bottom: 1px solid #374151 !important;
+}
+
+.ant-picker-dropdown .ant-picker-header button {
+  color: #9ca3af !important;
+}
+
+.ant-picker-dropdown .ant-picker-header button:hover {
+  color: #e2e8f0 !important;
+}
+
+.ant-picker-dropdown .ant-picker-content th {
+  color: #9ca3af !important;
+}
+
+.ant-picker-dropdown .ant-picker-cell {
+  color: #e2e8f0 !important;
+}
+
+.ant-picker-dropdown .ant-picker-cell:hover:not(.ant-picker-cell-in-view) .ant-picker-cell-inner,
+.ant-picker-dropdown
+  .ant-picker-cell:hover:not(.ant-picker-cell-selected):not(.ant-picker-cell-range-start):not(
+    .ant-picker-cell-range-end
+  ):not(.ant-picker-cell-range-hover-start):not(.ant-picker-cell-range-hover-end)
+  .ant-picker-cell-inner {
+  background-color: var(--dark-700) !important;
+}
+
+.ant-picker-dropdown .ant-picker-cell-in-view.ant-picker-cell-today .ant-picker-cell-inner::before {
+  border-color: var(--primary) !important;
+}
+
+.ant-picker-dropdown .ant-picker-cell-in-view.ant-picker-cell-selected .ant-picker-cell-inner,
+.ant-picker-dropdown .ant-picker-cell-in-view.ant-picker-cell-range-start .ant-picker-cell-inner,
+.ant-picker-dropdown .ant-picker-cell-in-view.ant-picker-cell-range-end .ant-picker-cell-inner {
+  background-color: var(--primary) !important;
+  color: white !important;
+}
+
+.ant-picker-dropdown .ant-picker-cell-in-view.ant-picker-cell-in-range::before {
+  background-color: rgba(19, 91, 236, 0.2) !important;
+}
+
+.ant-picker-dropdown
+  .ant-picker-cell-in-view.ant-picker-cell-range-hover-start:not(.ant-picker-cell-in-range):not(
+    .ant-picker-cell-range-start
+  ):not(.ant-picker-cell-range-end)::after,
+.ant-picker-dropdown
+  .ant-picker-cell-in-view.ant-picker-cell-range-hover-end:not(.ant-picker-cell-in-range):not(
+    .ant-picker-cell-range-start
+  ):not(.ant-picker-cell-range-end)::after,
+.ant-picker-dropdown
+  .ant-picker-cell-in-view.ant-picker-cell-range-hover-start.ant-picker-cell-range-start-single::after,
+.ant-picker-dropdown
+  .ant-picker-cell-in-view.ant-picker-cell-range-hover-end.ant-picker-cell-range-end-single::after,
+.ant-picker-dropdown
+  .ant-picker-cell-in-view.ant-picker-cell-range-hover:not(.ant-picker-cell-in-range)::after {
+  border-color: var(--primary) !important;
+}
+
+.ant-picker-dropdown .ant-picker-cell-disabled {
+  color: #4b5563 !important;
+}
+
+.ant-picker-dropdown .ant-picker-cell-disabled::before {
+  background-color: transparent !important;
+}
+
+/* Time Picker Panel */
+.ant-picker-dropdown
+  .ant-picker-time-panel-column
+  > li.ant-picker-time-panel-cell
+  .ant-picker-time-panel-cell-inner {
+  color: #e2e8f0 !important;
+}
+
+.ant-picker-dropdown
+  .ant-picker-time-panel-column
+  > li.ant-picker-time-panel-cell
+  .ant-picker-time-panel-cell-inner:hover {
+  background-color: var(--dark-700) !important;
+}
+
+.ant-picker-dropdown
+  .ant-picker-time-panel-column
+  > li.ant-picker-time-panel-cell-selected
+  .ant-picker-time-panel-cell-inner {
+  background-color: var(--primary) !important;
+  color: white !important;
+}
+
+/* Footer */
+.ant-picker-dropdown .ant-picker-footer {
+  border-top: 1px solid #374151 !important;
+}
+
+.ant-picker-dropdown .ant-picker-today-btn {
+  color: var(--primary) !important;
+}
+
+.ant-picker-dropdown .ant-picker-today-btn:hover {
+  color: var(--primary-hover) !important;
+}
+
+/* Range Picker specific styles */
+.ant-picker-dropdown .ant-picker-range-arrow::before,
+.ant-picker-dropdown .ant-picker-range-arrow::after {
+  background-color: var(--dark-800) !important;
+  border-color: #374151 !important;
+}
+
+/* Presets Panel (for RangePicker) */
+.ant-picker-dropdown .ant-picker-presets {
+  background-color: var(--dark-900) !important;
+  border-right: 1px solid #374151 !important;
+}
+
+.ant-picker-dropdown .ant-picker-presets ul li {
+  color: #d1d5db !important;
+}
+
+.ant-picker-dropdown .ant-picker-presets ul li:hover {
+  background-color: var(--dark-700) !important;
 }

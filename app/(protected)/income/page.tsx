@@ -1,4 +1,4 @@
-import IncomeManager from "@/components/pages/IncomeManager";
+import { IncomeManager } from "@/components/pages/income";
 
 export default function IncomePage() {
   return <IncomeManager />;

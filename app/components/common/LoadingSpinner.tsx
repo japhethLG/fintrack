@@ -30,12 +30,12 @@ export const LoadingSpinner: React.FC<LoadingSpinnerProps> = ({
     white: "border-white border-t-transparent",
   };
 
-	const spinnerClassName = cn(
-		sizeStyles[size],
-		colorStyles[color],
-		"rounded-full animate-spin",
-		className
-	);
+  const spinnerClassName = cn(
+    sizeStyles[size],
+    colorStyles[color],
+    "rounded-full animate-spin",
+    className
+  );
 
   return (
     <div className="flex flex-col items-center gap-4">

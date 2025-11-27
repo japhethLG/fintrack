@@ -5,6 +5,32 @@ import { useRouter } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button, Input, Alert, Divider, LoadingSpinner, Card, Icon } from "@/components/common";
 
+const getAuthErrorMessage = (error: unknown): string => {
+  const errorMessage = error instanceof Error ? error.message : String(error);
+
+  // Parse Firebase error codes
+  if (errorMessage.includes("auth/invalid-credential")) {
+    return "Invalid email or password. Please check your credentials or sign up for a new account.";
+  }
+  if (errorMessage.includes("auth/user-not-found")) {
+    return "No account found with this email. Please sign up first.";
+  }
+  if (errorMessage.includes("auth/wrong-password")) {
+    return "Incorrect password. Please try again.";
+  }
+  if (errorMessage.includes("auth/invalid-email")) {
+    return "Please enter a valid email address.";
+  }
+  if (errorMessage.includes("auth/user-disabled")) {
+    return "This account has been disabled. Please contact support.";
+  }
+  if (errorMessage.includes("auth/too-many-requests")) {
+    return "Too many failed attempts. Please try again later.";
+  }
+
+  return errorMessage;
+};
+
 export default function LoginPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -28,9 +54,7 @@ export default function LoginPage() {
       await login(email, password);
       router.push("/dashboard");
     } catch (err) {
-      setError(
-        err instanceof Error ? err.message : "Failed to sign in. Please check your credentials."
-      );
+      setError(getAuthErrorMessage(err));
     } finally {
       setLoading(false);
     }
@@ -140,8 +164,8 @@ export default function LoginPage() {
       </form>
 
       <p className="mt-6 text-center text-sm text-gray-400">
-        Don&apos;t have an account?
-        <a href="#" className="text-primary hover:text-primary/80 font-medium">
+        Don&apos;t have an account?{" "}
+        <a href="/signup" className="text-primary hover:text-primary/80 font-medium">
           Sign up
         </a>
       </p>

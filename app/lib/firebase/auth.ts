@@ -4,6 +4,11 @@ import {
   signInWithPopup,
   GoogleAuthProvider,
   signOut as firebaseSignOut,
+  deleteUser as firebaseDeleteUser,
+  updateEmail as firebaseUpdateEmail,
+  updatePassword as firebaseUpdatePassword,
+  reauthenticateWithCredential,
+  EmailAuthProvider,
   User,
   onAuthStateChanged as firebaseOnAuthStateChanged,
   Unsubscribe,
@@ -33,6 +38,38 @@ export const signOut = async (): Promise<void> => {
 
 export const onAuthStateChanged = (callback: (user: User | null) => void): Unsubscribe => {
   return firebaseOnAuthStateChanged(auth, callback);
+};
+
+export const deleteCurrentUser = async (): Promise<void> => {
+  const user = auth.currentUser;
+  if (user) {
+    await firebaseDeleteUser(user);
+  }
+};
+
+export const reauthenticateUser = async (password: string): Promise<void> => {
+  const user = auth.currentUser;
+  if (!user || !user.email) {
+    throw new Error("No user logged in");
+  }
+  const credential = EmailAuthProvider.credential(user.email, password);
+  await reauthenticateWithCredential(user, credential);
+};
+
+export const updateUserEmail = async (newEmail: string): Promise<void> => {
+  const user = auth.currentUser;
+  if (!user) {
+    throw new Error("No user logged in");
+  }
+  await firebaseUpdateEmail(user, newEmail);
+};
+
+export const updateUserPassword = async (newPassword: string): Promise<void> => {
+  const user = auth.currentUser;
+  if (!user) {
+    throw new Error("No user logged in");
+  }
+  await firebaseUpdatePassword(user, newPassword);
 };
 
 export { googleProvider };

@@ -3,7 +3,7 @@
 import React from "react";
 import { cn } from "@/lib/utils/cn";
 
-export interface IconProps {
+export interface IconProps extends React.HTMLAttributes<HTMLSpanElement> {
   name: string;
   size?: "xs" | "sm" | "md" | "lg" | "xl" | number;
   variant?: "outlined" | "filled" | "rounded";
@@ -15,6 +15,7 @@ export const Icon: React.FC<IconProps> = ({
   size = "md",
   variant = "outlined",
   className = "",
+  ...rest
 }) => {
   const sizeMap = {
     xs: "text-[16px]",
@@ -37,7 +38,7 @@ export const Icon: React.FC<IconProps> = ({
   const classes = cn(variantClass, sizeClass, className);
 
   return (
-    <span className={classes} style={sizeStyle}>
+    <span className={classes} style={sizeStyle} {...rest}>
       {name}
     </span>
   );

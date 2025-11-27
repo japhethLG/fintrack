@@ -1,0 +1,551 @@
+---
+alwaysApply: true
+---
+
+# Form Patterns
+
+## Core Principle
+
+All forms use React Hook Form with Yup validation. Form logic is separated into `formHelpers.ts` files. Use the `formElements` components for integration with React Hook Form context.
+
+## Form Architecture
+
+```
+FormComponent/
+├── index.tsx           # Main form component
+├── formHelpers.ts      # Schema, defaults, utilities
+├── components/         # Form sections
+│   └── SectionForm.tsx
+└── steps/              # (if multi-step)
+    ├── Step1.tsx
+    └── Step2.tsx
+```
+
+## Form Helper File Structure
+
+Every complex form has a `formHelpers.ts` file:
+
+```tsx
+// formHelpers.ts
+import * as yup from "yup";
+import { SomeType } from "@/lib/types";
+
+// ============================================================================
+// FORM SCHEMA TYPES
+// ============================================================================
+
+export interface FormValues {
+  // Form field types (use string for numbers that need parsing)
+  name: string;
+  amount: string;  // String for input, parse to number on submit
+  category: CategoryType;
+  isActive: boolean;
+  startDate: string;
+  // ...
+}
+
+// ============================================================================
+// DEFAULT VALUES
+// ============================================================================
+
+export const getDefaultValues = (initialData?: Partial<FormValues>): FormValues => ({
+  name: initialData?.name || "",
+  amount: initialData?.amount || "",
+  category: initialData?.category || "other",
+  isActive: initialData?.isActive ?? true,
+  startDate: initialData?.startDate || new Date().toISOString().split("T")[0],
+  // ...
+});
+
+// ============================================================================
+// VALIDATION SCHEMA
+// ============================================================================
+
+export const formSchema = yup.object({
+  name: yup.string().required("Name is required").min(1, "Name is required"),
+  amount: yup.string().required("Amount is required"),
+  category: yup.string().required("Category is required"),
+  isActive: yup.boolean(),
+  startDate: yup.string().required("Start date is required"),
+
+  // Conditional validation
+  endDate: yup.string().when("hasEndDate", {
+    is: true,
+    then: (schema) => schema.required("End date is required"),
+    otherwise: (schema) => schema.optional(),
+  }),
+});
+
+// ============================================================================
+// UTILITIES
+// ============================================================================
+
+export const calculateSomething = (value: number): number => {
+  // Calculation logic
+  return result;
+};
+
+export const buildConfig = (values: FormValues): ConfigType => {
+  // Transform form values to API format
+  return { ... };
+};
+```
+
+## Form Component Pattern
+
+### Basic Form
+
+```tsx
+"use client";
+
+import React, { useState } from "react";
+import { useForm } from "react-hook-form";
+import { yupResolver } from "@hookform/resolvers/yup";
+import { Button } from "@/components/common";
+import { Form, FormInput, FormSelect, FormCheckbox } from "@/components/formElements";
+import {
+  formSchema,
+  getDefaultValues,
+  type FormValues,
+} from "./formHelpers";
+
+interface IProps {
+  initialData?: Partial<FormValues>;
+  onSubmit: (data: SubmitData) => Promise<void>;
+  onCancel: () => void;
+  isEditing?: boolean;
+}
+
+const MyForm: React.FC<IProps> = ({
+  initialData,
+  onSubmit,
+  onCancel,
+  isEditing = false,
+}) => {
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const methods = useForm<FormValues>({
+    defaultValues: getDefaultValues(initialData),
+    resolver: yupResolver(formSchema) as never,
+    mode: "onChange",
+  });
+
+  const handleSubmit = async (values: FormValues) => {
+    setError(null);
+    setIsSubmitting(true);
+
+    try {
+      // Transform form values to API format
+      const submitData = {
+        name: values.name.trim(),
+        amount: parseFloat(values.amount),
+        // ...
+      };
+
+      await onSubmit(submitData);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to save");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  return (
+    <Form methods={methods} onSubmit={handleSubmit}>
+      <div className="space-y-6">
+        <FormInput
+          inputName="name"
+          label="Name"
+          placeholder="Enter name"
+          isRequired
+        />
+
+        <FormInput
+          inputName="amount"
+          type="number"
+          label="Amount"
+          prefix="$"
+          placeholder="0.00"
+          isRequired
+        />
+
+        <FormSelect
+          inputName="category"
+          label="Category"
+          options={CATEGORY_OPTIONS}
+          isRequired
+        />
+
+        <FormCheckbox
+          inputName="isActive"
+          label="Active"
+        />
+
+        {/* Error display */}
+        {error && (
+          <div className="p-3 bg-danger/20 border border-danger/30 rounded-lg text-danger text-sm">
+            {error}
+          </div>
+        )}
+
+        {/* Actions */}
+        <div className="flex justify-between pt-6 border-t border-gray-800">
+          <Button variant="ghost" onClick={onCancel} type="button">
+            Cancel
+          </Button>
+          <Button variant="primary" type="submit" disabled={isSubmitting}>
+            {isSubmitting ? "Saving..." : isEditing ? "Save Changes" : "Create"}
+          </Button>
+        </div>
+      </div>
+    </Form>
+  );
+};
+
+export default MyForm;
+```
+
+### Multi-Step Form
+
+```tsx
+"use client";
+
+import React, { useState, useMemo } from "react";
+import { useForm } from "react-hook-form";
+import { yupResolver } from "@hookform/resolvers/yup";
+import { Button } from "@/components/common";
+import { Form } from "@/components/formElements";
+import FormStepIndicator from "./components/FormStepIndicator";
+import Step1 from "./steps/Step1";
+import Step2 from "./steps/Step2";
+import ReviewStep from "./steps/ReviewStep";
+import {
+  formSchema,
+  getDefaultValues,
+  type FormValues,
+} from "./formHelpers";
+
+interface IProps {
+  initialData?: Partial<FormValues>;
+  onSubmit: (data: SubmitData) => Promise<void>;
+  onCancel: () => void;
+  isEditing?: boolean;
+}
+
+const MultiStepForm: React.FC<IProps> = ({
+  initialData,
+  onSubmit,
+  onCancel,
+  isEditing = false,
+}) => {
+  const [step, setStep] = useState(1);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const methods = useForm<FormValues>({
+    defaultValues: getDefaultValues(initialData),
+    resolver: yupResolver(formSchema) as never,
+    mode: "onChange",
+  });
+
+  const { watch } = methods;
+  const formType = watch("type");
+
+  // Dynamic step count based on form type
+  const totalSteps = useMemo(() => {
+    if (formType === "complex") return 4;
+    return 3;
+  }, [formType]);
+
+  // Validation for current step
+  const canProceed = useMemo(() => {
+    const values = methods.getValues();
+
+    switch (step) {
+      case 1:
+        return !!values.type;
+      case 2:
+        return !!values.name?.trim() && parseFloat(values.amount) > 0;
+      case 3:
+        return !!values.startDate;
+      default:
+        return true;
+    }
+  }, [step, methods]);
+
+  const handleSubmit = async (values: FormValues) => {
+    setError(null);
+    setIsSubmitting(true);
+
+    try {
+      // Transform and submit
+      await onSubmit(transformValues(values));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to save");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  const handleNext = () => {
+    if (step < totalSteps) setStep(step + 1);
+  };
+
+  const handleBack = () => {
+    if (step > 1) setStep(step - 1);
+    else onCancel();
+  };
+
+  return (
+    <Form methods={methods} onSubmit={handleSubmit}>
+      <div className="space-y-6">
+        {/* Progress indicator */}
+        <FormStepIndicator currentStep={step} totalSteps={totalSteps} />
+
+        {/* Step content */}
+        {step === 1 && <Step1 />}
+        {step === 2 && <Step2 />}
+        {step === 3 && <ReviewStep error={error} />}
+
+        {/* Navigation */}
+        <div className="flex justify-between pt-6 border-t border-gray-800">
+          <Button variant="ghost" onClick={handleBack} type="button">
+            {step === 1 ? "Cancel" : "Back"}
+          </Button>
+
+          {step === totalSteps ? (
+            <Button variant="primary" type="submit" disabled={!canProceed || isSubmitting}>
+              {isSubmitting ? "Saving..." : isEditing ? "Save Changes" : "Create"}
+            </Button>
+          ) : (
+            <Button variant="primary" onClick={handleNext} disabled={!canProceed} type="button">
+              Continue
+            </Button>
+          )}
+        </div>
+      </div>
+    </Form>
+  );
+};
+
+export default MultiStepForm;
+```
+
+## Form Step Components
+
+Steps use `useFormContext` to access form state:
+
+```tsx
+"use client";
+
+import React from "react";
+import { useFormContext } from "react-hook-form";
+import { FormInput, FormSelect } from "@/components/formElements";
+import type { FormValues } from "../formHelpers";
+
+const DetailsStep: React.FC = () => {
+  const { watch } = useFormContext<FormValues>();
+  const type = watch("type");
+
+  return (
+    <div className="space-y-6">
+      <h3 className="text-xl font-bold text-white">Details</h3>
+
+      <FormInput
+        inputName="name"
+        label="Name"
+        placeholder="Enter name"
+        isRequired
+      />
+
+      {type === "special" && (
+        <FormInput
+          inputName="specialField"
+          label="Special Field"
+          isRequired
+        />
+      )}
+    </div>
+  );
+};
+
+export default DetailsStep;
+```
+
+## Form Elements Usage
+
+### FormInput
+
+```tsx
+<FormInput
+  inputName="fieldName"        // Required: maps to form field
+  label="Field Label"          // Optional: adds label
+  type="text"                  // Optional: input type (text, number, date, email)
+  placeholder="Placeholder"    // Optional: placeholder text
+  prefix="$"                   // Optional: prefix text (for currency)
+  suffix="%"                   // Optional: suffix text
+  isRequired                   // Optional: adds * to label
+  className="custom-class"     // Optional: additional classes
+/>
+```
+
+### FormSelect
+
+```tsx
+<FormSelect
+  inputName="category"
+  label="Category"
+  options={[
+    { value: "option1", label: "Option 1" },
+    { value: "option2", label: "Option 2" },
+  ]}
+  isRequired
+/>
+```
+
+### FormCheckbox
+
+```tsx
+<FormCheckbox
+  inputName="isActive"
+  label="Active"
+/>
+```
+
+### FormTextArea
+
+```tsx
+<FormTextArea
+  inputName="notes"
+  label="Notes"
+  placeholder="Enter notes..."
+  rows={4}
+/>
+```
+
+## Validation Patterns
+
+### Conditional Validation
+
+```tsx
+export const schema = yup.object({
+  type: yup.string().required("Type is required"),
+
+  // Field required only when type is "loan"
+  loanAmount: yup.string().when("type", {
+    is: "loan",
+    then: (schema) => schema.required("Loan amount is required"),
+    otherwise: (schema) => schema.optional(),
+  }),
+});
+```
+
+### Cross-Field Validation
+
+```tsx
+export const schema = yup.object({
+  password: yup.string().required().min(8),
+  confirmPassword: yup
+    .string()
+    .required()
+    .oneOf([yup.ref("password")], "Passwords must match"),
+});
+```
+
+### Number Validation (Stored as String)
+
+```tsx
+export const schema = yup.object({
+  amount: yup
+    .string()
+    .required("Amount is required")
+    .test("positive", "Must be positive", (val) => parseFloat(val || "0") > 0),
+});
+```
+
+## Form Data Transformation
+
+### On Submit (Form → API)
+
+```tsx
+const handleSubmit = async (values: FormValues) => {
+  const apiData = {
+    name: values.name.trim(),
+    amount: parseFloat(values.amount),
+    startDate: values.startDate,
+    endDate: values.hasEndDate ? values.endDate : undefined,
+    config: buildConfig(values),
+  };
+
+  await onSubmit(apiData);
+};
+```
+
+### Initial Data (API → Form)
+
+```tsx
+const formDefaults = editingItem
+  ? {
+      name: editingItem.name,
+      amount: editingItem.amount.toString(),
+      startDate: editingItem.startDate,
+      endDate: editingItem.endDate || "",
+      hasEndDate: !!editingItem.endDate,
+    }
+  : undefined;
+```
+
+## Error Handling
+
+```tsx
+const [error, setError] = useState<string | null>(null);
+
+const handleSubmit = async (values: FormValues) => {
+  setError(null);
+
+  try {
+    await onSubmit(values);
+  } catch (err) {
+    setError(err instanceof Error ? err.message : "Failed to save");
+  }
+};
+
+// In render
+{error && (
+  <div className="p-3 bg-danger/20 border border-danger/30 rounded-lg text-danger text-sm">
+    {error}
+  </div>
+)}
+```
+
+## Form Layout Patterns
+
+### Two-Column Layout
+
+```tsx
+<div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+  <FormInput inputName="firstName" label="First Name" />
+  <FormInput inputName="lastName" label="Last Name" />
+</div>
+```
+
+### Section Grouping
+
+```tsx
+<div className="space-y-6">
+  {/* Section 1 */}
+  <div className="space-y-4">
+    <h4 className="font-medium text-white">Basic Information</h4>
+    <FormInput inputName="name" label="Name" />
+    <FormInput inputName="description" label="Description" />
+  </div>
+
+  {/* Section 2 */}
+  <div className="space-y-4">
+    <h4 className="font-medium text-white">Schedule</h4>
+    <FormInput inputName="startDate" type="date" label="Start Date" />
+    <FormInput inputName="endDate" type="date" label="End Date" />
+  </div>
+</div>
+```

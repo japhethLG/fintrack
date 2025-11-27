@@ -2,9 +2,12 @@
 
 import React from "react";
 import { cn } from "@/lib/utils/cn";
+import { Tooltip } from "./Tooltip";
 
-export interface InputProps extends React.InputHTMLAttributes<HTMLInputElement> {
+export interface InputProps
+  extends Omit<React.InputHTMLAttributes<HTMLInputElement>, "prefix" | "suffix"> {
   label?: string;
+  tooltip?: string;
   error?: string;
   prefix?: React.ReactNode;
   suffix?: React.ReactNode;
@@ -13,6 +16,7 @@ export interface InputProps extends React.InputHTMLAttributes<HTMLInputElement> 
 
 export const Input: React.FC<InputProps> = ({
   label,
+  tooltip,
   error,
   prefix,
   suffix,
@@ -28,12 +32,12 @@ export const Input: React.FC<InputProps> = ({
 
   const combinedInputClassName = cn(
     baseInputStyles,
+    "p-3",
     error
       ? "border-danger focus:border-danger focus:ring-2 focus:ring-danger/20"
       : "border-gray-700 focus:border-primary focus:ring-2 focus:ring-primary/20",
-    prefix && "pl-8",
-    suffix && "pr-8",
-    "p-3",
+    prefix && "pl-6",
+    suffix && "pr-6",
     disabled && "opacity-50 cursor-not-allowed",
     className
   );
@@ -41,9 +45,31 @@ export const Input: React.FC<InputProps> = ({
   return (
     <div className="w-full">
       {label && (
-        <label htmlFor={inputId} className="block text-sm font-medium text-gray-400 mb-2">
-          {label}
-        </label>
+        <div className="flex items-center gap-1 mb-2">
+          <label htmlFor={inputId} className="text-sm font-medium text-gray-400">
+            {label}
+          </label>
+          {tooltip && (
+            <Tooltip content={tooltip} position="top">
+              <span className="text-gray-500 hover:text-gray-400 cursor-help transition-colors">
+                <svg
+                  width="14"
+                  height="14"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                >
+                  <circle cx="12" cy="12" r="10" />
+                  <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3" />
+                  <line x1="12" y1="17" x2="12.01" y2="17" />
+                </svg>
+              </span>
+            </Tooltip>
+          )}
+        </div>
       )}
       <div className="relative">
         {prefix && (
