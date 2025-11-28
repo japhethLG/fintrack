@@ -24,6 +24,7 @@ const ScheduleStep: React.FC<IProps> = ({ totalSteps }) => {
   const specificDays = useWatch({ control, name: "specificDays" }) || [];
   const weekendAdjustment = useWatch({ control, name: "weekendAdjustment" });
   const dayOfMonth = useWatch({ control, name: "dayOfMonth" });
+  const creditDueDate = useWatch({ control, name: "creditDueDate" });
 
   const handleAddSpecificDay = () => {
     const day = parseInt(newSpecificDay);
@@ -166,27 +167,34 @@ const ScheduleStep: React.FC<IProps> = ({ totalSteps }) => {
             </div>
           )}
 
-        <div className="md:col-span-2">
-          <FormSelect
-            inputName="weekendAdjustment"
-            label="Weekend Adjustment"
-            options={WEEKEND_ADJUSTMENT_OPTIONS.map((o) => ({
-              value: o.value,
-              label: o.label,
-            }))}
-          />
-        </div>
+        {expenseType !== "one-time" && (
+          <div className="md:col-span-2">
+            <FormSelect
+              inputName="weekendAdjustment"
+              label="Weekend Adjustment"
+              options={WEEKEND_ADJUSTMENT_OPTIONS.map((o) => ({
+                value: o.value,
+                label: o.label,
+              }))}
+            />
+          </div>
+        )}
       </div>
 
-      <SchedulePreview
-        frequency={frequency}
-        startDate={startDate}
-        endDate={endDate}
-        hasEndDate={hasEndDate}
-        specificDays={specificDays}
-        weekendAdjustment={weekendAdjustment}
-        dayOfMonth={dayOfMonth || undefined}
-      />
+      {expenseType !== "one-time" && (
+        <SchedulePreview
+          frequency={frequency}
+          startDate={startDate}
+          endDate={endDate}
+          hasEndDate={hasEndDate}
+          specificDays={specificDays}
+          weekendAdjustment={weekendAdjustment}
+          dayOfMonth={dayOfMonth || undefined}
+          creditDueDate={
+            expenseType === "credit_card" && creditDueDate ? parseInt(creditDueDate) : undefined
+          }
+        />
+      )}
     </div>
   );
 };

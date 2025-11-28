@@ -72,7 +72,16 @@ const ExpenseManager: React.FC = () => {
   const activeRules = expenseRules.filter((r) => r.isActive);
 
   const recurringMonthly = activeRules.reduce((sum, rule) => {
-    return sum + rule.amount * getMonthlyExpenseMultiplier(rule.frequency);
+    // For credit cards with fixed payment strategy, use the fixed payment amount
+    let amount = rule.amount;
+    if (rule.creditConfig) {
+      if (rule.creditConfig.paymentStrategy === "fixed" && rule.creditConfig.fixedPaymentAmount) {
+        amount = rule.creditConfig.fixedPaymentAmount;
+      } else if (rule.creditConfig.paymentStrategy === "full_balance") {
+        amount = rule.creditConfig.currentBalance;
+      }
+    }
+    return sum + amount * getMonthlyExpenseMultiplier(rule.frequency);
   }, 0);
 
   const oneTimeTotal = activeRules

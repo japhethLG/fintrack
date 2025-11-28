@@ -11,6 +11,7 @@ import type { CalendarDay } from "./types";
 import DayCell from "./components/DayCell";
 import WeekDayCell from "./components/WeekDayCell";
 import MonthSummary from "./components/MonthSummary";
+import PeriodBalanceSummary from "./components/PeriodBalanceSummary";
 import DayDetailSidebar from "./components/DayDetailSidebar";
 
 const CalendarView: React.FC = () => {
@@ -18,10 +19,9 @@ const CalendarView: React.FC = () => {
     transactions,
     dailyBalances,
     isLoading,
-    isExpandingRange,
     markTransactionComplete,
     markTransactionSkipped,
-    expandDateRange,
+    setViewDateRange,
   } = useFinancial();
 
   const [currentDate, setCurrentDate] = useState(new Date());
@@ -137,19 +137,19 @@ const CalendarView: React.FC = () => {
   // Navigation
   const goToPrevMonth = () => {
     const newDate = new Date(currentDate.getFullYear(), currentDate.getMonth() - 1, 1);
-    // Expand date range to include the new month
+    // Update view date range to include the new month (expands if needed)
     const monthStart = formatDate(new Date(newDate.getFullYear(), newDate.getMonth(), 1));
     const monthEnd = formatDate(new Date(newDate.getFullYear(), newDate.getMonth() + 1, 0));
-    expandDateRange(monthStart, monthEnd);
+    setViewDateRange(monthStart, monthEnd);
     setCurrentDate(newDate);
   };
 
   const goToNextMonth = () => {
     const newDate = new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 1);
-    // Expand date range to include the new month
+    // Update view date range to include the new month (expands if needed)
     const monthStart = formatDate(new Date(newDate.getFullYear(), newDate.getMonth(), 1));
     const monthEnd = formatDate(new Date(newDate.getFullYear(), newDate.getMonth() + 1, 0));
-    expandDateRange(monthStart, monthEnd);
+    setViewDateRange(monthStart, monthEnd);
     setCurrentDate(newDate);
   };
 
@@ -157,26 +157,26 @@ const CalendarView: React.FC = () => {
   const goToPrevWeek = () => {
     const newDate = new Date(currentDate);
     newDate.setDate(currentDate.getDate() - 7);
-    // Expand date range to include the new week
+    // Update view date range to include the new week (expands if needed)
     const dayOfWeek = newDate.getDay();
     const weekStart = new Date(newDate);
     weekStart.setDate(newDate.getDate() - dayOfWeek);
     const weekEnd = new Date(weekStart);
     weekEnd.setDate(weekStart.getDate() + 6);
-    expandDateRange(formatDate(weekStart), formatDate(weekEnd));
+    setViewDateRange(formatDate(weekStart), formatDate(weekEnd));
     setCurrentDate(newDate);
   };
 
   const goToNextWeek = () => {
     const newDate = new Date(currentDate);
     newDate.setDate(currentDate.getDate() + 7);
-    // Expand date range to include the new week
+    // Update view date range to include the new week (expands if needed)
     const dayOfWeek = newDate.getDay();
     const weekStart = new Date(newDate);
     weekStart.setDate(newDate.getDate() - dayOfWeek);
     const weekEnd = new Date(weekStart);
     weekEnd.setDate(weekStart.getDate() + 6);
-    expandDateRange(formatDate(weekStart), formatDate(weekEnd));
+    setViewDateRange(formatDate(weekStart), formatDate(weekEnd));
     setCurrentDate(newDate);
   };
 
@@ -230,6 +230,44 @@ const CalendarView: React.FC = () => {
     return { income, expenses, net: income - expenses, projected, completed };
   }, [transactions, currentDate]);
 
+  // Period balance summary (opening/closing for current view)
+  const periodBalance = useMemo(() => {
+    if (viewMode === "month") {
+      const year = currentDate.getFullYear();
+      const month = currentDate.getMonth();
+      const firstDay = new Date(year, month, 1);
+      const lastDay = new Date(year, month + 1, 0);
+
+      const firstDayKey = formatDate(firstDay);
+      const lastDayKey = formatDate(lastDay);
+
+      const firstDayBalance = dailyBalances.get(firstDayKey);
+      const lastDayBalance = dailyBalances.get(lastDayKey);
+
+      return {
+        openingBalance: firstDayBalance?.openingBalance ?? null,
+        closingBalance: lastDayBalance?.closingBalance ?? null,
+        startDateLabel: firstDay.toLocaleDateString("en-US", { month: "short", day: "numeric" }),
+        endDateLabel: lastDay.toLocaleDateString("en-US", { month: "short", day: "numeric" }),
+      };
+    } else {
+      // Week view
+      if (calendarWeekDays.length === 0) {
+        return { openingBalance: null, closingBalance: null, startDateLabel: "", endDateLabel: "" };
+      }
+
+      const firstDay = calendarWeekDays[0];
+      const lastDay = calendarWeekDays[6];
+
+      return {
+        openingBalance: firstDay.dayBalance?.openingBalance ?? null,
+        closingBalance: lastDay.dayBalance?.closingBalance ?? null,
+        startDateLabel: firstDay.date.toLocaleDateString("en-US", { month: "short", day: "numeric" }),
+        endDateLabel: lastDay.date.toLocaleDateString("en-US", { month: "short", day: "numeric" }),
+      };
+    }
+  }, [viewMode, currentDate, dailyBalances, calendarWeekDays]);
+
   if (isLoading) {
     return (
       <div className="p-6 lg:p-10 flex items-center justify-center min-h-[400px]">
@@ -277,20 +315,19 @@ const CalendarView: React.FC = () => {
         completed={monthSummary.completed}
       />
 
+      {/* Period Balance Summary (Opening/Closing) */}
+      <PeriodBalanceSummary
+        openingBalance={periodBalance.openingBalance}
+        closingBalance={periodBalance.closingBalance}
+        viewMode={viewMode}
+        startDateLabel={periodBalance.startDateLabel}
+        endDateLabel={periodBalance.endDateLabel}
+      />
+
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
         {/* Calendar Grid */}
         <div className={viewMode === "week" ? "lg:col-span-4" : "lg:col-span-3"}>
-          <div className="relative">
-            {/* Loading overlay when expanding date range */}
-            {isExpandingRange && (
-              <div className="absolute inset-0 bg-gray-900/70 backdrop-blur-sm z-10 flex items-center justify-center rounded-xl">
-                <div className="flex flex-col items-center gap-3">
-                  <LoadingSpinner size="md" />
-                  <span className="text-sm text-gray-300">Loading transactions...</span>
-                </div>
-              </div>
-            )}
-            <Card padding="none">
+          <Card padding="none">
               {/* Header */}
               <div className="p-4 border-b border-gray-800 flex items-center justify-between">
                 <Button
@@ -369,7 +406,6 @@ const CalendarView: React.FC = () => {
                 </div>
               </div>
             </Card>
-          </div>
         </div>
 
         {/* Day Detail Sidebar - Only show in month view */}

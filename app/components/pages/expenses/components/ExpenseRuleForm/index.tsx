@@ -39,6 +39,10 @@ const getFieldsForStep = (step: number, expenseType: string): (keyof ExpenseRule
       if (expenseType === "installment") {
         return ["name", "installmentTotal", "installmentCount", "category"];
       }
+      // One-time expenses include startDate in step 2
+      if (expenseType === "one-time") {
+        return ["name", "amount", "category", "startDate"];
+      }
       return ["name", "amount", "category"];
     case 3:
       return ["frequency", "startDate"];
@@ -101,6 +105,10 @@ const ExpenseRuleForm: React.FC<IProps> = ({
     ) {
       return 4;
     }
+    // One-time expenses only need 2 steps: Type + Details (with date)
+    if (expenseType === "one-time") {
+      return 2;
+    }
     return 3;
   }, [expenseType]);
 
@@ -156,19 +164,21 @@ const ExpenseRuleForm: React.FC<IProps> = ({
           parseFloat(values.loanInterestRate),
           parseInt(values.loanTermMonths)
         );
-      } else if (
-        values.expenseType === "credit_card" &&
-        values.creditBalance &&
-        values.creditApr &&
-        values.creditMinPaymentPercent
-      ) {
-        finalAmount = calculateCreditCardPayment(
-          parseFloat(values.creditBalance),
-          parseFloat(values.creditApr),
-          parseFloat(values.creditMinPaymentPercent),
-          parseFloat(values.creditMinPaymentFloor) || 0,
-          values.creditMinPaymentMethod
-        );
+      } else if (values.expenseType === "credit_card" && values.creditBalance) {
+        // Use fixed payment amount if strategy is "fixed", otherwise calculate minimum
+        if (values.creditPaymentStrategy === "fixed" && values.creditFixedPayment) {
+          finalAmount = parseFloat(values.creditFixedPayment);
+        } else if (values.creditPaymentStrategy === "full_balance") {
+          finalAmount = parseFloat(values.creditBalance);
+        } else {
+          finalAmount = calculateCreditCardPayment(
+            parseFloat(values.creditBalance),
+            parseFloat(values.creditApr),
+            parseFloat(values.creditMinPaymentPercent),
+            parseFloat(values.creditMinPaymentFloor) || 0,
+            values.creditMinPaymentMethod
+          );
+        }
       } else if (
         values.expenseType === "installment" &&
         values.installmentTotal &&

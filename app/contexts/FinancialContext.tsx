@@ -20,7 +20,6 @@ import {
   BillCoverageReport,
   UpcomingBill,
   Alert,
-  BalanceStatus,
   IncomeSourceFormData,
   ExpenseRuleFormData,
   CompleteTransactionData,
@@ -50,12 +49,9 @@ import {
   skipTransaction,
   partialPayTransaction,
   deleteTransaction,
-  deleteTransactionsBySource,
-  subscribeToTransactions,
-  addTransactionsBatch,
+  subscribeToStoredTransactions,
   // Alerts
   getAlerts,
-  createAlert,
   markAlertAsRead,
   dismissAlert,
   subscribeToAlerts,
@@ -63,11 +59,14 @@ import {
 import { generateProjections } from "@/lib/logic/projectionEngine";
 import { calculateDailyBalances, getBillCoverageReport } from "@/lib/logic/balanceCalculator";
 
+// ============================================================================
+// CONTEXT INTERFACE
+// ============================================================================
+
 interface FinancialContextValue {
   // Loading states
   isLoading: boolean;
   isInitialized: boolean;
-  isExpandingRange: boolean;
 
   // User data
   userProfile: UserProfile | null;
@@ -88,7 +87,7 @@ interface FinancialContextValue {
   removeExpenseRule: (id: string) => Promise<void>;
   toggleExpenseRuleActive: (id: string, isActive: boolean) => Promise<void>;
 
-  // Transactions
+  // Transactions (merged: stored + computed projections)
   transactions: Transaction[];
   addManualTransaction: (
     transaction: Omit<Transaction, "id" | "userId" | "createdAt" | "updatedAt">
@@ -102,6 +101,10 @@ interface FinancialContextValue {
   ) => Promise<Transaction>;
   removeTransaction: (id: string) => Promise<void>;
 
+  // View date range for projections
+  viewDateRange: { start: string; end: string };
+  setViewDateRange: (start: string, end: string) => void;
+
   // Computed data
   dailyBalances: Map<string, DayBalance>;
   billCoverage: BillCoverageReport | null;
@@ -113,10 +116,12 @@ interface FinancialContextValue {
   dismissAlertById: (id: string) => Promise<void>;
 
   // Actions
-  regenerateProjections: () => Promise<void>;
   refreshData: () => Promise<void>;
-  expandDateRange: (requestedStart: string, requestedEnd: string) => void;
 }
+
+// ============================================================================
+// CONTEXT CREATION
+// ============================================================================
 
 const FinancialContext = createContext<FinancialContextValue | null>(null);
 
@@ -128,6 +133,10 @@ export const useFinancial = (): FinancialContextValue => {
   return context;
 };
 
+// ============================================================================
+// PROVIDER COMPONENT
+// ============================================================================
+
 interface FinancialProviderProps {
   children: ReactNode;
 }
@@ -138,17 +147,35 @@ export const FinancialProvider: React.FC<FinancialProviderProps> = ({ children }
   // State
   const [isLoading, setIsLoading] = useState(true);
   const [isInitialized, setIsInitialized] = useState(false);
-  const [isExpandingRange, setIsExpandingRange] = useState(false);
   const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
   const [incomeSources, setIncomeSources] = useState<IncomeSource[]>([]);
   const [expenseRules, setExpenseRules] = useState<ExpenseRule[]>([]);
-  const [transactions, setTransactions] = useState<Transaction[]>([]);
+  const [storedTransactions, setStoredTransactions] = useState<Transaction[]>([]);
   const [alerts, setAlerts] = useState<Alert[]>([]);
 
-  // Date range for projections (expandable, starts with current month + 4 months)
-  const [dateRange, setDateRange] = useState(() => {
+  // Refs for use in callbacks (avoids recreating callbacks when these change)
+  const storedTransactionsRef = useRef<Transaction[]>([]);
+  const expenseRulesRef = useRef<ExpenseRule[]>([]);
+  const userProfileRef = useRef<UserProfile | null>(null);
+
+  // Keep refs in sync with state
+  useEffect(() => {
+    storedTransactionsRef.current = storedTransactions;
+  }, [storedTransactions]);
+
+  useEffect(() => {
+    expenseRulesRef.current = expenseRules;
+  }, [expenseRules]);
+
+  useEffect(() => {
+    userProfileRef.current = userProfile;
+  }, [userProfile]);
+
+  // View date range for computing projections (calendar can adjust this)
+  const [viewDateRange, setViewDateRangeState] = useState(() => {
     const today = new Date();
-    const startDate = new Date(today.getFullYear(), today.getMonth(), 1);
+    // Default: 2 months back to 4 months forward
+    const startDate = new Date(today.getFullYear(), today.getMonth() - 2, 1);
     const endDate = new Date(today.getFullYear(), today.getMonth() + 4, 0);
     return {
       start: startDate.toISOString().split("T")[0],
@@ -156,16 +183,13 @@ export const FinancialProvider: React.FC<FinancialProviderProps> = ({ children }
     };
   });
 
-  // Track previous date range to detect expansion
-  const prevDateRangeRef = useRef(dateRange);
+  // Set view date range (expands if needed, never shrinks)
+  const setViewDateRange = useCallback((start: string, end: string) => {
+    setViewDateRangeState((current) => {
+      const newStart = start < current.start ? start : current.start;
+      const newEnd = end > current.end ? end : current.end;
 
-  // Expand date range when calendar navigates outside current range
-  const expandDateRange = useCallback((requestedStart: string, requestedEnd: string) => {
-    setDateRange((current) => {
-      const newStart = requestedStart < current.start ? requestedStart : current.start;
-      const newEnd = requestedEnd > current.end ? requestedEnd : current.end;
-
-      // Only update if range actually expanded
+      // Only update if range actually changed
       if (newStart === current.start && newEnd === current.end) {
         return current;
       }
@@ -174,74 +198,6 @@ export const FinancialProvider: React.FC<FinancialProviderProps> = ({ children }
     });
   }, []);
 
-  // Generate projections when date range expands
-  useEffect(() => {
-    const prevRange = prevDateRangeRef.current;
-    const hasExpanded = dateRange.start < prevRange.start || dateRange.end > prevRange.end;
-
-    // Update ref immediately
-    prevDateRangeRef.current = dateRange;
-
-    // Skip if not expanded or not initialized
-    if (!hasExpanded || !isInitialized || !user) return;
-
-    const generateProjectionsForExpandedRange = async () => {
-      setIsExpandingRange(true);
-
-      try {
-        const activeIncomeSources = incomeSources.filter((s) => s.isActive);
-        const activeExpenseRules = expenseRules.filter((r) => r.isActive);
-
-        // Get existing transaction dates to avoid duplicates
-        const existingDates = new Set(
-          transactions
-            .filter((t) => t.status === "projected")
-            .map((t) => `${t.sourceId}-${t.scheduledDate}`)
-        );
-
-        // Generate projections for expanded range portions
-        const newProjections: Omit<Transaction, "id" | "userId" | "createdAt" | "updatedAt">[] = [];
-
-        // If expanded backward (new start < old start)
-        if (dateRange.start < prevRange.start) {
-          const backwardProjections = generateProjections(
-            activeIncomeSources,
-            activeExpenseRules,
-            new Date(dateRange.start),
-            new Date(prevRange.start)
-          );
-          newProjections.push(...backwardProjections);
-        }
-
-        // If expanded forward (new end > old end)
-        if (dateRange.end > prevRange.end) {
-          const forwardProjections = generateProjections(
-            activeIncomeSources,
-            activeExpenseRules,
-            new Date(prevRange.end),
-            new Date(dateRange.end)
-          );
-          newProjections.push(...forwardProjections);
-        }
-
-        // Filter out duplicates
-        const uniqueProjections = newProjections.filter(
-          (p) => !existingDates.has(`${p.sourceId}-${p.scheduledDate}`)
-        );
-
-        if (uniqueProjections.length > 0) {
-          await addTransactionsBatch(user.uid, uniqueProjections);
-        }
-      } catch (error) {
-        console.error("Error generating projections for expanded range:", error);
-      } finally {
-        setIsExpandingRange(false);
-      }
-    };
-
-    generateProjectionsForExpandedRange();
-  }, [dateRange, isInitialized, user, incomeSources, expenseRules, transactions]);
-
   // Subscribe to real-time updates when user is authenticated
   useEffect(() => {
     if (authLoading) return;
@@ -249,17 +205,14 @@ export const FinancialProvider: React.FC<FinancialProviderProps> = ({ children }
       setUserProfile(null);
       setIncomeSources([]);
       setExpenseRules([]);
-      setTransactions([]);
+      setStoredTransactions([]);
       setAlerts([]);
       setIsLoading(false);
       setIsInitialized(true);
       return;
     }
 
-    // Only show full page loading on initial load, not on date range expansion
-    if (!isInitialized) {
-      setIsLoading(true);
-    }
+    setIsLoading(true);
     const unsubscribers: (() => void)[] = [];
 
     // Subscribe to user profile
@@ -280,14 +233,11 @@ export const FinancialProvider: React.FC<FinancialProviderProps> = ({ children }
     });
     unsubscribers.push(unsubExpenses);
 
-    // Subscribe to transactions
-    const unsubTransactions = subscribeToTransactions(
-      user.uid,
-      (txns) => {
-        setTransactions(txns);
-      },
-      { startDate: dateRange.start, endDate: dateRange.end }
-    );
+    // Subscribe to stored transactions only (completed, skipped, partial, pending)
+    // Projections are computed on-the-fly, not stored
+    const unsubTransactions = subscribeToStoredTransactions(user.uid, (txns) => {
+      setStoredTransactions(txns);
+    });
     unsubscribers.push(unsubTransactions);
 
     // Subscribe to alerts
@@ -306,7 +256,90 @@ export const FinancialProvider: React.FC<FinancialProviderProps> = ({ children }
       unsubscribers.forEach((unsub) => unsub());
       clearTimeout(timer);
     };
-  }, [user, authLoading, dateRange]);
+  }, [user, authLoading]);
+
+  // ============================================================================
+  // ON-THE-FLY PROJECTION COMPUTATION
+  // ============================================================================
+
+  // Compute merged transactions: stored transactions + generated projections
+  const transactions = useMemo(() => {
+    // Don't compute projections until initialized to avoid unnecessary work
+    if (!isInitialized) {
+      return storedTransactions;
+    }
+
+    // Generate projections for the view date range
+    const activeIncomeSources = incomeSources.filter((s) => s.isActive);
+    const activeExpenseRules = expenseRules.filter((r) => r.isActive);
+
+    // Skip projection generation if no sources/rules
+    if (activeIncomeSources.length === 0 && activeExpenseRules.length === 0) {
+      return storedTransactions;
+    }
+
+    const projections = generateProjections(
+      activeIncomeSources,
+      activeExpenseRules,
+      new Date(viewDateRange.start),
+      new Date(viewDateRange.end)
+    );
+
+    // Create lookup map of stored transactions by key (sourceId + scheduledDate)
+    // This allows us to match stored transactions with their projected counterparts
+    const storedByKey = new Map<string, Transaction>();
+    storedTransactions.forEach((t) => {
+      if (t.sourceId) {
+        const key = `${t.sourceId}-${t.scheduledDate}`;
+        storedByKey.set(key, t);
+      }
+    });
+
+    // Merge: stored transactions take precedence over projections
+    const mergedTransactions: Transaction[] = projections.map((proj) => {
+      const key = `${proj.sourceId}-${proj.scheduledDate}`;
+      const stored = storedByKey.get(key);
+
+      if (stored) {
+        // Use stored transaction (completed, skipped, etc.) - remove from map
+        storedByKey.delete(key);
+        return stored;
+      }
+
+      // Return projection with deterministic ID
+      return {
+        ...proj,
+        id: `proj_${key}`, // Deterministic ID for projections
+        userId: user?.uid || "",
+        createdAt: null as unknown as Transaction["createdAt"],
+        updatedAt: null as unknown as Transaction["updatedAt"],
+      } as Transaction;
+    });
+
+    // Add any manual transactions (no sourceId) and remaining stored transactions
+    // that weren't matched (e.g., from sources that no longer exist or are inactive)
+    storedTransactions.forEach((t) => {
+      if (!t.sourceId) {
+        // Manual transaction - always include
+        mergedTransactions.push(t);
+      } else {
+        const key = `${t.sourceId}-${t.scheduledDate}`;
+        if (storedByKey.has(key)) {
+          // Stored transaction that didn't match any projection - include it
+          mergedTransactions.push(t);
+        }
+      }
+    });
+
+    // Sort by scheduled date
+    mergedTransactions.sort((a, b) => {
+      const dateA = a.actualDate || a.scheduledDate;
+      const dateB = b.actualDate || b.scheduledDate;
+      return dateA.localeCompare(dateB);
+    });
+
+    return mergedTransactions;
+  }, [incomeSources, expenseRules, storedTransactions, viewDateRange, user?.uid, isInitialized]);
 
   // Calculate daily balances whenever data changes
   const dailyBalances = useMemo(() => {
@@ -317,11 +350,11 @@ export const FinancialProvider: React.FC<FinancialProviderProps> = ({ children }
     return calculateDailyBalances(
       userProfile.currentBalance,
       transactions,
-      new Date(dateRange.start),
-      new Date(dateRange.end),
+      new Date(viewDateRange.start),
+      new Date(viewDateRange.end),
       userProfile.preferences.defaultWarningThreshold
     );
-  }, [userProfile, transactions, dateRange]);
+  }, [userProfile, transactions, viewDateRange]);
 
   // Calculate bill coverage report
   const billCoverage = useMemo(() => {
@@ -341,7 +374,10 @@ export const FinancialProvider: React.FC<FinancialProviderProps> = ({ children }
     return billCoverage?.upcomingBills || [];
   }, [billCoverage]);
 
-  // User profile actions
+  // ============================================================================
+  // USER PROFILE ACTIONS
+  // ============================================================================
+
   const updateProfile = useCallback(
     async (updates: Partial<UserProfile["preferences"]>) => {
       if (!user) return;
@@ -360,92 +396,51 @@ export const FinancialProvider: React.FC<FinancialProviderProps> = ({ children }
     [user]
   );
 
-  // Income source actions
+  // ============================================================================
+  // INCOME SOURCE ACTIONS
+  // ============================================================================
+
   const createIncomeSource = useCallback(
     async (data: IncomeSourceFormData): Promise<IncomeSource> => {
       if (!user) throw new Error("User not authenticated");
 
+      // Just create the source - projections are computed on-the-fly
       const source = await addIncomeSource(user.uid, {
         ...data,
         isActive: true,
       });
 
-      // Generate projections for this source
-      const newProjections = generateProjections(
-        [source],
-        [],
-        new Date(dateRange.start),
-        new Date(dateRange.end)
-      );
-
-      if (newProjections.length > 0) {
-        await addTransactionsBatch(user.uid, newProjections);
-      }
-
       return source;
     },
-    [user, dateRange]
+    [user]
   );
 
   const editIncomeSource = useCallback(
     async (id: string, data: Partial<IncomeSourceFormData>) => {
+      // Just update the source - projections will recompute automatically
       await updateIncomeSource(id, data);
-
-      // Regenerate projections if schedule changed
-      if (data.frequency || data.scheduleConfig || data.startDate || data.endDate || data.amount) {
-        // Delete existing projected transactions and regenerate
-        await deleteTransactionsBySource("income_source", id, ["projected"]);
-
-        const source = incomeSources.find((s) => s.id === id);
-        if (source && user) {
-          const updatedSource = { ...source, ...data };
-          const newProjections = generateProjections(
-            [updatedSource as IncomeSource],
-            [],
-            new Date(dateRange.start),
-            new Date(dateRange.end)
-          );
-          if (newProjections.length > 0) {
-            await addTransactionsBatch(user.uid, newProjections);
-          }
-        }
-      }
     },
-    [user, incomeSources, dateRange]
+    []
   );
 
   const removeIncomeSource = useCallback(async (id: string) => {
-    await deleteTransactionsBySource("income_source", id, ["projected", "pending"]);
+    // Just delete the source - projections will recompute automatically
+    // Note: We don't delete stored transactions (completed/skipped) as they're historical
     await deleteIncomeSource(id);
   }, []);
 
   const toggleIncomeSourceActive = useCallback(
     async (id: string, isActive: boolean) => {
+      // Just update - projections will recompute automatically
       await updateIncomeSource(id, { isActive });
-
-      if (!isActive) {
-        // Remove future projections
-        await deleteTransactionsBySource("income_source", id, ["projected"]);
-      } else if (user) {
-        // Regenerate projections
-        const source = incomeSources.find((s) => s.id === id);
-        if (source) {
-          const newProjections = generateProjections(
-            [{ ...source, isActive: true }],
-            [],
-            new Date(dateRange.start),
-            new Date(dateRange.end)
-          );
-          if (newProjections.length > 0) {
-            await addTransactionsBatch(user.uid, newProjections);
-          }
-        }
-      }
     },
-    [user, incomeSources, dateRange]
+    []
   );
 
-  // Expense rule actions
+  // ============================================================================
+  // EXPENSE RULE ACTIONS
+  // ============================================================================
+
   const createExpenseRule = useCallback(
     async (data: ExpenseRuleFormData): Promise<ExpenseRule> => {
       if (!user) throw new Error("User not authenticated");
@@ -460,90 +455,40 @@ export const FinancialProvider: React.FC<FinancialProviderProps> = ({ children }
           : undefined,
       };
 
+      // Just create the rule - projections are computed on-the-fly
       const rule = await addExpenseRule(user.uid, ruleData);
-
-      // Generate projections for this rule
-      const newProjections = generateProjections(
-        [],
-        [rule],
-        new Date(dateRange.start),
-        new Date(dateRange.end)
-      );
-
-      if (newProjections.length > 0) {
-        await addTransactionsBatch(user.uid, newProjections);
-      }
 
       return rule;
     },
-    [user, dateRange]
+    [user]
   );
 
   const editExpenseRule = useCallback(
     async (id: string, data: Partial<ExpenseRuleFormData>) => {
+      // Just update the rule - projections will recompute automatically
       await updateExpenseRule(id, data);
-
-      // Regenerate projections if schedule changed
-      if (
-        data.frequency ||
-        data.scheduleConfig ||
-        data.startDate ||
-        data.endDate ||
-        data.amount ||
-        data.loanConfig ||
-        data.creditConfig ||
-        data.installmentConfig
-      ) {
-        await deleteTransactionsBySource("expense_rule", id, ["projected"]);
-
-        const rule = expenseRules.find((r) => r.id === id);
-        if (rule && user) {
-          const updatedRule = { ...rule, ...data };
-          const newProjections = generateProjections(
-            [],
-            [updatedRule as ExpenseRule],
-            new Date(dateRange.start),
-            new Date(dateRange.end)
-          );
-          if (newProjections.length > 0) {
-            await addTransactionsBatch(user.uid, newProjections);
-          }
-        }
-      }
     },
-    [user, expenseRules, dateRange]
+    []
   );
 
   const removeExpenseRule = useCallback(async (id: string) => {
-    await deleteTransactionsBySource("expense_rule", id, ["projected", "pending"]);
+    // Just delete the rule - projections will recompute automatically
+    // Note: We don't delete stored transactions (completed/skipped) as they're historical
     await deleteExpenseRule(id);
   }, []);
 
   const toggleExpenseRuleActive = useCallback(
     async (id: string, isActive: boolean) => {
+      // Just update - projections will recompute automatically
       await updateExpenseRule(id, { isActive });
-
-      if (!isActive) {
-        await deleteTransactionsBySource("expense_rule", id, ["projected"]);
-      } else if (user) {
-        const rule = expenseRules.find((r) => r.id === id);
-        if (rule) {
-          const newProjections = generateProjections(
-            [],
-            [{ ...rule, isActive: true }],
-            new Date(dateRange.start),
-            new Date(dateRange.end)
-          );
-          if (newProjections.length > 0) {
-            await addTransactionsBatch(user.uid, newProjections);
-          }
-        }
-      }
     },
-    [user, expenseRules, dateRange]
+    []
   );
 
-  // Transaction actions
+  // ============================================================================
+  // TRANSACTION ACTIONS
+  // ============================================================================
+
   const addManualTransaction = useCallback(
     async (
       transaction: Omit<Transaction, "id" | "userId" | "createdAt" | "updatedAt">
@@ -554,26 +499,205 @@ export const FinancialProvider: React.FC<FinancialProviderProps> = ({ children }
     [user]
   );
 
-  const markTransactionComplete = useCallback(async (id: string, data: CompleteTransactionData) => {
-    await completeTransaction(id, data.actualAmount, data.actualDate, data.notes);
-  }, []);
+  const markTransactionComplete = useCallback(
+    async (id: string, data: CompleteTransactionData) => {
+      if (!user) throw new Error("User not authenticated");
 
-  const markTransactionSkipped = useCallback(async (id: string, notes?: string) => {
-    await skipTransaction(id, notes);
-  }, []);
+      // Check if this is a projected transaction (needs to be stored first)
+      if (id.startsWith("proj_")) {
+        // Parse the projection ID to get sourceId and scheduledDate
+        // Format: proj_${sourceId}-${scheduledDate}
+        const keyPart = id.substring(5); // Remove "proj_" prefix
+        const lastDashIndex = keyPart.lastIndexOf("-");
+        if (lastDashIndex === -1) {
+          throw new Error("Invalid projection ID format");
+        }
+        const sourceId = keyPart.substring(0, lastDashIndex);
+        const scheduledDate = keyPart.substring(lastDashIndex + 1);
+
+        // Find the source to get transaction details
+        const incomeSource = incomeSources.find((s) => s.id === sourceId);
+        const expenseRule = expenseRulesRef.current.find((r) => r.id === sourceId);
+        const source = incomeSource || expenseRule;
+
+        if (!source) {
+          throw new Error("Source not found for projection");
+        }
+
+        const isIncome = !!incomeSource;
+        const sourceType = isIncome ? "income_source" : "expense_rule";
+
+        // Create the stored transaction as completed
+        await addTransaction(user.uid, {
+          name: source.name,
+          type: isIncome ? "income" : "expense",
+          category: source.category,
+          sourceType,
+          sourceId: source.id,
+          projectedAmount: source.amount,
+          actualAmount: data.actualAmount,
+          scheduledDate,
+          actualDate: data.actualDate || scheduledDate,
+          status: "completed",
+          notes: data.notes,
+        });
+
+        // Update user balance
+        const delta = isIncome ? data.actualAmount : -data.actualAmount;
+        await updateUserBalance(user.uid, (userProfileRef.current?.currentBalance || 0) + delta);
+
+        // Update source tracking if applicable (loan/installment)
+        if (!isIncome && expenseRule) {
+          if (expenseRule.loanConfig) {
+            await updateExpenseRule(source.id, {
+              loanConfig: {
+                ...expenseRule.loanConfig,
+                paymentsMade: expenseRule.loanConfig.paymentsMade + 1,
+              },
+            });
+          } else if (expenseRule.installmentConfig) {
+            await updateExpenseRule(source.id, {
+              installmentConfig: {
+                ...expenseRule.installmentConfig,
+                installmentsPaid: expenseRule.installmentConfig.installmentsPaid + 1,
+              },
+            });
+          }
+        }
+      } else {
+        // This is a stored transaction - use normal completion flow
+        await completeTransaction(id, data.actualAmount, data.actualDate, data.notes);
+      }
+    },
+    [user, incomeSources]
+  );
+
+  const markTransactionSkipped = useCallback(
+    async (id: string, notes?: string) => {
+      if (!user) throw new Error("User not authenticated");
+
+      // Check if this is a projected transaction
+      if (id.startsWith("proj_")) {
+        // Parse the projection ID to get sourceId and scheduledDate
+        const keyPart = id.substring(5);
+        const lastDashIndex = keyPart.lastIndexOf("-");
+        if (lastDashIndex === -1) {
+          throw new Error("Invalid projection ID format");
+        }
+        const sourceId = keyPart.substring(0, lastDashIndex);
+        const scheduledDate = keyPart.substring(lastDashIndex + 1);
+
+        // Find the source
+        const incomeSource = incomeSources.find((s) => s.id === sourceId);
+        const expenseRule = expenseRulesRef.current.find((r) => r.id === sourceId);
+        const source = incomeSource || expenseRule;
+
+        if (!source) {
+          throw new Error("Source not found for projection");
+        }
+
+        const isIncome = !!incomeSource;
+
+        // Create stored transaction as skipped
+        await addTransaction(user.uid, {
+          name: source.name,
+          type: isIncome ? "income" : "expense",
+          category: source.category,
+          sourceType: isIncome ? "income_source" : "expense_rule",
+          sourceId: source.id,
+          projectedAmount: source.amount,
+          scheduledDate,
+          status: "skipped",
+          notes,
+        });
+      } else {
+        await skipTransaction(id, notes);
+      }
+    },
+    [user, incomeSources]
+  );
 
   const markTransactionPartial = useCallback(
     async (id: string, partialAmount: number, notes?: string): Promise<Transaction> => {
-      return partialPayTransaction(id, partialAmount, notes);
+      if (!user) throw new Error("User not authenticated");
+
+      // Check if this is a projected transaction
+      if (id.startsWith("proj_")) {
+        // Parse the projection ID
+        const keyPart = id.substring(5);
+        const lastDashIndex = keyPart.lastIndexOf("-");
+        if (lastDashIndex === -1) {
+          throw new Error("Invalid projection ID format");
+        }
+        const sourceId = keyPart.substring(0, lastDashIndex);
+        const scheduledDate = keyPart.substring(lastDashIndex + 1);
+
+        // Find the source
+        const incomeSource = incomeSources.find((s) => s.id === sourceId);
+        const expenseRule = expenseRulesRef.current.find((r) => r.id === sourceId);
+        const source = incomeSource || expenseRule;
+
+        if (!source) {
+          throw new Error("Source not found for projection");
+        }
+
+        const isIncome = !!incomeSource;
+        const sourceType = isIncome ? "income_source" : "expense_rule";
+
+        // Create stored transaction as partial
+        const partialTx = await addTransaction(user.uid, {
+          name: source.name,
+          type: isIncome ? "income" : "expense",
+          category: source.category,
+          sourceType,
+          sourceId: source.id,
+          projectedAmount: source.amount,
+          actualAmount: partialAmount,
+          scheduledDate,
+          status: "partial",
+          notes,
+        });
+
+        // Update user balance
+        const delta = isIncome ? partialAmount : -partialAmount;
+        await updateUserBalance(user.uid, (userProfileRef.current?.currentBalance || 0) + delta);
+
+        // Create remainder transaction
+        const remainder = source.amount - partialAmount;
+        const nextWeek = new Date(scheduledDate);
+        nextWeek.setDate(nextWeek.getDate() + 7);
+        const nextWeekStr = nextWeek.toISOString().split("T")[0];
+
+        await addTransaction(user.uid, {
+          name: `${source.name} (Remainder)`,
+          type: isIncome ? "income" : "expense",
+          category: source.category,
+          sourceType,
+          sourceId: source.id,
+          projectedAmount: remainder,
+          scheduledDate: nextWeekStr,
+          status: "pending",
+        });
+
+        return partialTx;
+      } else {
+        return partialPayTransaction(id, partialAmount, notes);
+      }
     },
-    []
+    [user, incomeSources]
   );
 
   const removeTransaction = useCallback(async (id: string) => {
-    await deleteTransaction(id);
+    // Can only delete stored transactions, not projections
+    if (!id.startsWith("proj_")) {
+      await deleteTransaction(id);
+    }
   }, []);
 
-  // Alert actions
+  // ============================================================================
+  // ALERT ACTIONS
+  // ============================================================================
+
   const markAlertRead = useCallback(async (id: string) => {
     await markAlertAsRead(id);
   }, []);
@@ -582,39 +706,10 @@ export const FinancialProvider: React.FC<FinancialProviderProps> = ({ children }
     await dismissAlert(id);
   }, []);
 
-  // Regenerate all projections
-  const regenerateProjections = useCallback(async () => {
-    if (!user) return;
+  // ============================================================================
+  // REFRESH DATA
+  // ============================================================================
 
-    setIsLoading(true);
-
-    try {
-      // Delete all projected transactions
-      const projectedTransactions = transactions.filter((t) => t.status === "projected");
-      for (const t of projectedTransactions) {
-        await deleteTransaction(t.id);
-      }
-
-      // Generate new projections
-      const activeIncomeSources = incomeSources.filter((s) => s.isActive);
-      const activeExpenseRules = expenseRules.filter((r) => r.isActive);
-
-      const newProjections = generateProjections(
-        activeIncomeSources,
-        activeExpenseRules,
-        new Date(dateRange.start),
-        new Date(dateRange.end)
-      );
-
-      if (newProjections.length > 0) {
-        await addTransactionsBatch(user.uid, newProjections);
-      }
-    } finally {
-      setIsLoading(false);
-    }
-  }, [user, transactions, incomeSources, expenseRules, dateRange]);
-
-  // Refresh all data
   const refreshData = useCallback(async () => {
     if (!user) return;
 
@@ -626,8 +721,7 @@ export const FinancialProvider: React.FC<FinancialProviderProps> = ({ children }
         getIncomeSources(user.uid),
         getExpenseRules(user.uid),
         getTransactions(user.uid, {
-          startDate: dateRange.start,
-          endDate: dateRange.end,
+          status: ["completed", "skipped", "partial", "pending"],
         }),
         getAlerts(user.uid),
       ]);
@@ -635,17 +729,20 @@ export const FinancialProvider: React.FC<FinancialProviderProps> = ({ children }
       setUserProfile(profile);
       setIncomeSources(sources);
       setExpenseRules(rules);
-      setTransactions(txns);
+      setStoredTransactions(txns);
       setAlerts(alertsList);
     } finally {
       setIsLoading(false);
     }
-  }, [user, dateRange]);
+  }, [user]);
+
+  // ============================================================================
+  // CONTEXT VALUE
+  // ============================================================================
 
   const value: FinancialContextValue = {
     isLoading,
     isInitialized,
-    isExpandingRange,
     userProfile,
     updateProfile,
     setCurrentBalance,
@@ -665,15 +762,15 @@ export const FinancialProvider: React.FC<FinancialProviderProps> = ({ children }
     markTransactionSkipped,
     markTransactionPartial,
     removeTransaction,
+    viewDateRange,
+    setViewDateRange,
     dailyBalances,
     billCoverage,
     upcomingBills,
     alerts,
     markAlertRead,
     dismissAlertById,
-    regenerateProjections,
     refreshData,
-    expandDateRange,
   };
 
   return <FinancialContext.Provider value={value}>{children}</FinancialContext.Provider>;

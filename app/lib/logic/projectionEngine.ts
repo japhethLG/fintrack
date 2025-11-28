@@ -69,6 +69,12 @@ const calculateOccurrences = (
   const end = params.endDate ? parseDate(params.endDate) : viewEndDate;
   const effectiveEnd = end < viewEndDate ? end : viewEndDate;
 
+  // Safety check: ensure scheduleConfig is defined
+  const scheduleConfig = params.scheduleConfig || {};
+
+  // Safety limit to prevent infinite loops (max 500 occurrences)
+  const MAX_OCCURRENCES = 500;
+
   if (start > effectiveEnd) return [];
 
   switch (params.frequency) {
@@ -81,7 +87,7 @@ const calculateOccurrences = (
 
     case "daily": {
       let current = new Date(Math.max(start.getTime(), viewStartDate.getTime()));
-      while (current <= effectiveEnd) {
+      while (current <= effectiveEnd && occurrences.length < MAX_OCCURRENCES) {
         occurrences.push(adjustForWeekend(new Date(current), params.weekendAdjustment));
         current = addDays(current, 1);
       }
@@ -92,15 +98,17 @@ const calculateOccurrences = (
       // Start from the first occurrence on or after viewStartDate
       let current = new Date(start);
 
-      // Find the first occurrence
-      if (params.scheduleConfig.dayOfWeek !== undefined) {
-        const targetDay = params.scheduleConfig.dayOfWeek;
-        while (current.getDay() !== targetDay) {
+      // Find the first occurrence (with safety limit)
+      if (scheduleConfig.dayOfWeek !== undefined) {
+        const targetDay = scheduleConfig.dayOfWeek;
+        let alignmentAttempts = 0;
+        while (current.getDay() !== targetDay && alignmentAttempts < 7) {
           current = addDays(current, 1);
+          alignmentAttempts++;
         }
       }
 
-      while (current <= effectiveEnd) {
+      while (current <= effectiveEnd && occurrences.length < MAX_OCCURRENCES) {
         if (current >= viewStartDate) {
           occurrences.push(adjustForWeekend(new Date(current), params.weekendAdjustment));
         }
@@ -110,18 +118,20 @@ const calculateOccurrences = (
     }
 
     case "bi-weekly": {
-      const intervalWeeks = params.scheduleConfig.intervalWeeks || 2;
+      const intervalWeeks = scheduleConfig.intervalWeeks || 2;
       let current = new Date(start);
 
-      // Align to correct day if specified
-      if (params.scheduleConfig.dayOfWeek !== undefined) {
-        const targetDay = params.scheduleConfig.dayOfWeek;
-        while (current.getDay() !== targetDay) {
+      // Align to correct day if specified (with safety limit)
+      if (scheduleConfig.dayOfWeek !== undefined) {
+        const targetDay = scheduleConfig.dayOfWeek;
+        let alignmentAttempts = 0;
+        while (current.getDay() !== targetDay && alignmentAttempts < 7) {
           current = addDays(current, 1);
+          alignmentAttempts++;
         }
       }
 
-      while (current <= effectiveEnd) {
+      while (current <= effectiveEnd && occurrences.length < MAX_OCCURRENCES) {
         if (current >= viewStartDate) {
           occurrences.push(adjustForWeekend(new Date(current), params.weekendAdjustment));
         }
@@ -132,15 +142,16 @@ const calculateOccurrences = (
 
     case "semi-monthly": {
       // Specific dates like 15th and 30th
-      const specificDays = params.scheduleConfig.specificDays || [15, 30];
+      const specificDays = scheduleConfig.specificDays || [15, 30];
       let monthCursor = new Date(start);
       monthCursor.setDate(1); // Start from beginning of month
 
-      while (monthCursor <= effectiveEnd) {
+      while (monthCursor <= effectiveEnd && occurrences.length < MAX_OCCURRENCES) {
         const year = monthCursor.getFullYear();
         const month = monthCursor.getMonth();
 
         specificDays.forEach((day) => {
+          if (occurrences.length >= MAX_OCCURRENCES) return;
           const actualDay = clampDayToMonth(day, year, month);
           const date = new Date(year, month, actualDay);
 
@@ -155,10 +166,10 @@ const calculateOccurrences = (
     }
 
     case "monthly": {
-      const dayOfMonth = params.scheduleConfig.dayOfMonth || start.getDate();
+      const dayOfMonth = scheduleConfig.dayOfMonth || start.getDate();
       let monthCursor = new Date(start);
 
-      while (monthCursor <= effectiveEnd) {
+      while (monthCursor <= effectiveEnd && occurrences.length < MAX_OCCURRENCES) {
         const year = monthCursor.getFullYear();
         const month = monthCursor.getMonth();
         const actualDay = clampDayToMonth(dayOfMonth, year, month);
@@ -175,11 +186,11 @@ const calculateOccurrences = (
     }
 
     case "quarterly": {
-      const monthOfYear = params.scheduleConfig.monthOfYear;
-      const dayOfMonth = params.scheduleConfig.dayOfMonth || 1;
+      const monthOfYear = scheduleConfig.monthOfYear;
+      const dayOfMonth = scheduleConfig.dayOfMonth || 1;
       let current = new Date(start);
 
-      while (current <= effectiveEnd) {
+      while (current <= effectiveEnd && occurrences.length < MAX_OCCURRENCES) {
         const year = current.getFullYear();
         const month = current.getMonth();
         const actualDay = clampDayToMonth(dayOfMonth, year, month);
@@ -196,11 +207,11 @@ const calculateOccurrences = (
     }
 
     case "yearly": {
-      const monthOfYear = params.scheduleConfig.monthOfYear || start.getMonth();
-      const dayOfMonth = params.scheduleConfig.dayOfMonth || start.getDate();
+      const monthOfYear = scheduleConfig.monthOfYear || start.getMonth();
+      const dayOfMonth = scheduleConfig.dayOfMonth || start.getDate();
       let yearCursor = start.getFullYear();
 
-      while (yearCursor <= effectiveEnd.getFullYear()) {
+      while (yearCursor <= effectiveEnd.getFullYear() && occurrences.length < MAX_OCCURRENCES) {
         const actualDay = clampDayToMonth(dayOfMonth, yearCursor, monthOfYear);
         const date = new Date(yearCursor, monthOfYear, actualDay);
 
@@ -412,8 +423,16 @@ const generateCreditProjections = (
     const monthlyRate = creditConfig.apr / 100 / 12;
     const projections: Omit<Transaction, "id" | "userId" | "createdAt" | "updatedAt">[] = [];
 
-    let currentDate = parseDate(rule.startDate);
+    const startDateParsed = parseDate(rule.startDate);
+    let currentDate = new Date(startDateParsed);
     currentDate.setDate(creditConfig.dueDate);
+
+    // If the due date in the start month is before the start date, move to next month
+    if (currentDate < startDateParsed) {
+      currentDate = addMonths(currentDate, 1);
+      // Re-set the day in case month length differs
+      currentDate.setDate(Math.min(creditConfig.dueDate, new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0).getDate()));
+    }
 
     let paymentNum = 1;
     while (balance > 0 && currentDate <= viewEndDate) {
@@ -425,7 +444,7 @@ const generateCreditProjections = (
         projections.push(
           createProjectedTransaction(
             { ...rule, amount: actualPayment },
-            currentDate,
+            new Date(currentDate),
             "expense",
             "expense_rule",
             {
@@ -443,6 +462,8 @@ const generateCreditProjections = (
       }
 
       currentDate = addMonths(currentDate, 1);
+      // Re-set the day in case month length differs
+      currentDate.setDate(Math.min(creditConfig.dueDate, new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0).getDate()));
     }
 
     return projections;

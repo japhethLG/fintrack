@@ -1,12 +1,19 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useMemo } from "react";
 import { ExpenseRule } from "@/lib/types";
 import { EXPENSE_CATEGORY_LABELS } from "@/lib/constants";
-import { Button, Card, Icon, Badge } from "@/components/common";
+import { Button, Card, Icon, Badge, Tooltip } from "@/components/common";
 import { cn } from "@/lib/utils/cn";
 import { useCurrency } from "@/lib/hooks/useCurrency";
 import { EXPENSE_TYPE_ICONS, EXPENSE_TYPE_LABELS, FREQUENCY_LABELS } from "../constants";
+import {
+  calculatePayoffSummary,
+  calculateMinimumPayment,
+  formatPayoffTime,
+  type CreditCardPayoffSummary,
+  type PayoffScenario,
+} from "@/lib/logic/creditCardCalculator";
 
 interface IProps {
   rule: ExpenseRule;
@@ -27,7 +34,35 @@ const getDayName = (day: number) => {
 
 const ExpenseRuleDetail: React.FC<IProps> = ({ rule, onEdit, onDelete, onToggleActive }) => {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
+  const [showPayoffScenarios, setShowPayoffScenarios] = useState(false);
   const { formatCurrency } = useCurrency();
+
+  // Get the display amount based on payment strategy for credit cards
+  const getDisplayAmount = () => {
+    if (rule.creditConfig) {
+      if (rule.creditConfig.paymentStrategy === "fixed" && rule.creditConfig.fixedPaymentAmount) {
+        return rule.creditConfig.fixedPaymentAmount;
+      }
+      if (rule.creditConfig.paymentStrategy === "full_balance") {
+        return rule.creditConfig.currentBalance;
+      }
+    }
+    return rule.amount;
+  };
+
+  // Calculate estimated minimum payment for credit cards
+  const getEstimatedMinimumPayment = () => {
+    if (!rule.creditConfig) return 0;
+    return calculateMinimumPayment(rule.creditConfig);
+  };
+
+  // Calculate credit card payoff summary
+  const creditPayoffSummary = useMemo((): CreditCardPayoffSummary | null => {
+    if (!rule.creditConfig) return null;
+    return calculatePayoffSummary(rule.creditConfig);
+  }, [rule.creditConfig]);
+
+  const displayAmount = getDisplayAmount();
 
   const getScheduleDescription = () => {
     switch (rule.frequency) {
@@ -76,10 +111,18 @@ const ExpenseRuleDetail: React.FC<IProps> = ({ rule, onEdit, onDelete, onToggleA
       {/* Amount */}
       <div className="bg-gray-800/50 rounded-xl p-6 mb-6">
         <p className="text-gray-400 text-sm mb-1">
-          {rule.expenseType === "cash_loan" ? "Monthly Payment" : "Amount"}
+          {rule.expenseType === "cash_loan"
+            ? "Monthly Payment"
+            : rule.creditConfig?.paymentStrategy === "fixed"
+              ? "Fixed Payment"
+              : rule.creditConfig?.paymentStrategy === "full_balance"
+                ? "Full Balance Payment"
+                : rule.creditConfig
+                  ? "Est. Min Payment"
+                  : "Amount"}
         </p>
         <p className="text-4xl font-bold text-danger">
-          {formatCurrency(rule.amount, {
+          {formatCurrency(displayAmount, {
             minimumFractionDigits: 2,
             maximumFractionDigits: 2,
           })}
@@ -139,76 +182,327 @@ const ExpenseRuleDetail: React.FC<IProps> = ({ rule, onEdit, onDelete, onToggleA
       )}
 
       {/* Credit Card Details */}
-      {rule.creditConfig && (
-        <div className="bg-gray-800/30 rounded-xl p-6 mb-6">
-          <h4 className="font-bold text-white mb-4">Credit Card Details</h4>
+      {rule.creditConfig && creditPayoffSummary && (
+        <div className="space-y-4 mb-6">
+          {/* Card Overview */}
+          <div className="bg-gray-800/30 rounded-xl p-6">
+            <h4 className="font-bold text-white mb-4 flex items-center gap-2">
+              <Icon name="credit_card" size={20} />
+              Credit Card Overview
+            </h4>
 
-          {/* Utilization */}
-          <div className="mb-4">
-            <div className="flex justify-between text-sm mb-2">
-              <span className="text-gray-400">Credit Utilization</span>
-              <span
-                className={cn(
-                  "font-medium",
-                  rule.creditConfig.currentBalance / rule.creditConfig.creditLimit > 0.3
-                    ? "text-danger"
-                    : "text-success"
-                )}
-              >
-                {((rule.creditConfig.currentBalance / rule.creditConfig.creditLimit) * 100).toFixed(
-                  0
-                )}
-                %
-              </span>
+            {/* Credit Utilization */}
+            <div className="mb-4">
+              <div className="flex justify-between text-sm mb-2">
+                <span className="text-gray-400">Credit Utilization</span>
+                <span
+                  className={cn(
+                    "font-medium",
+                    rule.creditConfig.currentBalance / rule.creditConfig.creditLimit > 0.3
+                      ? "text-danger"
+                      : "text-success"
+                  )}
+                >
+                  {((rule.creditConfig.currentBalance / rule.creditConfig.creditLimit) * 100).toFixed(0)}%
+                </span>
+              </div>
+              <div className="h-3 bg-gray-700 rounded-full overflow-hidden">
+                <div
+                  className={cn(
+                    "h-full rounded-full transition-all",
+                    rule.creditConfig.currentBalance / rule.creditConfig.creditLimit > 0.3
+                      ? "bg-danger"
+                      : "bg-success"
+                  )}
+                  style={{
+                    width: `${Math.min(100, (rule.creditConfig.currentBalance / rule.creditConfig.creditLimit) * 100)}%`,
+                  }}
+                />
+              </div>
             </div>
-            <div className="h-3 bg-gray-700 rounded-full overflow-hidden">
-              <div
-                className={cn(
-                  "h-full rounded-full transition-all",
-                  rule.creditConfig.currentBalance / rule.creditConfig.creditLimit > 0.3
-                    ? "bg-danger"
-                    : "bg-success"
-                )}
-                style={{
-                  width: `${(rule.creditConfig.currentBalance / rule.creditConfig.creditLimit) * 100}%`,
-                }}
-              />
+
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <div>
+                <p className="text-xs text-gray-400">Credit Limit</p>
+                <p className="text-white font-medium">{formatCurrency(rule.creditConfig.creditLimit)}</p>
+              </div>
+              <div>
+                <p className="text-xs text-gray-400">Current Balance</p>
+                <p className="text-danger font-medium">{formatCurrency(rule.creditConfig.currentBalance)}</p>
+              </div>
+              <div>
+                <p className="text-xs text-gray-400">Available Credit</p>
+                <p className="text-success font-medium">
+                  {formatCurrency(rule.creditConfig.creditLimit - rule.creditConfig.currentBalance)}
+                </p>
+              </div>
+              <div>
+                <p className="text-xs text-gray-400">APR</p>
+                <p className="text-white font-medium">{rule.creditConfig.apr}%</p>
+              </div>
             </div>
           </div>
 
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <div>
-              <p className="text-xs text-gray-400">Credit Limit</p>
-              <p className="text-white font-medium">
-                {formatCurrency(rule.creditConfig.creditLimit)}
-              </p>
-            </div>
-            <div>
-              <p className="text-xs text-gray-400">Current Balance</p>
-              <p className="text-danger font-medium">
-                {formatCurrency(rule.creditConfig.currentBalance)}
-              </p>
-            </div>
-            <div>
-              <p className="text-xs text-gray-400">APR</p>
-              <p className="text-white font-medium">{rule.creditConfig.apr}%</p>
-            </div>
-            <div>
-              <p className="text-xs text-gray-400">Due Date</p>
-              <p className="text-white font-medium">
-                {rule.creditConfig.dueDate}
-                {getOrdinalSuffix(rule.creditConfig.dueDate)} of month
-              </p>
-            </div>
-            <div>
-              <p className="text-xs text-gray-400">Payment Strategy</p>
-              <p className="text-white font-medium capitalize">
-                {rule.creditConfig.paymentStrategy === "fixed"
-                  ? `Fixed ${formatCurrency(rule.creditConfig.fixedPaymentAmount || 0)}`
-                  : rule.creditConfig.paymentStrategy.replace("_", " ")}
-              </p>
+          {/* Payoff Timeline */}
+          <div className="bg-gray-800/30 rounded-xl p-6">
+            <h4 className="font-bold text-white mb-4 flex items-center gap-2">
+              <Icon name="event" size={20} />
+              Payoff Timeline
+              {creditPayoffSummary.isMinimumPaymentTrap && (
+                <Tooltip content="Your payment barely covers interest. Consider increasing your payment.">
+                  <Badge variant="danger" className="ml-2">
+                    <Icon name="warning" size={14} className="mr-1" />
+                    Warning
+                  </Badge>
+                </Tooltip>
+              )}
+            </h4>
+
+            {/* Payoff Progress */}
+            {creditPayoffSummary.payoffDate && (
+              <div className="mb-4">
+                <div className="flex justify-between text-sm mb-2">
+                  <span className="text-gray-400">Payoff Progress</span>
+                  <span className="text-white">
+                    {formatPayoffTime(creditPayoffSummary.monthsToPayoff)} remaining
+                  </span>
+                </div>
+                <div className="h-3 bg-gray-700 rounded-full overflow-hidden">
+                  <div
+                    className="h-full bg-primary rounded-full transition-all"
+                    style={{
+                      width: `${Math.max(5, 100 - (creditPayoffSummary.monthsToPayoff / (creditPayoffSummary.monthsToPayoff + 12)) * 100)}%`,
+                    }}
+                  />
+                </div>
+              </div>
+            )}
+
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <div>
+                <p className="text-xs text-gray-400">Estimated Payoff Date</p>
+                <p className={cn("font-medium", creditPayoffSummary.payoffDate ? "text-white" : "text-danger")}>
+                  {creditPayoffSummary.payoffDate
+                    ? creditPayoffSummary.payoffDate.toLocaleDateString("en-US", {
+                        month: "short",
+                        year: "numeric",
+                      })
+                    : "Never"}
+                </p>
+              </div>
+              <div>
+                <p className="text-xs text-gray-400">Time to Pay Off</p>
+                <p className={cn("font-medium", creditPayoffSummary.monthsToPayoff > 60 ? "text-warning" : "text-white")}>
+                  {formatPayoffTime(creditPayoffSummary.monthsToPayoff)}
+                </p>
+              </div>
+              <div>
+                <p className="text-xs text-gray-400">Payments Remaining</p>
+                <p className="text-white font-medium">
+                  {isFinite(creditPayoffSummary.monthsToPayoff) ? creditPayoffSummary.monthsToPayoff : "∞"}
+                </p>
+              </div>
+              <div>
+                <p className="text-xs text-gray-400">Current Payment</p>
+                <p className="text-primary font-medium">
+                  {formatCurrency(creditPayoffSummary.effectiveMonthlyPayment, {
+                    minimumFractionDigits: 2,
+                    maximumFractionDigits: 2,
+                  })}
+                </p>
+              </div>
             </div>
           </div>
+
+          {/* Cost Breakdown */}
+          <div className="bg-gray-800/30 rounded-xl p-6">
+            <h4 className="font-bold text-white mb-4 flex items-center gap-2">
+              <Icon name="payments" size={20} />
+              Cost Breakdown
+            </h4>
+
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
+              <div>
+                <p className="text-xs text-gray-400">Principal (Balance)</p>
+                <p className="text-white font-medium">{formatCurrency(rule.creditConfig.currentBalance)}</p>
+              </div>
+              <div>
+                <p className="text-xs text-gray-400">Total Interest to Pay</p>
+                <p className={cn("font-medium", isFinite(creditPayoffSummary.totalInterestToPay) ? "text-danger" : "text-danger")}>
+                  {isFinite(creditPayoffSummary.totalInterestToPay)
+                    ? formatCurrency(creditPayoffSummary.totalInterestToPay)
+                    : "Accumulating"}
+                </p>
+              </div>
+              <div>
+                <p className="text-xs text-gray-400">Total Amount to Pay</p>
+                <p className="text-white font-medium">
+                  {isFinite(creditPayoffSummary.totalAmountToPay)
+                    ? formatCurrency(creditPayoffSummary.totalAmountToPay)
+                    : "N/A"}
+                </p>
+              </div>
+              <div>
+                <p className="text-xs text-gray-400">Monthly Interest Charge</p>
+                <p className="text-warning font-medium">
+                  {formatCurrency(creditPayoffSummary.currentMonthlyInterest, {
+                    minimumFractionDigits: 2,
+                    maximumFractionDigits: 2,
+                  })}
+                </p>
+              </div>
+            </div>
+
+            {/* Interest vs Principal visualization */}
+            {isFinite(creditPayoffSummary.totalInterestToPay) && (
+              <div className="mt-4 p-4 bg-gray-900/50 rounded-lg">
+                <p className="text-xs text-gray-400 mb-2">Payment Breakdown Visualization</p>
+                <div className="flex h-6 rounded-lg overflow-hidden">
+                  <div
+                    className="bg-primary flex items-center justify-center text-xs font-medium text-white"
+                    style={{
+                      width: `${(rule.creditConfig.currentBalance / creditPayoffSummary.totalAmountToPay) * 100}%`,
+                    }}
+                  >
+                    {((rule.creditConfig.currentBalance / creditPayoffSummary.totalAmountToPay) * 100).toFixed(0)}%
+                  </div>
+                  <div
+                    className="bg-danger flex items-center justify-center text-xs font-medium text-white"
+                    style={{
+                      width: `${(creditPayoffSummary.totalInterestToPay / creditPayoffSummary.totalAmountToPay) * 100}%`,
+                    }}
+                  >
+                    {((creditPayoffSummary.totalInterestToPay / creditPayoffSummary.totalAmountToPay) * 100).toFixed(0)}%
+                  </div>
+                </div>
+                <div className="flex justify-between mt-2 text-xs">
+                  <span className="text-primary">Principal: {formatCurrency(rule.creditConfig.currentBalance)}</span>
+                  <span className="text-danger">Interest: {formatCurrency(creditPayoffSummary.totalInterestToPay)}</span>
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Payment & Schedule Details */}
+          <div className="bg-gray-800/30 rounded-xl p-6">
+            <h4 className="font-bold text-white mb-4 flex items-center gap-2">
+              <Icon name="schedule" size={20} />
+              Payment Details
+            </h4>
+
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <div>
+                <p className="text-xs text-gray-400">Due Date</p>
+                <p className="text-white font-medium">
+                  {rule.creditConfig.dueDate}
+                  {getOrdinalSuffix(rule.creditConfig.dueDate)} of month
+                </p>
+              </div>
+              <div>
+                <p className="text-xs text-gray-400">Statement Date</p>
+                <p className="text-white font-medium">
+                  {rule.creditConfig.statementDate}
+                  {getOrdinalSuffix(rule.creditConfig.statementDate)} of month
+                </p>
+              </div>
+              <div>
+                <p className="text-xs text-gray-400">Est. Minimum Payment</p>
+                <p className="text-warning font-medium">
+                  {formatCurrency(getEstimatedMinimumPayment(), {
+                    minimumFractionDigits: 2,
+                    maximumFractionDigits: 2,
+                  })}
+                </p>
+              </div>
+              <div>
+                <p className="text-xs text-gray-400">Min Payment Rule</p>
+                <p className="text-white font-medium text-sm">
+                  {rule.creditConfig.minimumPaymentPercent}%
+                  {rule.creditConfig.minimumPaymentMethod === "percent_plus_interest" ? " + Interest" : " of Balance"}
+                </p>
+              </div>
+              <div>
+                <p className="text-xs text-gray-400">Payment Strategy</p>
+                <p className="text-white font-medium capitalize">
+                  {rule.creditConfig.paymentStrategy === "fixed"
+                    ? `Fixed ${formatCurrency(rule.creditConfig.fixedPaymentAmount || 0)}`
+                    : rule.creditConfig.paymentStrategy === "full_balance"
+                      ? "Full Balance"
+                      : "Minimum"}
+                </p>
+              </div>
+              <div>
+                <p className="text-xs text-gray-400">Minimum Floor</p>
+                <p className="text-white font-medium">{formatCurrency(rule.creditConfig.minimumPaymentFloor)}</p>
+              </div>
+            </div>
+          </div>
+
+          {/* Payoff Scenarios */}
+          {creditPayoffSummary.scenarios.length > 0 && (
+            <div className="bg-gray-800/30 rounded-xl p-6">
+              <div className="flex items-center justify-between mb-4">
+                <h4 className="font-bold text-white flex items-center gap-2">
+                  <Icon name="lightbulb" size={20} />
+                  Pay Off Faster
+                </h4>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => setShowPayoffScenarios(!showPayoffScenarios)}
+                  icon={<Icon name={showPayoffScenarios ? "expand_less" : "expand_more"} size="sm" />}
+                >
+                  {showPayoffScenarios ? "Hide" : "Show"} Options
+                </Button>
+              </div>
+
+              {showPayoffScenarios && (
+                <div className="space-y-3">
+                  {creditPayoffSummary.scenarios.map((scenario: PayoffScenario, index: number) => (
+                    <div
+                      key={index}
+                      className="p-4 bg-gray-900/50 rounded-lg border border-gray-700 hover:border-primary/50 transition-colors"
+                    >
+                      <div className="flex items-center justify-between mb-2">
+                        <span className="font-medium text-white">{scenario.name}</span>
+                        <Badge variant="success">
+                          Save {formatCurrency(scenario.interestSavings)}
+                        </Badge>
+                      </div>
+                      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
+                        <div>
+                          <p className="text-xs text-gray-400">Monthly Payment</p>
+                          <p className="text-primary font-medium">{formatCurrency(scenario.monthlyPayment)}</p>
+                        </div>
+                        <div>
+                          <p className="text-xs text-gray-400">Time to Pay Off</p>
+                          <p className="text-white">{formatPayoffTime(scenario.monthsToPayoff)}</p>
+                        </div>
+                        <div>
+                          <p className="text-xs text-gray-400">Total Interest</p>
+                          <p className="text-white">{formatCurrency(scenario.totalInterest)}</p>
+                        </div>
+                        <div>
+                          <p className="text-xs text-gray-400">Time Saved</p>
+                          <p className="text-success">{formatPayoffTime(scenario.timeSavingsMonths)}</p>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              {!showPayoffScenarios && (
+                <p className="text-sm text-gray-400">
+                  See how you could save up to{" "}
+                  <span className="text-success font-medium">
+                    {formatCurrency(Math.max(...creditPayoffSummary.scenarios.map((s) => s.interestSavings)))}
+                  </span>{" "}
+                  in interest by increasing your payments.
+                </p>
+              )}
+            </div>
+          )}
         </div>
       )}
 

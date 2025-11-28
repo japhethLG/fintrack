@@ -628,7 +628,7 @@ export const deleteTransactionsBySource = async (
   await batch.commit();
 };
 
-// Real-time listener for transactions
+// Real-time listener for transactions (legacy - with date filtering)
 export const subscribeToTransactions = (
   userId: string,
   callback: (transactions: Transaction[]) => void,
@@ -651,6 +651,30 @@ export const subscribeToTransactions = (
   }
 
   const q = query(transactionsRef, ...constraints);
+  return onSnapshot(q, (snapshot) => {
+    const transactions = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }) as Transaction);
+    callback(transactions);
+  });
+};
+
+/**
+ * Subscribe to stored transactions only (excludes projected status).
+ * Used with on-the-fly projection computation - only fetches actual/completed transactions.
+ * No date filtering - fetches all stored transactions for the user.
+ */
+export const subscribeToStoredTransactions = (
+  userId: string,
+  callback: (transactions: Transaction[]) => void
+): (() => void) => {
+  const transactionsRef = collection(db, "transactions");
+  // Fetch all non-projected transactions (completed, skipped, partial, pending)
+  const q = query(
+    transactionsRef,
+    where("userId", "==", userId),
+    where("status", "in", ["completed", "skipped", "partial", "pending"]),
+    orderBy("scheduledDate", "asc")
+  );
+
   return onSnapshot(q, (snapshot) => {
     const transactions = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }) as Transaction);
     callback(transactions);
@@ -810,6 +834,44 @@ export const subscribeToAlerts = (
     const alerts = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }) as Alert);
     callback(alerts);
   });
+};
+
+// ============================================================================
+// MIGRATION UTILITIES
+// ============================================================================
+
+/**
+ * Delete all projected transactions for a user.
+ * This is a one-time migration utility to clean up when switching to on-the-fly projections.
+ * Only deletes transactions with status "projected" - completed, skipped, partial, and pending are preserved.
+ */
+export const deleteProjectedTransactions = async (userId: string): Promise<number> => {
+  const transactionsRef = collection(db, "transactions");
+  const q = query(
+    transactionsRef,
+    where("userId", "==", userId),
+    where("status", "==", "projected")
+  );
+
+  const snapshot = await getDocs(q);
+  const docs = snapshot.docs;
+
+  if (docs.length === 0) {
+    return 0;
+  }
+
+  // Delete in batches (Firestore limit is 500 operations per batch)
+  const batchSize = 500;
+  for (let i = 0; i < docs.length; i += batchSize) {
+    const batch = writeBatch(db);
+    const chunk = docs.slice(i, i + batchSize);
+    chunk.forEach((docSnapshot) => {
+      batch.delete(docSnapshot.ref);
+    });
+    await batch.commit();
+  }
+
+  return docs.length;
 };
 
 // ============================================================================

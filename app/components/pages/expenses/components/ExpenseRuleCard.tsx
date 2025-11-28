@@ -15,6 +15,22 @@ interface IProps {
 
 const ExpenseRuleCard: React.FC<IProps> = ({ rule, isSelected, onClick }) => {
   const { formatCurrency } = useCurrency();
+
+  // Get the display amount based on payment strategy for credit cards
+  const getDisplayAmount = () => {
+    if (rule.creditConfig) {
+      if (rule.creditConfig.paymentStrategy === "fixed" && rule.creditConfig.fixedPaymentAmount) {
+        return rule.creditConfig.fixedPaymentAmount;
+      }
+      if (rule.creditConfig.paymentStrategy === "full_balance") {
+        return rule.creditConfig.currentBalance;
+      }
+    }
+    return rule.amount;
+  };
+
+  const displayAmount = getDisplayAmount();
+
   const getProgress = () => {
     if (rule.loanConfig) {
       const paid = rule.loanConfig.principalAmount - rule.loanConfig.currentBalance;
@@ -69,7 +85,7 @@ const ExpenseRuleCard: React.FC<IProps> = ({ rule, isSelected, onClick }) => {
 
       <div className="mt-3 flex items-center justify-between">
         <p className="text-danger font-bold">
-          {formatCurrency(rule.amount, {
+          {formatCurrency(displayAmount, {
             minimumFractionDigits: 2,
             maximumFractionDigits: 2,
           })}

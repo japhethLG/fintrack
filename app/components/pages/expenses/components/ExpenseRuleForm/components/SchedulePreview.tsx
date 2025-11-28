@@ -13,6 +13,7 @@ interface IProps {
   specificDays: number[];
   weekendAdjustment: "before" | "after" | "none";
   dayOfMonth?: number;
+  creditDueDate?: number;
 }
 
 const SchedulePreview: React.FC<IProps> = ({
@@ -23,6 +24,7 @@ const SchedulePreview: React.FC<IProps> = ({
   specificDays,
   weekendAdjustment,
   dayOfMonth,
+  creditDueDate,
 }) => {
   const previewDates = useMemo(() => {
     const dates: Date[] = [];
@@ -84,7 +86,8 @@ const SchedulePreview: React.FC<IProps> = ({
         }
         break;
       case "monthly": {
-        const targetDay = dayOfMonth || start.getDate();
+        // For credit cards, use the due date; otherwise use dayOfMonth or start date
+        const targetDay = creditDueDate || dayOfMonth || start.getDate();
         const monthCursor = new Date(start.getFullYear(), start.getMonth(), 1);
 
         while (dates.length < 12 && monthCursor <= effectiveEnd) {
@@ -118,7 +121,7 @@ const SchedulePreview: React.FC<IProps> = ({
     }
 
     return dates.sort((a, b) => a.getTime() - b.getTime());
-  }, [startDate, endDate, hasEndDate, frequency, specificDays, weekendAdjustment, dayOfMonth]);
+  }, [startDate, endDate, hasEndDate, frequency, specificDays, weekendAdjustment, dayOfMonth, creditDueDate]);
 
   if (previewDates.length === 0) return null;
 
