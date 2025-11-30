@@ -1,5 +1,6 @@
 ---
-alwaysApply: true
+alwaysApply: false
+description: Governs project organization, file naming conventions, and import patterns for the Next.js App Router structure. Apply when creating new features, components, or reorganizing code.
 ---
 
 # Folder Structure & Organization Rules
@@ -247,24 +248,24 @@ lib/utils/
 
 ### Files
 
-| Type | Convention | Example |
-|------|------------|---------|
-| Page components | PascalCase | `ExpenseManager.tsx` |
-| Common components | PascalCase | `Button.tsx` |
-| Form elements | PascalCase | `FormInput/index.tsx` |
-| Helpers | camelCase | `formHelpers.ts` |
-| Constants | camelCase | `constants.ts` |
-| Types | camelCase | `types.ts` |
-| Utils | camelCase | `cn.ts` |
+| Type              | Convention | Example               |
+| ----------------- | ---------- | --------------------- |
+| Page components   | PascalCase | `ExpenseManager.tsx`  |
+| Common components | PascalCase | `Button.tsx`          |
+| Form elements     | PascalCase | `FormInput/index.tsx` |
+| Helpers           | camelCase  | `formHelpers.ts`      |
+| Constants         | camelCase  | `constants.ts`        |
+| Types             | camelCase  | `types.ts`            |
+| Utils             | camelCase  | `cn.ts`               |
 
 ### Folders
 
-| Type | Convention | Example |
-|------|------------|---------|
-| Route groups | kebab-case in parens | `(protected)` |
-| Routes | kebab-case | `analyze-budget` |
-| Component folders | PascalCase | `ExpenseRuleForm/` |
-| Utility folders | camelCase | `formElements/` |
+| Type              | Convention           | Example            |
+| ----------------- | -------------------- | ------------------ |
+| Route groups      | kebab-case in parens | `(protected)`      |
+| Routes            | kebab-case           | `analyze-budget`   |
+| Component folders | PascalCase           | `ExpenseRuleForm/` |
+| Utility folders   | camelCase            | `formElements/`    |
 
 ### Exports
 

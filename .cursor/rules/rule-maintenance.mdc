@@ -1,5 +1,6 @@
 ---
-alwaysApply: true
+alwaysApply: false
+description: Governs when and how to update rule files as the codebase evolves. Apply after implementing new patterns, abstractions, or architectural changes that should be documented for consistency.
 ---
 
 # Rule Maintenance & Updates
@@ -94,6 +95,7 @@ When updating rules, follow this format:
 \`\`\`
 
 **Notes:**
+
 - Important consideration 1
 - Important consideration 2
 ```
@@ -137,17 +139,17 @@ alwaysApply: true
 
 ## Rule File Naming
 
-| Domain | Filename |
-|--------|----------|
-| UI Components | `common-components.mdc` |
-| Page Structure | `page-component-patterns.mdc` |
-| Forms | `form-patterns.mdc` |
-| Types/Constants | `types-and-constants.mdc` |
-| Folder Organization | `folder-structure.mdc` |
-| State Management | `context-patterns.mdc` |
-| Testing | `testing-patterns.mdc` |
-| API Routes | `api-patterns.mdc` |
-| Styling | `styling-patterns.mdc` |
+| Domain              | Filename                      |
+| ------------------- | ----------------------------- |
+| UI Components       | `common-components.mdc`       |
+| Page Structure      | `page-component-patterns.mdc` |
+| Forms               | `form-patterns.mdc`           |
+| Types/Constants     | `types-and-constants.mdc`     |
+| Folder Organization | `folder-structure.mdc`        |
+| State Management    | `context-patterns.mdc`        |
+| Testing             | `testing-patterns.mdc`        |
+| API Routes          | `api-patterns.mdc`            |
+| Styling             | `styling-patterns.mdc`        |
 
 ## Checklist Before Implementing New Code
 
@@ -176,12 +178,14 @@ When the AI (you) implements new patterns:
 1. **Recognize pattern establishment**: When implementing something that could be a template for future similar implementations, note it.
 
 2. **Proactively suggest updates**: At the end of implementing significant features, suggest:
+
    ```
    "I've implemented [pattern]. This establishes a new pattern for [use case].
    Would you like me to update [rule-file.mdc] to document this pattern?"
    ```
 
 3. **Update rules alongside code**: When asked to update rules, provide specific additions:
+
    ```
    "I'll add the following to [rule-file.mdc]:
 

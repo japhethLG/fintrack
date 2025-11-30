@@ -1,5 +1,6 @@
 ---
-alwaysApply: true
+alwaysApply: false
+description: Governs usage of reusable UI components from `components/common/` instead of raw HTML elements. Apply when building any UI with buttons, inputs, forms, cards, or interactive elements.
 ---
 
 # Common Components Rule
@@ -12,23 +13,23 @@ Always use and create common components from `components/common/` instead of bas
 
 Import from `@/components/common`:
 
-| Component | Purpose | Key Props |
-|-----------|---------|-----------|
-| `Button` | Interactive buttons | `variant`, `size`, `icon`, `loading` |
-| `Input` | Text/number inputs | `label`, `error`, `prefix`, `suffix` |
-| `Select` | Dropdown select | `options`, `label`, `error` |
-| `TextArea` | Multi-line text | `label`, `error`, `rows` |
-| `Checkbox` | Boolean toggle | `label`, `checked` |
-| `Card` | Container component | `padding` (none/sm/md/lg) |
-| `Badge` | Status indicators | `variant` (success/warning/danger/default/primary) |
-| `Alert` | Notification messages | `type`, `title`, `message` |
-| `Icon` | Material icons | `name`, `size` |
-| `LoadingSpinner` | Loading states | `size`, `text` |
-| `PageHeader` | Page title section | `title`, `description`, `actions` |
-| `Table` | Data tables | `columns`, `data` |
-| `Divider` | Visual separator | `className` |
-| `Tooltip` | Hover tooltips | `content` |
-| `FieldLabel` | Form field labels | `label`, `tooltip` |
+| Component        | Purpose               | Key Props                                          |
+| ---------------- | --------------------- | -------------------------------------------------- |
+| `Button`         | Interactive buttons   | `variant`, `size`, `icon`, `loading`               |
+| `Input`          | Text/number inputs    | `label`, `error`, `prefix`, `suffix`               |
+| `Select`         | Dropdown select       | `options`, `label`, `error`                        |
+| `TextArea`       | Multi-line text       | `label`, `error`, `rows`                           |
+| `Checkbox`       | Boolean toggle        | `label`, `checked`                                 |
+| `Card`           | Container component   | `padding` (none/sm/md/lg)                          |
+| `Badge`          | Status indicators     | `variant` (success/warning/danger/default/primary) |
+| `Alert`          | Notification messages | `type`, `title`, `message`                         |
+| `Icon`           | Material icons        | `name`, `size`                                     |
+| `LoadingSpinner` | Loading states        | `size`, `text`                                     |
+| `PageHeader`     | Page title section    | `title`, `description`, `actions`                  |
+| `Table`          | Data tables           | `columns`, `data`                                  |
+| `Divider`        | Visual separator      | `className`                                        |
+| `Tooltip`        | Hover tooltips        | `content`                                          |
+| `FieldLabel`     | Form field labels     | `label`, `tooltip`                                 |
 
 ## Usage Rules
 
@@ -49,6 +50,7 @@ NEVER use raw `<button>` HTML tags. ALWAYS use the common `Button` component:
 ```
 
 **Button Variants:**
+
 - `primary` - Main actions (cyan background)
 - `secondary` - Secondary actions (gray border)
 - `danger` - Destructive actions (red tint)

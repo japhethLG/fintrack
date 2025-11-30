@@ -1,5 +1,6 @@
 ---
-alwaysApply: true
+alwaysApply: false
+description: Governs TypeScript type definitions in `lib/types.ts` and constant organization across global and feature-specific scopes. Apply when defining new types, interfaces, or constant values.
 ---
 
 # Types & Constants Patterns
@@ -82,12 +83,7 @@ export interface Entity {
 // Use string literal unions instead of enums
 export type TransactionStatus = "projected" | "pending" | "completed" | "skipped" | "partial";
 
-export type ExpenseCategory =
-  | "housing"
-  | "utilities"
-  | "transportation"
-  | "groceries"
-  | "other";
+export type ExpenseCategory = "housing" | "utilities" | "transportation" | "groceries" | "other";
 ```
 
 #### Config Interfaces
@@ -116,10 +112,7 @@ Derive form data types from entity types:
 
 ```tsx
 // Omit system fields for form submission
-export type IncomeSourceFormData = Omit<
-  IncomeSource,
-  "id" | "userId" | "createdAt" | "updatedAt"
->;
+export type IncomeSourceFormData = Omit<IncomeSource, "id" | "userId" | "createdAt" | "updatedAt">;
 
 // Specific form data interface
 export interface CompleteTransactionData {
@@ -286,8 +279,18 @@ export const CHART_COLORS = [
 export const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
 
 export const MONTHS = [
-  "January", "February", "March", "April", "May", "June",
-  "July", "August", "September", "October", "November", "December"
+  "January",
+  "February",
+  "March",
+  "April",
+  "May",
+  "June",
+  "July",
+  "August",
+  "September",
+  "October",
+  "November",
+  "December",
 ];
 ```
 
@@ -304,7 +307,9 @@ import type { CalendarDay } from "./types";
 ### Type Guards
 
 ```tsx
-export const isLoanExpense = (rule: ExpenseRule): rule is ExpenseRule & { loanConfig: LoanConfig } => {
+export const isLoanExpense = (
+  rule: ExpenseRule
+): rule is ExpenseRule & { loanConfig: LoanConfig } => {
   return rule.expenseType === "cash_loan" && !!rule.loanConfig;
 };
 
@@ -358,13 +363,13 @@ import { STATUS_OPTIONS, STATUS_VARIANTS, STATUS_ICONS } from "./constants";
 
 ## Naming Conventions
 
-| Type | Convention | Example |
-|------|------------|---------|
-| Interfaces | PascalCase | `UserProfile`, `Transaction` |
-| Type aliases | PascalCase | `TransactionStatus`, `ExpenseType` |
-| Constants | SCREAMING_SNAKE_CASE | `STATUS_OPTIONS`, `CHART_COLORS` |
-| Option arrays | _OPTIONS suffix | `TYPE_OPTIONS`, `CATEGORY_OPTIONS` |
-| Variant maps | _VARIANTS suffix | `STATUS_VARIANTS` |
-| Icon maps | _ICONS suffix | `STATUS_ICONS` |
-| Config types | Config suffix | `LoanConfig`, `ScheduleConfig` |
-| Form data | FormData suffix | `IncomeSourceFormData` |
+| Type          | Convention           | Example                            |
+| ------------- | -------------------- | ---------------------------------- |
+| Interfaces    | PascalCase           | `UserProfile`, `Transaction`       |
+| Type aliases  | PascalCase           | `TransactionStatus`, `ExpenseType` |
+| Constants     | SCREAMING_SNAKE_CASE | `STATUS_OPTIONS`, `CHART_COLORS`   |
+| Option arrays | \_OPTIONS suffix     | `TYPE_OPTIONS`, `CATEGORY_OPTIONS` |
+| Variant maps  | \_VARIANTS suffix    | `STATUS_VARIANTS`                  |
+| Icon maps     | \_ICONS suffix       | `STATUS_ICONS`                     |
+| Config types  | Config suffix        | `LoanConfig`, `ScheduleConfig`     |
+| Form data     | FormData suffix      | `IncomeSourceFormData`             |

@@ -1,5 +1,6 @@
 ---
-alwaysApply: true
+alwaysApply: false
+description: Governs React Context structure for global state management, including provider composition, custom hooks, and real-time subscriptions. Apply when working with AuthContext, FinancialContext, or creating new context providers.
 ---
 
 # Context & State Management Patterns
@@ -146,12 +147,9 @@ export const FinancialProvider: React.FC<ProviderProps> = ({ children }) => {
     [user]
   );
 
-  const editEntity = useCallback(
-    async (id: string, data: Partial<FormData>) => {
-      await updateEntity(id, data);
-    },
-    []
-  );
+  const editEntity = useCallback(async (id: string, data: Partial<FormData>) => {
+    await updateEntity(id, data);
+  }, []);
 
   const removeEntity = useCallback(async (id: string) => {
     await deleteEntity(id);
@@ -180,11 +178,7 @@ export const FinancialProvider: React.FC<ProviderProps> = ({ children }) => {
     refreshData,
   };
 
-  return (
-    <FinancialContext.Provider value={value}>
-      {children}
-    </FinancialContext.Provider>
-  );
+  return <FinancialContext.Provider value={value}>{children}</FinancialContext.Provider>;
 };
 
 export default FinancialContext;
@@ -202,9 +196,7 @@ import { FinancialProvider } from "./contexts/FinancialContext";
 export function Providers({ children }: { children: React.ReactNode }) {
   return (
     <AuthProvider>
-      <FinancialProvider>
-        {children}
-      </FinancialProvider>
+      <FinancialProvider>{children}</FinancialProvider>
     </AuthProvider>
   );
 }
@@ -231,8 +223,8 @@ export default function RootLayout({ children }) {
 
 ```tsx
 interface ContextValue {
-  isLoading: boolean;      // Currently fetching/updating data
-  isInitialized: boolean;  // Initial load complete
+  isLoading: boolean; // Currently fetching/updating data
+  isInitialized: boolean; // Initial load complete
 }
 ```
 
@@ -277,12 +269,7 @@ import { useFinancial } from "@/contexts/FinancialContext";
 import { LoadingSpinner } from "@/components/common";
 
 const MyComponent: React.FC = () => {
-  const {
-    entities,
-    isLoading,
-    createEntity,
-    removeEntity,
-  } = useFinancial();
+  const { entities, isLoading, createEntity, removeEntity } = useFinancial();
 
   const handleCreate = async (data: FormData) => {
     const entity = await createEntity(data);
@@ -296,11 +283,7 @@ const MyComponent: React.FC = () => {
   return (
     <div>
       {entities.map((entity) => (
-        <EntityCard
-          key={entity.id}
-          entity={entity}
-          onDelete={() => removeEntity(entity.id)}
-        />
+        <EntityCard key={entity.id} entity={entity} onDelete={() => removeEntity(entity.id)} />
       ))}
     </div>
   );
@@ -388,12 +371,7 @@ const createEntity = useCallback(
 "use client";
 
 import React, { createContext, useContext, useState, useEffect, ReactNode } from "react";
-import {
-  User,
-  onAuthStateChanged,
-  signInWithEmailAndPassword,
-  signOut,
-} from "firebase/auth";
+import { User, onAuthStateChanged, signInWithEmailAndPassword, signOut } from "firebase/auth";
 import { auth } from "@/lib/firebase/config";
 import { createUserProfile } from "@/lib/firebase/firestore";
 
@@ -440,9 +418,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   };
 
   return (
-    <AuthContext.Provider value={{ user, loading, login, logout }}>
-      {children}
-    </AuthContext.Provider>
+    <AuthContext.Provider value={{ user, loading, login, logout }}>{children}</AuthContext.Provider>
   );
 };
 ```

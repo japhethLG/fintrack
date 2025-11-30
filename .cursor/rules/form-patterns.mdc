@@ -1,5 +1,6 @@
 ---
-alwaysApply: true
+alwaysApply: false
+description: Governs form implementation using React Hook Form with Yup validation, including form helpers, multi-step forms, and form elements. Apply when creating or modifying any form component.
 ---
 
 # Form Patterns
@@ -103,11 +104,7 @@ import { useForm } from "react-hook-form";
 import { yupResolver } from "@hookform/resolvers/yup";
 import { Button } from "@/components/common";
 import { Form, FormInput, FormSelect, FormCheckbox } from "@/components/formElements";
-import {
-  formSchema,
-  getDefaultValues,
-  type FormValues,
-} from "./formHelpers";
+import { formSchema, getDefaultValues, type FormValues } from "./formHelpers";
 
 interface IProps {
   initialData?: Partial<FormValues>;
@@ -116,12 +113,7 @@ interface IProps {
   isEditing?: boolean;
 }
 
-const MyForm: React.FC<IProps> = ({
-  initialData,
-  onSubmit,
-  onCancel,
-  isEditing = false,
-}) => {
+const MyForm: React.FC<IProps> = ({ initialData, onSubmit, onCancel, isEditing = false }) => {
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -154,12 +146,7 @@ const MyForm: React.FC<IProps> = ({
   return (
     <Form methods={methods} onSubmit={handleSubmit}>
       <div className="space-y-6">
-        <FormInput
-          inputName="name"
-          label="Name"
-          placeholder="Enter name"
-          isRequired
-        />
+        <FormInput inputName="name" label="Name" placeholder="Enter name" isRequired />
 
         <FormInput
           inputName="amount"
@@ -170,17 +157,9 @@ const MyForm: React.FC<IProps> = ({
           isRequired
         />
 
-        <FormSelect
-          inputName="category"
-          label="Category"
-          options={CATEGORY_OPTIONS}
-          isRequired
-        />
+        <FormSelect inputName="category" label="Category" options={CATEGORY_OPTIONS} isRequired />
 
-        <FormCheckbox
-          inputName="isActive"
-          label="Active"
-        />
+        <FormCheckbox inputName="isActive" label="Active" />
 
         {/* Error display */}
         {error && (
@@ -220,11 +199,7 @@ import FormStepIndicator from "./components/FormStepIndicator";
 import Step1 from "./steps/Step1";
 import Step2 from "./steps/Step2";
 import ReviewStep from "./steps/ReviewStep";
-import {
-  formSchema,
-  getDefaultValues,
-  type FormValues,
-} from "./formHelpers";
+import { formSchema, getDefaultValues, type FormValues } from "./formHelpers";
 
 interface IProps {
   initialData?: Partial<FormValues>;
@@ -352,19 +327,10 @@ const DetailsStep: React.FC = () => {
     <div className="space-y-6">
       <h3 className="text-xl font-bold text-white">Details</h3>
 
-      <FormInput
-        inputName="name"
-        label="Name"
-        placeholder="Enter name"
-        isRequired
-      />
+      <FormInput inputName="name" label="Name" placeholder="Enter name" isRequired />
 
       {type === "special" && (
-        <FormInput
-          inputName="specialField"
-          label="Special Field"
-          isRequired
-        />
+        <FormInput inputName="specialField" label="Special Field" isRequired />
       )}
     </div>
   );
@@ -379,14 +345,14 @@ export default DetailsStep;
 
 ```tsx
 <FormInput
-  inputName="fieldName"        // Required: maps to form field
-  label="Field Label"          // Optional: adds label
-  type="text"                  // Optional: input type (text, number, date, email)
-  placeholder="Placeholder"    // Optional: placeholder text
-  prefix="$"                   // Optional: prefix text (for currency)
-  suffix="%"                   // Optional: suffix text
-  isRequired                   // Optional: adds * to label
-  className="custom-class"     // Optional: additional classes
+  inputName="fieldName" // Required: maps to form field
+  label="Field Label" // Optional: adds label
+  type="text" // Optional: input type (text, number, date, email)
+  placeholder="Placeholder" // Optional: placeholder text
+  prefix="$" // Optional: prefix text (for currency)
+  suffix="%" // Optional: suffix text
+  isRequired // Optional: adds * to label
+  className="custom-class" // Optional: additional classes
 />
 ```
 
@@ -407,21 +373,13 @@ export default DetailsStep;
 ### FormCheckbox
 
 ```tsx
-<FormCheckbox
-  inputName="isActive"
-  label="Active"
-/>
+<FormCheckbox inputName="isActive" label="Active" />
 ```
 
 ### FormTextArea
 
 ```tsx
-<FormTextArea
-  inputName="notes"
-  label="Notes"
-  placeholder="Enter notes..."
-  rows={4}
-/>
+<FormTextArea inputName="notes" label="Notes" placeholder="Enter notes..." rows={4} />
 ```
 
 ## Validation Patterns
@@ -512,11 +470,13 @@ const handleSubmit = async (values: FormValues) => {
 };
 
 // In render
-{error && (
-  <div className="p-3 bg-danger/20 border border-danger/30 rounded-lg text-danger text-sm">
-    {error}
-  </div>
-)}
+{
+  error && (
+    <div className="p-3 bg-danger/20 border border-danger/30 rounded-lg text-danger text-sm">
+      {error}
+    </div>
+  );
+}
 ```
 
 ## Form Layout Patterns
