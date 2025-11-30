@@ -100,7 +100,11 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
               <ReloadIcon className="h-4 w-4 animate-spin" />
             </span>
           )}
-          <span className={cn("inline-flex items-center", loading && "invisible")}>{children}</span>
+          {children && (
+            <span className={cn("inline-flex items-center", loading && "invisible")}>
+              {children}
+            </span>
+          )}
           {effectiveEndIcon && (
             <span className={cn("flex items-center", loading && "invisible")}>
               {effectiveEndIcon}

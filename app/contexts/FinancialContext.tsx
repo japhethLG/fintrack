@@ -29,6 +29,7 @@ import {
   getUserProfile,
   updateUserProfile,
   updateUserBalance,
+  adjustUserBalance,
   subscribeToUserProfile,
   // Income Sources
   addIncomeSource,
@@ -155,6 +156,7 @@ export const FinancialProvider: React.FC<FinancialProviderProps> = ({ children }
 
   // Refs for use in callbacks (avoids recreating callbacks when these change)
   const storedTransactionsRef = useRef<Transaction[]>([]);
+  const incomeSourcesRef = useRef<IncomeSource[]>([]);
   const expenseRulesRef = useRef<ExpenseRule[]>([]);
   const userProfileRef = useRef<UserProfile | null>(null);
 
@@ -162,6 +164,10 @@ export const FinancialProvider: React.FC<FinancialProviderProps> = ({ children }
   useEffect(() => {
     storedTransactionsRef.current = storedTransactions;
   }, [storedTransactions]);
+
+  useEffect(() => {
+    incomeSourcesRef.current = incomeSources;
+  }, [incomeSources]);
 
   useEffect(() => {
     expenseRulesRef.current = expenseRules;
@@ -415,13 +421,10 @@ export const FinancialProvider: React.FC<FinancialProviderProps> = ({ children }
     [user]
   );
 
-  const editIncomeSource = useCallback(
-    async (id: string, data: Partial<IncomeSourceFormData>) => {
-      // Just update the source - projections will recompute automatically
-      await updateIncomeSource(id, data);
-    },
-    []
-  );
+  const editIncomeSource = useCallback(async (id: string, data: Partial<IncomeSourceFormData>) => {
+    // Just update the source - projections will recompute automatically
+    await updateIncomeSource(id, data);
+  }, []);
 
   const removeIncomeSource = useCallback(async (id: string) => {
     // Just delete the source - projections will recompute automatically
@@ -429,13 +432,10 @@ export const FinancialProvider: React.FC<FinancialProviderProps> = ({ children }
     await deleteIncomeSource(id);
   }, []);
 
-  const toggleIncomeSourceActive = useCallback(
-    async (id: string, isActive: boolean) => {
-      // Just update - projections will recompute automatically
-      await updateIncomeSource(id, { isActive });
-    },
-    []
-  );
+  const toggleIncomeSourceActive = useCallback(async (id: string, isActive: boolean) => {
+    // Just update - projections will recompute automatically
+    await updateIncomeSource(id, { isActive });
+  }, []);
 
   // ============================================================================
   // EXPENSE RULE ACTIONS
@@ -463,13 +463,10 @@ export const FinancialProvider: React.FC<FinancialProviderProps> = ({ children }
     [user]
   );
 
-  const editExpenseRule = useCallback(
-    async (id: string, data: Partial<ExpenseRuleFormData>) => {
-      // Just update the rule - projections will recompute automatically
-      await updateExpenseRule(id, data);
-    },
-    []
-  );
+  const editExpenseRule = useCallback(async (id: string, data: Partial<ExpenseRuleFormData>) => {
+    // Just update the rule - projections will recompute automatically
+    await updateExpenseRule(id, data);
+  }, []);
 
   const removeExpenseRule = useCallback(async (id: string) => {
     // Just delete the rule - projections will recompute automatically
@@ -477,13 +474,10 @@ export const FinancialProvider: React.FC<FinancialProviderProps> = ({ children }
     await deleteExpenseRule(id);
   }, []);
 
-  const toggleExpenseRuleActive = useCallback(
-    async (id: string, isActive: boolean) => {
-      // Just update - projections will recompute automatically
-      await updateExpenseRule(id, { isActive });
-    },
-    []
-  );
+  const toggleExpenseRuleActive = useCallback(async (id: string, isActive: boolean) => {
+    // Just update - projections will recompute automatically
+    await updateExpenseRule(id, { isActive });
+  }, []);
 
   // ============================================================================
   // TRANSACTION ACTIONS
@@ -506,22 +500,26 @@ export const FinancialProvider: React.FC<FinancialProviderProps> = ({ children }
       // Check if this is a projected transaction (needs to be stored first)
       if (id.startsWith("proj_")) {
         // Parse the projection ID to get sourceId and scheduledDate
-        // Format: proj_${sourceId}-${scheduledDate}
+        // Format: proj_${sourceId}-${scheduledDate} where scheduledDate is YYYY-MM-DD (10 chars)
         const keyPart = id.substring(5); // Remove "proj_" prefix
-        const lastDashIndex = keyPart.lastIndexOf("-");
-        if (lastDashIndex === -1) {
+        if (keyPart.length < 12) {
+          // At least 1 char for ID + dash + 10 for date
           throw new Error("Invalid projection ID format");
         }
-        const sourceId = keyPart.substring(0, lastDashIndex);
-        const scheduledDate = keyPart.substring(lastDashIndex + 1);
+        // Date is always last 10 characters (YYYY-MM-DD)
+        const scheduledDate = keyPart.substring(keyPart.length - 10);
+        // Source ID is everything before the last dash (keyPart.length - 11)
+        const sourceId = keyPart.substring(0, keyPart.length - 11);
 
         // Find the source to get transaction details
-        const incomeSource = incomeSources.find((s) => s.id === sourceId);
+        const incomeSource = incomeSourcesRef.current.find((s) => s.id === sourceId);
         const expenseRule = expenseRulesRef.current.find((r) => r.id === sourceId);
         const source = incomeSource || expenseRule;
 
         if (!source) {
-          throw new Error("Source not found for projection");
+          throw new Error(
+            `Source not found for projection. ID: ${sourceId}, Income sources: ${incomeSourcesRef.current.length}, Expense rules: ${expenseRulesRef.current.length}`
+          );
         }
 
         const isIncome = !!incomeSource;
@@ -544,7 +542,7 @@ export const FinancialProvider: React.FC<FinancialProviderProps> = ({ children }
 
         // Update user balance
         const delta = isIncome ? data.actualAmount : -data.actualAmount;
-        await updateUserBalance(user.uid, (userProfileRef.current?.currentBalance || 0) + delta);
+        await adjustUserBalance(user.uid, delta);
 
         // Update source tracking if applicable (loan/installment)
         if (!isIncome && expenseRule) {
@@ -569,7 +567,7 @@ export const FinancialProvider: React.FC<FinancialProviderProps> = ({ children }
         await completeTransaction(id, data.actualAmount, data.actualDate, data.notes);
       }
     },
-    [user, incomeSources]
+    [user]
   );
 
   const markTransactionSkipped = useCallback(
@@ -579,21 +577,21 @@ export const FinancialProvider: React.FC<FinancialProviderProps> = ({ children }
       // Check if this is a projected transaction
       if (id.startsWith("proj_")) {
         // Parse the projection ID to get sourceId and scheduledDate
+        // Format: proj_${sourceId}-${scheduledDate} where scheduledDate is YYYY-MM-DD (10 chars)
         const keyPart = id.substring(5);
-        const lastDashIndex = keyPart.lastIndexOf("-");
-        if (lastDashIndex === -1) {
+        if (keyPart.length < 12) {
           throw new Error("Invalid projection ID format");
         }
-        const sourceId = keyPart.substring(0, lastDashIndex);
-        const scheduledDate = keyPart.substring(lastDashIndex + 1);
+        const scheduledDate = keyPart.substring(keyPart.length - 10);
+        const sourceId = keyPart.substring(0, keyPart.length - 11);
 
         // Find the source
-        const incomeSource = incomeSources.find((s) => s.id === sourceId);
+        const incomeSource = incomeSourcesRef.current.find((s) => s.id === sourceId);
         const expenseRule = expenseRulesRef.current.find((r) => r.id === sourceId);
         const source = incomeSource || expenseRule;
 
         if (!source) {
-          throw new Error("Source not found for projection");
+          throw new Error(`Source not found for projection. ID: ${sourceId}`);
         }
 
         const isIncome = !!incomeSource;
@@ -614,7 +612,7 @@ export const FinancialProvider: React.FC<FinancialProviderProps> = ({ children }
         await skipTransaction(id, notes);
       }
     },
-    [user, incomeSources]
+    [user]
   );
 
   const markTransactionPartial = useCallback(
@@ -624,21 +622,21 @@ export const FinancialProvider: React.FC<FinancialProviderProps> = ({ children }
       // Check if this is a projected transaction
       if (id.startsWith("proj_")) {
         // Parse the projection ID
+        // Format: proj_${sourceId}-${scheduledDate} where scheduledDate is YYYY-MM-DD (10 chars)
         const keyPart = id.substring(5);
-        const lastDashIndex = keyPart.lastIndexOf("-");
-        if (lastDashIndex === -1) {
+        if (keyPart.length < 12) {
           throw new Error("Invalid projection ID format");
         }
-        const sourceId = keyPart.substring(0, lastDashIndex);
-        const scheduledDate = keyPart.substring(lastDashIndex + 1);
+        const scheduledDate = keyPart.substring(keyPart.length - 10);
+        const sourceId = keyPart.substring(0, keyPart.length - 11);
 
         // Find the source
-        const incomeSource = incomeSources.find((s) => s.id === sourceId);
+        const incomeSource = incomeSourcesRef.current.find((s) => s.id === sourceId);
         const expenseRule = expenseRulesRef.current.find((r) => r.id === sourceId);
         const source = incomeSource || expenseRule;
 
         if (!source) {
-          throw new Error("Source not found for projection");
+          throw new Error(`Source not found for projection. ID: ${sourceId}`);
         }
 
         const isIncome = !!incomeSource;
@@ -660,7 +658,7 @@ export const FinancialProvider: React.FC<FinancialProviderProps> = ({ children }
 
         // Update user balance
         const delta = isIncome ? partialAmount : -partialAmount;
-        await updateUserBalance(user.uid, (userProfileRef.current?.currentBalance || 0) + delta);
+        await adjustUserBalance(user.uid, delta);
 
         // Create remainder transaction
         const remainder = source.amount - partialAmount;
@@ -684,7 +682,7 @@ export const FinancialProvider: React.FC<FinancialProviderProps> = ({ children }
         return partialPayTransaction(id, partialAmount, notes);
       }
     },
-    [user, incomeSources]
+    [user]
   );
 
   const removeTransaction = useCallback(async (id: string) => {

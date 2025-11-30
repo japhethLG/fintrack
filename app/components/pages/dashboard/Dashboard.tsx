@@ -31,6 +31,7 @@ const Dashboard: React.FC = () => {
     isLoading,
     markTransactionComplete,
     markTransactionSkipped,
+    markTransactionPartial,
     setViewDateRange,
   } = useFinancial();
 
@@ -182,15 +183,42 @@ const Dashboard: React.FC = () => {
     actualDate?: string;
     notes?: string;
   }) => {
-    if (!selectedTransaction) return;
-    await markTransactionComplete(selectedTransaction.id, data);
-    setSelectedTransaction(null);
+    if (!selectedTransaction) {
+      return;
+    }
+    try {
+      await markTransactionComplete(selectedTransaction.id, data);
+      setSelectedTransaction(null);
+    } catch (error) {
+      console.error("❌ Error completing transaction:", error);
+      throw error; // Re-throw so the modal can handle it
+    }
   };
 
   const handleSkip = async (notes?: string) => {
-    if (!selectedTransaction) return;
-    await markTransactionSkipped(selectedTransaction.id, notes);
-    setSelectedTransaction(null);
+    if (!selectedTransaction) {
+      return;
+    }
+    try {
+      await markTransactionSkipped(selectedTransaction.id, notes);
+      setSelectedTransaction(null);
+    } catch (error) {
+      console.error("❌ Error skipping transaction:", error);
+      throw error; // Re-throw so the modal can handle it
+    }
+  };
+
+  const handlePartial = async (amount: number, notes?: string) => {
+    if (!selectedTransaction) {
+      return;
+    }
+    try {
+      await markTransactionPartial(selectedTransaction.id, amount, notes);
+      setSelectedTransaction(null);
+    } catch (error) {
+      console.error("❌ Error recording partial payment:", error);
+      throw error; // Re-throw so the modal can handle it
+    }
   };
 
   if (isLoading) {
@@ -294,6 +322,7 @@ const Dashboard: React.FC = () => {
           transaction={selectedTransaction}
           onComplete={handleComplete}
           onSkip={handleSkip}
+          onPartial={handlePartial}
           onClose={() => setSelectedTransaction(null)}
         />
       )}

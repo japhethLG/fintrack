@@ -21,6 +21,7 @@ const CalendarView: React.FC = () => {
     isLoading,
     markTransactionComplete,
     markTransactionSkipped,
+    markTransactionPartial,
     setViewDateRange,
   } = useFinancial();
 
@@ -195,6 +196,12 @@ const CalendarView: React.FC = () => {
   const handleSkip = async (notes?: string) => {
     if (!selectedTransaction) return;
     await markTransactionSkipped(selectedTransaction.id, notes);
+    setSelectedTransaction(null);
+  };
+
+  const handlePartial = async (amount: number, notes?: string) => {
+    if (!selectedTransaction) return;
+    await markTransactionPartial(selectedTransaction.id, amount, notes);
     setSelectedTransaction(null);
   };
 
@@ -427,6 +434,7 @@ const CalendarView: React.FC = () => {
           transaction={selectedTransaction}
           onComplete={handleComplete}
           onSkip={handleSkip}
+          onPartial={handlePartial}
           onClose={() => setSelectedTransaction(null)}
         />
       )}

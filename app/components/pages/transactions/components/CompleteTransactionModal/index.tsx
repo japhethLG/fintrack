@@ -1,6 +1,6 @@
 "use client";
 
-import React from "react";
+import React, { useState } from "react";
 import { useForm, Resolver } from "react-hook-form";
 import { yupResolver } from "@hookform/resolvers/yup";
 import { Transaction, CompleteTransactionData } from "@/lib/types";
@@ -30,6 +30,9 @@ const CompleteTransactionModal: React.FC<IProps> = ({
   onClose,
 }) => {
   const { formatCurrency, formatCurrencyWithSign, currencySymbol } = useCurrency();
+  const [error, setError] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
   const methods = useForm<CompleteTransactionFormValues>({
     defaultValues: getDefaultValues(
       transaction.projectedAmount,
@@ -49,6 +52,9 @@ const CompleteTransactionModal: React.FC<IProps> = ({
   const hasVariance = variance !== 0;
 
   const handleSubmit = async (values: CompleteTransactionFormValues) => {
+    setError(null);
+    setIsSubmitting(true);
+
     try {
       if (values.mode === "complete") {
         await onComplete({
@@ -63,7 +69,9 @@ const CompleteTransactionModal: React.FC<IProps> = ({
       }
       onClose();
     } catch (err) {
-      // Error handled by form
+      setError(err instanceof Error ? err.message : "Failed to process transaction");
+    } finally {
+      setIsSubmitting(false);
     }
   };
 
@@ -220,21 +228,37 @@ const CompleteTransactionModal: React.FC<IProps> = ({
             <FormInput inputName="notes" label="Notes (Optional)" placeholder="Add a note..." />
           </div>
 
+          {/* Error Display */}
+          {error && (
+            <div className="mt-4 p-3 bg-danger/20 border border-danger/30 rounded-lg text-danger text-sm">
+              {error}
+            </div>
+          )}
+
           {/* Actions */}
           <div className="flex gap-3 mt-6 pt-6 border-t border-gray-800">
-            <Button type="button" variant="ghost" className="flex-1" onClick={onClose}>
+            <Button
+              type="button"
+              variant="ghost"
+              className="flex-1"
+              onClick={onClose}
+              disabled={isSubmitting}
+            >
               Cancel
             </Button>
             <Button
               type="submit"
               variant={mode === "skip" ? "secondary" : "primary"}
               className="flex-1"
+              disabled={isSubmitting}
             >
-              {mode === "complete"
-                ? "Mark Complete"
-                : mode === "skip"
-                  ? "Skip Transaction"
-                  : "Record Partial"}
+              {isSubmitting
+                ? "Processing..."
+                : mode === "complete"
+                  ? "Mark Complete"
+                  : mode === "skip"
+                    ? "Skip Transaction"
+                    : "Record Partial"}
             </Button>
           </div>
         </Form>

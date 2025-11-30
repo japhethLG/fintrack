@@ -82,7 +82,8 @@ export const buildScheduleConfig = (values: IncomeSourceFormValues): ScheduleCon
       break;
     case "weekly":
     case "bi-weekly":
-      config.dayOfWeek = values.dayOfWeek;
+      // Parse to number since FormSelect returns strings
+      config.dayOfWeek = typeof values.dayOfWeek === "string" ? parseInt(values.dayOfWeek) : values.dayOfWeek;
       if (values.frequency === "bi-weekly") {
         config.intervalWeeks = 2;
       }
