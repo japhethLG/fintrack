@@ -17,6 +17,7 @@ import {
   deleteAllUserData,
   deleteUserProfile,
   subscribeToUserProfile,
+  migrateToInitialBalance,
 } from "@/lib/firebase/firestore";
 
 interface AuthContextType {
@@ -66,8 +67,10 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         // Create profile if it doesn't exist
         try {
           await createUserProfile(user.uid, user.email || "", user.displayName || "User");
+          // Run migration to ensure initialBalance field exists
+          await migrateToInitialBalance(user.uid);
         } catch (error) {
-          console.error("Error creating user profile:", error);
+          console.error("Error creating user profile or running migration:", error);
         }
 
         // Subscribe to real-time profile updates

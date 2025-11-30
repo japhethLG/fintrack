@@ -151,6 +151,13 @@ export const completeTransaction = async (
   const transaction = await getTransaction(id);
   if (!transaction) throw new Error("Transaction not found");
 
+  // REVERSAL LOGIC: If already completed/partial, reverse the old adjustment
+  if (transaction.status === "completed" || transaction.status === "partial") {
+    const oldAmount = transaction.actualAmount ?? transaction.projectedAmount;
+    const reversalDelta = transaction.type === "income" ? -oldAmount : oldAmount;
+    await adjustUserBalance(transaction.userId, reversalDelta);
+  }
+
   const variance = actualAmount - transaction.projectedAmount;
 
   await updateTransaction(id, {
@@ -162,7 +169,7 @@ export const completeTransaction = async (
     notes: notes || transaction.notes,
   });
 
-  // Update user's current balance to reflect actual bank balance
+  // Apply new balance adjustment
   const delta = transaction.type === "income" ? actualAmount : -actualAmount;
   await adjustUserBalance(transaction.userId, delta);
 
@@ -188,6 +195,21 @@ export const skipTransaction = async (id: string, notes?: string): Promise<void>
   });
 };
 
+/**
+ * Delete remainder transactions created from a partial payment
+ * @param parentTransactionId - ID of the parent partial transaction
+ */
+const deleteRemainderTransactions = async (parentTransactionId: string): Promise<void> => {
+  const transactionsRef = collection(db, "transactions");
+  const q = query(
+    transactionsRef,
+    where("parentTransactionId", "==", parentTransactionId),
+    where("status", "==", "pending")
+  );
+  const snapshot = await getDocs(q);
+  await Promise.all(snapshot.docs.map((doc) => deleteDoc(doc.ref)));
+};
+
 export const partialPayTransaction = async (
   id: string,
   partialAmount: number,
@@ -196,6 +218,16 @@ export const partialPayTransaction = async (
   const transaction = await getTransaction(id);
   if (!transaction) throw new Error("Transaction not found");
 
+  // REVERSAL: If already partial, delete old remainder and reverse old adjustment
+  if (transaction.status === "partial") {
+    const oldAmount = transaction.actualAmount ?? 0;
+    const reversalDelta = transaction.type === "income" ? -oldAmount : oldAmount;
+    await adjustUserBalance(transaction.userId, reversalDelta);
+
+    // Delete old remainder transaction
+    await deleteRemainderTransactions(transaction.id);
+  }
+
   // Update original transaction
   await updateTransaction(id, {
     actualAmount: partialAmount,
@@ -203,11 +235,11 @@ export const partialPayTransaction = async (
     notes,
   });
 
-  // Update user's current balance to reflect actual bank balance
+  // Apply new balance adjustment
   const delta = transaction.type === "income" ? partialAmount : -partialAmount;
   await adjustUserBalance(transaction.userId, delta);
 
-  // Create remainder transaction
+  // Create new remainder transaction
   const remainder = transaction.projectedAmount - partialAmount;
   const nextWeek = new Date(transaction.scheduledDate);
   nextWeek.setDate(nextWeek.getDate() + 7);
@@ -227,6 +259,7 @@ export const partialPayTransaction = async (
     projectedAmount: remainder,
     scheduledDate: nextWeekStr,
     status: "pending",
+    parentTransactionId: id, // Link to parent for cleanup
   });
 
   return remainderTransaction;

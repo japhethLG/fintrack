@@ -30,6 +30,7 @@ export const createUserProfile = async (
       email,
       displayName,
       currentBalance: 0,
+      initialBalance: 0,
       balanceLastUpdatedAt: new Date().toISOString().split("T")[0],
       preferences: {
         currency: "PHP",

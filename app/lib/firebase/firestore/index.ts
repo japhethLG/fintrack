@@ -95,5 +95,6 @@ export {
 export {
   deleteProjectedTransactions,
   deleteAllUserData,
+  migrateToInitialBalance,
 } from "./migrations";
 

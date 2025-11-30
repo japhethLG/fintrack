@@ -4,7 +4,7 @@ import React, { useState } from "react";
 import { useForm, Resolver } from "react-hook-form";
 import { yupResolver } from "@hookform/resolvers/yup";
 import { Transaction, CompleteTransactionData } from "@/lib/types";
-import { Button, Card, Icon } from "@/components/common";
+import { Button, Card, Icon, Alert } from "@/components/common";
 import { Form, FormInput } from "@/components/formElements";
 import { cn } from "@/lib/utils/cn";
 import { useCurrency } from "@/lib/hooks/useCurrency";
@@ -124,6 +124,16 @@ const CompleteTransactionModal: React.FC<IProps> = ({
             </div>
           </div>
         </div>
+
+        {/* Resubmission Warning */}
+        {(transaction.status === "completed" || transaction.status === "partial") && (
+          <div className="mb-6">
+            <Alert variant="warning">
+              This transaction is already {transaction.status}. Resubmitting will update the amount and
+              adjust your balance accordingly. The previous adjustment will be reversed automatically.
+            </Alert>
+          </div>
+        )}
 
         <Form methods={methods} onSubmit={handleSubmit}>
           {/* Mode Selection */}

@@ -13,7 +13,7 @@ import {
 } from "firebase/firestore";
 import { db } from "../config";
 import { Transaction } from "@/lib/types";
-import { updateUserProfile } from "./users";
+import { getUserProfile, updateUserProfile } from "./users";
 
 /**
  * Delete all projected transactions for a user.
@@ -86,5 +86,23 @@ export const deleteAllUserData = async (userId: string): Promise<void> => {
     currentBalance: 0,
     balanceLastUpdatedAt: new Date().toISOString().split("T")[0],
   });
+};
+
+/**
+ * Migrate user profile to include initialBalance field
+ * If initialBalance doesn't exist, set it to currentBalance (preserving existing balance state)
+ * This ensures backward compatibility with existing user data
+ */
+export const migrateToInitialBalance = async (userId: string): Promise<void> => {
+  const profile = await getUserProfile(userId);
+  if (!profile) return;
+
+  // If initialBalance doesn't exist, set it to currentBalance
+  // This preserves the existing balance state for users who were already using the app
+  if (profile.initialBalance === undefined || profile.initialBalance === null) {
+    await updateUserProfile(userId, {
+      initialBalance: profile.currentBalance,
+    });
+  }
 };
 

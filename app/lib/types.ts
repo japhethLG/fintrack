@@ -9,6 +9,7 @@ export interface UserProfile {
   email: string;
   displayName: string;
   currentBalance: number;
+  initialBalance: number;
   balanceLastUpdatedAt: string;
   preferences: {
     currency: string;
@@ -197,6 +198,7 @@ export interface Transaction {
 
   sourceType: "income_source" | "expense_rule" | "manual";
   sourceId?: string;
+  parentTransactionId?: string;
 
   name: string;
   type: TransactionType;

@@ -208,6 +208,7 @@ export async function markTransactionPartialAction(
       projectedAmount: remainder,
       scheduledDate: nextWeekStr,
       status: "pending",
+      parentTransactionId: partialTx.id, // Link to parent for cleanup
     });
 
     return partialTx;
