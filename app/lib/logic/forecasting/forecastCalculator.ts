@@ -1,5 +1,17 @@
-import { Transaction, ForecastData } from "@/lib/types";
+/**
+ * Balance forecast calculations
+ */
 
+import { ForecastData, Transaction } from "@/lib/types";
+
+/**
+ * Calculate future balance forecast based on pending and projected transactions
+ * @param currentBalance - Current account balance
+ * @param allTransactions - All transactions to consider
+ * @param startDate - Start date for forecast
+ * @param daysToForecast - Number of days to forecast (default: 90)
+ * @returns Array of daily forecast data points
+ */
 export const calculateForecast = (
   currentBalance: number,
   allTransactions: Transaction[],
@@ -9,17 +21,14 @@ export const calculateForecast = (
   const forecast: ForecastData[] = [];
   let runningBalance = currentBalance;
 
-  // 1. Group transactions by date
-  // Consider only 'pending' and 'projected' for future balance calculation?
-  // Or if 'allTransactions' includes past, we should start balance from now.
-  // Assumption: currentBalance is the ACTUAL balance TODAY.
-  // We only care about transactions from TODAY onwards.
-
+  // Only care about transactions from TODAY onwards
+  // Assumption: currentBalance is the ACTUAL balance TODAY
   const todayStr = startDate.toISOString().split("T")[0];
   const relevantTransactions = allTransactions.filter(
     (t) => t.scheduledDate >= todayStr && (t.status === "pending" || t.status === "projected")
   );
 
+  // Group transactions by date
   const transactionsByDate: Record<string, Transaction[]> = {};
   relevantTransactions.forEach((t) => {
     if (!transactionsByDate[t.scheduledDate]) {
@@ -34,6 +43,7 @@ export const calculateForecast = (
     const dateStr = currentDate.toISOString().split("T")[0];
     const daysTransactions = transactionsByDate[dateStr] || [];
 
+    // Process transactions for the day
     daysTransactions.forEach((t) => {
       if (t.type === "income") {
         runningBalance += t.projectedAmount;
