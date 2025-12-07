@@ -70,20 +70,22 @@ const DetailPanel: React.FC<DetailPanelProps> = ({
   };
 
   const renderTransactionsList = () => (
-    <div className="space-y-2">
+    <div>
       <h4 className="text-sm font-medium text-gray-400">Transactions ({transactions.length})</h4>
-      {transactions.length > 0 ? (
-        transactions.map((t) => (
-          <DraggableTransaction key={t.id} transaction={t}>
-            <TransactionItem transaction={t} onClick={() => onTransactionClick?.(t)} />
-          </DraggableTransaction>
-        ))
-      ) : (
-        <div className="py-8 text-center">
-          <Icon name="event_available" size={32} className="text-gray-600 mx-auto mb-2" />
-          <p className="text-gray-500 text-sm">No transactions</p>
-        </div>
-      )}
+      <div className="mt-2 space-y-2 max-h-[360px] overflow-y-auto pr-1">
+        {transactions.length > 0 ? (
+          transactions.map((t) => (
+            <DraggableTransaction key={t.id} transaction={t}>
+              <TransactionItem transaction={t} onClick={() => onTransactionClick?.(t)} />
+            </DraggableTransaction>
+          ))
+        ) : (
+          <div className="py-8 text-center">
+            <Icon name="event_available" size={32} className="text-gray-600 mx-auto mb-2" />
+            <p className="text-gray-500 text-sm">No transactions</p>
+          </div>
+        )}
+      </div>
     </div>
   );
 

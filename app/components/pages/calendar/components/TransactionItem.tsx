@@ -32,39 +32,45 @@ const TransactionItem: React.FC<IProps> = ({ transaction, onClick }) => {
   return (
     <div
       className={cn(
-        "flex items-center justify-between p-3 rounded-lg cursor-pointer transition-colors",
+        "flex items-start gap-3 p-3 rounded-lg cursor-pointer transition-colors",
         bgColor
       )}
       onClick={onClick}
     >
-      <div className="flex items-center gap-3">
-        <div className={cn("w-8 h-8 rounded-full flex items-center justify-center", iconBgColor)}>
-          <Icon name={isIncome ? "arrow_downward" : "arrow_upward"} size="sm" />
-        </div>
-        <div>
-          <p className={cn("font-medium text-sm", isSkipped ? "text-gray-500" : "text-white")}>
+      {/* Icon */}
+      <div className={cn("w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0", iconBgColor)}>
+        <Icon name={isIncome ? "arrow_downward" : "arrow_upward"} size="sm" />
+      </div>
+
+      {/* Content */}
+      <div className="flex-1 min-w-0">
+        {/* Top row: Name and Amount */}
+        <div className="flex items-start justify-between gap-2 mb-1">
+          <p className={cn("font-medium text-sm truncate", isSkipped ? "text-gray-500" : "text-white")}>
             {transaction.name}
           </p>
-          <p className="text-xs text-gray-400">{transaction.category}</p>
+          <p className={cn("font-bold text-sm whitespace-nowrap flex-shrink-0", amountColor)}>
+            {isIncome ? "+" : "-"}$
+            {(transaction.actualAmount ?? transaction.projectedAmount).toLocaleString()}
+          </p>
         </div>
-      </div>
-      <div className="text-right">
-        <p className={cn("font-bold", amountColor)}>
-          {isIncome ? "+" : "-"}$
-          {(transaction.actualAmount ?? transaction.projectedAmount).toLocaleString()}
-        </p>
-        <Badge
-          variant={
-            transaction.status === "completed"
-              ? "success"
-              : transaction.status === "skipped"
-                ? "default"
-                : "default"
-          }
-          className="text-xs"
-        >
-          {transaction.status}
-        </Badge>
+
+        {/* Bottom row: Category and Status */}
+        <div className="flex items-center justify-between gap-2">
+          <p className="text-xs text-gray-400 truncate">{transaction.category}</p>
+          <Badge
+            variant={
+              transaction.status === "completed"
+                ? "success"
+                : transaction.status === "skipped"
+                  ? "default"
+                  : "default"
+            }
+            className="text-xs flex-shrink-0"
+          >
+            {transaction.status}
+          </Badge>
+        </div>
       </div>
     </div>
   );
