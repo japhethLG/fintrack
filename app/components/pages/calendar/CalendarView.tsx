@@ -491,6 +491,7 @@ const CalendarView: React.FC = () => {
                         key={i}
                         day={day}
                         isSelected={selectedDate ? isSameDay(selectedDate, day.date) : false}
+                        onTransactionClick={setSelectedTransaction}
                         onClick={() =>
                           setSelectedDate((prev) =>
                             prev && isSameDay(prev, day.date) ? null : day.date
@@ -576,7 +577,11 @@ const CalendarView: React.FC = () => {
       </div>
 
       <DragOverlay>
-        {draggingTransaction ? <TransactionItem transaction={draggingTransaction} /> : null}
+        {draggingTransaction ? (
+          <div className="w-[221px] max-w-sm drop-shadow-lg">
+            <TransactionItem transaction={draggingTransaction} />
+          </div>
+        ) : null}
       </DragOverlay>
     </DndContext>
   );
