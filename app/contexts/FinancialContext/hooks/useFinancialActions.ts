@@ -8,6 +8,7 @@ import {
   IncomeSourceFormData,
   ExpenseRuleFormData,
   CompleteTransactionData,
+  OccurrenceOverride,
 } from "@/lib/types";
 import {
   createIncomeSourceAction,
@@ -18,6 +19,8 @@ import {
   editExpenseRuleAction,
   removeExpenseRuleAction,
   toggleExpenseRuleActiveAction,
+  setOccurrenceOverrideAction,
+  removeOccurrenceOverrideAction,
 } from "../actions/sourceActions";
 import {
   addManualTransactionAction,
@@ -198,6 +201,24 @@ export function useFinancialActions({
   }, []);
 
   // ============================================================================
+  // OVERRIDE ACTIONS
+  // ============================================================================
+
+  const setOccurrenceOverride = useCallback(
+    async (sourceId: string, occurrenceId: string, override: OccurrenceOverride, isIncome: boolean) => {
+      await setOccurrenceOverrideAction(sourceId, occurrenceId, override, isIncome);
+    },
+    []
+  );
+
+  const removeOccurrenceOverride = useCallback(
+    async (sourceId: string, occurrenceId: string, isIncome: boolean) => {
+      await removeOccurrenceOverrideAction(sourceId, occurrenceId, isIncome);
+    },
+    []
+  );
+
+  // ============================================================================
   // ALERT ACTIONS
   // ============================================================================
 
@@ -224,7 +245,7 @@ export function useFinancialActions({
         getIncomeSources(user.uid),
         getExpenseRules(user.uid),
         getTransactions(user.uid, {
-          status: ["completed", "skipped", "pending"],
+          status: ["completed", "skipped"],
         }),
         getAlerts(user.uid),
       ]);
@@ -259,6 +280,8 @@ export function useFinancialActions({
     markTransactionSkipped,
     rescheduleTransaction,
     removeTransaction,
+    setOccurrenceOverride,
+    removeOccurrenceOverride,
     // Alert actions
     markAlertRead,
     dismissAlertById,

@@ -114,11 +114,9 @@ const TransactionsManager: React.FC = () => {
     return {
       total: dateFilteredTransactions.length,
       completed: dateFilteredTransactions.filter((t) => t.status === "completed").length,
-      pending: dateFilteredTransactions.filter(
-        (t) => t.status === "pending" || t.status === "projected"
-      ).length,
+      pending: dateFilteredTransactions.filter((t) => t.status === "projected").length,
       overdue: dateFilteredTransactions.filter(
-        (t) => (t.status === "pending" || t.status === "projected") && t.scheduledDate < today
+        (t) => t.status === "projected" && t.scheduledDate < today
       ).length,
     };
   }, [dateFilteredTransactions]);

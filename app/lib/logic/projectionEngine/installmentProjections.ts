@@ -42,6 +42,14 @@ export const generateInstallmentProjections = (
     if (currentDate >= viewStartDate) {
       const adjustedDate = adjustForWeekend(currentDate, rule.weekendAdjustment);
       const paymentNumber = installmentConfig.installmentsPaid + i + 1;
+      const occurrenceId = generateOccurrenceId(
+        rule.id,
+        rule.frequency,
+        adjustedDate,
+        rule.startDate,
+        rule.scheduleConfig
+      );
+      const override = rule.occurrenceOverrides?.[occurrenceId];
 
       projections.push(
         createProjectedTransaction(
@@ -58,13 +66,8 @@ export const generateInstallmentProjections = (
             paymentNumber,
             totalPayments: installmentConfig.installmentCount,
           },
-          generateOccurrenceId(
-            rule.id,
-            rule.frequency,
-            adjustedDate,
-            rule.startDate,
-            rule.scheduleConfig
-          )
+          occurrenceId,
+          override
         )
       );
     }
@@ -72,6 +75,6 @@ export const generateInstallmentProjections = (
     currentDate = addMonths(currentDate, 1);
   }
 
-  return projections;
+  return projections.filter((t): t is NonNullable<typeof t> => t !== null);
 };
 

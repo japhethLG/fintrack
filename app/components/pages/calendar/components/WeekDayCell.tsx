@@ -35,8 +35,6 @@ const WeekDayCell: React.FC<IProps> = ({ day, isSelected, onClick, onTransaction
         return "success";
       case "skipped":
         return "default";
-      case "pending":
-        return "warning";
       default:
         return "default";
     }

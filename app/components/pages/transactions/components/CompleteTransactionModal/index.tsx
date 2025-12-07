@@ -55,7 +55,6 @@ const CompleteTransactionModal: React.FC<IProps> = ({
   > = {
     completed: "success",
     skipped: "default",
-    pending: "warning",
     projected: "default",
   };
 

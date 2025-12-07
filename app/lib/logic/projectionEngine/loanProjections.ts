@@ -41,6 +41,14 @@ export const generateLoanProjections = (
     .filter((step) => step.date >= viewStartDate && step.date <= viewEndDate)
     .map((step, index) => {
       const paymentNumber = loanConfig.paymentsMade + index + 1;
+      const occurrenceId = generateOccurrenceId(
+        rule.id,
+        rule.frequency,
+        step.date,
+        rule.startDate,
+        rule.scheduleConfig
+      );
+      const override = rule.occurrenceOverrides?.[occurrenceId];
 
       return createProjectedTransaction(
         { ...rule, amount: step.payment },
@@ -54,8 +62,10 @@ export const generateLoanProjections = (
           paymentNumber,
           totalPayments: loanConfig.termMonths,
         },
-        generateOccurrenceId(rule.id, rule.frequency, step.date, rule.startDate, rule.scheduleConfig)
+        occurrenceId,
+        override
       );
-    });
+    })
+    .filter((t): t is NonNullable<typeof t> => t !== null);
 };
 

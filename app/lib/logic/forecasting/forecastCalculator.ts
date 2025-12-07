@@ -5,7 +5,7 @@
 import { ForecastData, Transaction } from "@/lib/types";
 
 /**
- * Calculate future balance forecast based on pending and projected transactions
+ * Calculate future balance forecast based on projected transactions
  * @param currentBalance - Current account balance
  * @param allTransactions - All transactions to consider
  * @param startDate - Start date for forecast
@@ -25,7 +25,7 @@ export const calculateForecast = (
   // Assumption: currentBalance is the ACTUAL balance TODAY
   const todayStr = startDate.toISOString().split("T")[0];
   const relevantTransactions = allTransactions.filter(
-    (t) => t.scheduledDate >= todayStr && (t.status === "pending" || t.status === "projected")
+    (t) => t.scheduledDate >= todayStr && t.status === "projected"
   );
 
   // Group transactions by date

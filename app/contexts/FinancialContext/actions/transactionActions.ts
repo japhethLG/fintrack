@@ -1,4 +1,10 @@
-import { Transaction, CompleteTransactionData, IncomeSource, ExpenseRule } from "@/lib/types";
+import {
+  Transaction,
+  CompleteTransactionData,
+  IncomeSource,
+  ExpenseRule,
+  OccurrenceOverride,
+} from "@/lib/types";
 import {
   addTransaction,
   completeTransaction,
@@ -8,6 +14,10 @@ import {
   adjustUserBalance,
   updateTransaction,
   getTransaction,
+  setIncomeSourceOverride,
+  removeIncomeSourceOverride,
+  setExpenseRuleOverride,
+  removeExpenseRuleOverride,
 } from "@/lib/firebase/firestore";
 import { generateOccurrenceId } from "@/lib/logic/projectionEngine/occurrenceIdGenerator";
 import { parseDate } from "@/lib/utils/dateUtils";
@@ -94,6 +104,14 @@ export async function markTransactionCompleteAction(
     const delta = isIncome ? data.actualAmount : -data.actualAmount;
     await adjustUserBalance(userId, delta);
 
+      // Remove any override now that occurrence is realized
+      const overrideRemover = isIncome
+        ? removeIncomeSourceOverride
+        : removeExpenseRuleOverride;
+      if (parsedOccurrenceId) {
+        await overrideRemover(source.id, parsedOccurrenceId);
+      }
+
     // Update source tracking if applicable (loan/installment)
     if (!isIncome) {
       const expenseRule = source as ExpenseRule;
@@ -156,6 +174,12 @@ export async function markTransactionSkippedAction(
         parsedOccurrenceId ||
         generateOccurrenceId(source.id, source.frequency, parseDate(scheduledDate), source.startDate, source.scheduleConfig),
     });
+
+    // Remove any override now that occurrence is realized
+    const overrideRemover = isIncome ? removeIncomeSourceOverride : removeExpenseRuleOverride;
+    if (parsedOccurrenceId) {
+      await overrideRemover(source.id, parsedOccurrenceId);
+    }
   } else {
     await skipTransaction(id, notes);
   }
@@ -188,17 +212,12 @@ export async function rescheduleTransactionAction(
         source.scheduleConfig
       );
 
-    await addTransaction(userId, {
-      name: source.name,
-      type: isIncome ? "income" : "expense",
-      category: source.category,
-      sourceType: isIncome ? "income_source" : "expense_rule",
-      sourceId: source.id,
-      projectedAmount: source.amount,
-      scheduledDate: newDate,
-      status: "pending",
-      occurrenceId,
-    });
+    const override: OccurrenceOverride = { scheduledDate: newDate };
+    if (isIncome) {
+      await setIncomeSourceOverride(source.id, occurrenceId, override);
+    } else {
+      await setExpenseRuleOverride(source.id, occurrenceId, override);
+    }
     return;
   }
 

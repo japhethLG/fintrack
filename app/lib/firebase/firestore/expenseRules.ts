@@ -17,9 +17,10 @@ import {
   Timestamp,
   onSnapshot,
   QueryConstraint,
+  deleteField,
 } from "firebase/firestore";
 import { db } from "../config";
-import { ExpenseRule } from "@/lib/types";
+import { ExpenseRule, OccurrenceOverride } from "@/lib/types";
 import { removeUndefined } from "./utils";
 
 export const addExpenseRule = async (
@@ -87,6 +88,29 @@ export const updateExpenseRule = async (
 export const deleteExpenseRule = async (id: string): Promise<void> => {
   const docRef = doc(db, "expense_rules", id);
   await deleteDoc(docRef);
+};
+
+export const setExpenseRuleOverride = async (
+  ruleId: string,
+  occurrenceId: string,
+  override: OccurrenceOverride
+): Promise<void> => {
+  const docRef = doc(db, "expense_rules", ruleId);
+  await updateDoc(docRef, {
+    [`occurrenceOverrides.${occurrenceId}`]: override,
+    updatedAt: Timestamp.now(),
+  });
+};
+
+export const removeExpenseRuleOverride = async (
+  ruleId: string,
+  occurrenceId: string
+): Promise<void> => {
+  const docRef = doc(db, "expense_rules", ruleId);
+  await updateDoc(docRef, {
+    [`occurrenceOverrides.${occurrenceId}`]: deleteField(),
+    updatedAt: Timestamp.now(),
+  });
 };
 
 // Update loan balance after payment

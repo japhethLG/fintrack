@@ -16,9 +16,10 @@ import {
   Timestamp,
   onSnapshot,
   QueryConstraint,
+  deleteField,
 } from "firebase/firestore";
 import { db } from "../config";
-import { IncomeSource } from "@/lib/types";
+import { IncomeSource, OccurrenceOverride } from "@/lib/types";
 import { removeUndefined } from "./utils";
 
 export const addIncomeSource = async (
@@ -86,6 +87,29 @@ export const updateIncomeSource = async (
 export const deleteIncomeSource = async (id: string): Promise<void> => {
   const docRef = doc(db, "income_sources", id);
   await deleteDoc(docRef);
+};
+
+export const setIncomeSourceOverride = async (
+  sourceId: string,
+  occurrenceId: string,
+  override: OccurrenceOverride
+): Promise<void> => {
+  const docRef = doc(db, "income_sources", sourceId);
+  await updateDoc(docRef, {
+    [`occurrenceOverrides.${occurrenceId}`]: override,
+    updatedAt: Timestamp.now(),
+  });
+};
+
+export const removeIncomeSourceOverride = async (
+  sourceId: string,
+  occurrenceId: string
+): Promise<void> => {
+  const docRef = doc(db, "income_sources", sourceId);
+  await updateDoc(docRef, {
+    [`occurrenceOverrides.${occurrenceId}`]: deleteField(),
+    updatedAt: Timestamp.now(),
+  });
 };
 
 // Real-time listener for income sources

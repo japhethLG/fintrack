@@ -59,9 +59,7 @@ const TransactionItem: React.FC<IProps> = ({ transaction, onClick }) => {
               ? "success"
               : transaction.status === "skipped"
                 ? "default"
-                : transaction.status === "pending"
-                  ? "warning"
-                  : "default"
+                : "default"
           }
           className="text-xs"
         >

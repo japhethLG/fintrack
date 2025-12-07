@@ -33,6 +33,8 @@ export {
   getIncomeSource,
   updateIncomeSource,
   deleteIncomeSource,
+  setIncomeSourceOverride,
+  removeIncomeSourceOverride,
   subscribeToIncomeSources,
 } from "./incomeSources";
 
@@ -45,6 +47,8 @@ export {
   getExpenseRule,
   updateExpenseRule,
   deleteExpenseRule,
+  setExpenseRuleOverride,
+  removeExpenseRuleOverride,
   updateLoanBalance,
   updateCreditBalance,
   updateInstallmentProgress,
@@ -96,5 +100,6 @@ export {
   deleteAllUserData,
   deleteSelectiveUserData,
   migrateToInitialBalance,
+  migratePendingToOverrides,
 } from "./migrations";
 

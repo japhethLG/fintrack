@@ -89,6 +89,14 @@ export const generateCreditProjections = (
     let paymentNum = 1;
     while (balance > 0 && currentDate <= viewEndDate) {
       if (currentDate >= viewStartDate) {
+        const occurrenceId = generateOccurrenceId(
+          rule.id,
+          rule.frequency,
+          currentDate,
+          rule.startDate,
+          rule.scheduleConfig
+        );
+        const override = rule.occurrenceOverrides?.[occurrenceId];
         const interest = balance * monthlyRate;
         const actualPayment = Math.min(paymentAmount, balance + interest);
         const principal = actualPayment - interest;
@@ -105,14 +113,9 @@ export const generateCreditProjections = (
               remainingBalance: Math.max(0, balance - principal),
               paymentNumber: paymentNum,
               totalPayments: 0, // Unknown for credit cards
-          },
-          generateOccurrenceId(
-            rule.id,
-            rule.frequency,
-            currentDate,
-            rule.startDate,
-            rule.scheduleConfig
-          )
+            },
+            occurrenceId,
+            override
           )
         );
 
@@ -132,20 +135,33 @@ export const generateCreditProjections = (
   return schedule
     .filter((step) => step.date >= viewStartDate && step.date <= viewEndDate)
     .map((step, index) =>
-      createProjectedTransaction(
-        { ...rule, amount: step.payment },
-        step.date,
-        "expense",
-        "expense_rule",
-        {
-          principalPaid: step.principal,
-          interestPaid: step.interest,
-          remainingBalance: step.remainingBalance,
-          paymentNumber: index + 1,
-          totalPayments: 0,
-        },
-        generateOccurrenceId(rule.id, rule.frequency, step.date, rule.startDate, rule.scheduleConfig)
-      )
-    );
+      {
+        const occurrenceId = generateOccurrenceId(
+          rule.id,
+          rule.frequency,
+          step.date,
+          rule.startDate,
+          rule.scheduleConfig
+        );
+        const override = rule.occurrenceOverrides?.[occurrenceId];
+
+        return createProjectedTransaction(
+          { ...rule, amount: step.payment },
+          step.date,
+          "expense",
+          "expense_rule",
+          {
+            principalPaid: step.principal,
+            interestPaid: step.interest,
+            remainingBalance: step.remainingBalance,
+            paymentNumber: index + 1,
+            totalPayments: 0,
+          },
+          occurrenceId,
+          override
+        );
+      }
+    )
+    .filter((t): t is NonNullable<typeof t> => t !== null);
 };
 

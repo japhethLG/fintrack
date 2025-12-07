@@ -1,4 +1,10 @@
-import { IncomeSource, ExpenseRule, IncomeSourceFormData, ExpenseRuleFormData } from "@/lib/types";
+import {
+  IncomeSource,
+  ExpenseRule,
+  IncomeSourceFormData,
+  ExpenseRuleFormData,
+  OccurrenceOverride,
+} from "@/lib/types";
 import {
   addIncomeSource,
   updateIncomeSource,
@@ -6,6 +12,10 @@ import {
   addExpenseRule,
   updateExpenseRule,
   deleteExpenseRule,
+  setIncomeSourceOverride,
+  removeIncomeSourceOverride,
+  setExpenseRuleOverride,
+  removeExpenseRuleOverride,
 } from "@/lib/firebase/firestore";
 
 // ============================================================================
@@ -94,5 +104,36 @@ export async function removeExpenseRuleAction(id: string): Promise<void> {
  */
 export async function toggleExpenseRuleActiveAction(id: string, isActive: boolean): Promise<void> {
   await updateExpenseRule(id, { isActive });
+}
+
+/**
+ * Set an occurrence-level override for a source or rule
+ */
+export async function setOccurrenceOverrideAction(
+  sourceId: string,
+  occurrenceId: string,
+  override: OccurrenceOverride,
+  isIncome: boolean
+): Promise<void> {
+  if (isIncome) {
+    await setIncomeSourceOverride(sourceId, occurrenceId, override);
+  } else {
+    await setExpenseRuleOverride(sourceId, occurrenceId, override);
+  }
+}
+
+/**
+ * Remove an occurrence-level override for a source or rule
+ */
+export async function removeOccurrenceOverrideAction(
+  sourceId: string,
+  occurrenceId: string,
+  isIncome: boolean
+): Promise<void> {
+  if (isIncome) {
+    await removeIncomeSourceOverride(sourceId, occurrenceId);
+  } else {
+    await removeExpenseRuleOverride(sourceId, occurrenceId);
+  }
 }
 

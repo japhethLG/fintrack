@@ -33,15 +33,27 @@ export const generateIncomeProjections = (
     viewEndDate
   );
 
-  return occurrences.map((date) =>
-    createProjectedTransaction(
-      source,
-      date,
-      "income",
-      "income_source",
-      undefined,
-      generateOccurrenceId(source.id, source.frequency, date, source.startDate, source.scheduleConfig)
-    )
-  );
+  return occurrences
+    .map((date) => {
+      const occurrenceId = generateOccurrenceId(
+        source.id,
+        source.frequency,
+        date,
+        source.startDate,
+        source.scheduleConfig
+      );
+      const override = source.occurrenceOverrides?.[occurrenceId];
+
+      return createProjectedTransaction(
+        source,
+        date,
+        "income",
+        "income_source",
+        undefined,
+        occurrenceId,
+        override
+      );
+    })
+    .filter((t): t is NonNullable<typeof t> => t !== null);
 };
 

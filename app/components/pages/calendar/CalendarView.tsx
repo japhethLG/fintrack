@@ -320,7 +320,7 @@ const CalendarView: React.FC = () => {
         } else {
           expenses += amount;
         }
-        if (t.status === "projected" || t.status === "pending") projected++;
+        if (t.status === "projected") projected++;
         if (t.status === "completed") completed++;
       }
     });

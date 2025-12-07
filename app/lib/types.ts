@@ -66,6 +66,7 @@ export interface IncomeSource {
   notes?: string;
   color?: string;
   isActive: boolean;
+  occurrenceOverrides?: Record<string, OccurrenceOverride>;
 
   createdAt: Timestamp;
   updatedAt: Timestamp;
@@ -172,6 +173,7 @@ export interface ExpenseRule {
   color?: string;
   isActive: boolean;
   isPriority: boolean;
+  occurrenceOverrides?: Record<string, OccurrenceOverride>;
 
   createdAt: Timestamp;
   updatedAt: Timestamp;
@@ -182,7 +184,7 @@ export interface ExpenseRule {
 // ============================================================================
 
 export type TransactionType = "income" | "expense";
-export type TransactionStatus = "projected" | "pending" | "completed" | "skipped";
+export type TransactionStatus = "projected" | "completed" | "skipped";
 
 export interface PaymentBreakdown {
   principalPaid: number;
@@ -367,6 +369,13 @@ export type ExpenseRuleFormData = Omit<ExpenseRule, "id" | "userId" | "createdAt
 export interface CompleteTransactionData {
   actualAmount: number;
   actualDate?: string;
+  notes?: string;
+}
+
+export interface OccurrenceOverride {
+  scheduledDate?: string;
+  amount?: number;
+  skipped?: boolean;
   notes?: string;
 }
 

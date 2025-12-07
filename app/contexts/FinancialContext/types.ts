@@ -10,6 +10,7 @@ import {
   IncomeSourceFormData,
   ExpenseRuleFormData,
   CompleteTransactionData,
+  OccurrenceOverride,
 } from "@/lib/types";
 
 /**
@@ -49,6 +50,17 @@ export interface FinancialContextValue {
   markTransactionSkipped: (id: string, notes?: string) => Promise<void>;
   rescheduleTransaction: (id: string, newDate: string) => Promise<void>;
   removeTransaction: (id: string) => Promise<void>;
+  setOccurrenceOverride: (
+    sourceId: string,
+    occurrenceId: string,
+    override: OccurrenceOverride,
+    isIncome: boolean
+  ) => Promise<void>;
+  removeOccurrenceOverride: (
+    sourceId: string,
+    occurrenceId: string,
+    isIncome: boolean
+  ) => Promise<void>;
 
   // View date range for projections
   viewDateRange: { start: string; end: string };

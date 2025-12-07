@@ -73,7 +73,7 @@ const Dashboard: React.FC = () => {
     transactions.forEach((t) => {
       const date = t.actualDate || t.scheduledDate;
       if (date >= start && date <= end) {
-        const isPending = t.status === "pending" || t.status === "projected";
+        const isPending = t.status === "projected";
         const isCompleted = t.status === "completed";
         const isSkipped = t.status === "skipped";
 

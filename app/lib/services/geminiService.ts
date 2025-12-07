@@ -70,7 +70,7 @@ const formatTransactions = (transactions: Transaction[]) => {
   if (transactions.length === 0) return "No transactions.";
 
   const completed = transactions.filter((t) => t.status === "completed");
-  const upcoming = transactions.filter((t) => t.status === "pending" || t.status === "projected");
+  const upcoming = transactions.filter((t) => t.status === "projected");
 
   let text = "";
 
@@ -205,7 +205,7 @@ export const getSmartInsights = async (context: AnalysisContext): Promise<Analys
 // Helper to format transaction data for the AI
 export const formatTransactionsForAI = (transactions: Transaction[]): string => {
   const completed = transactions.filter((t) => t.status === "completed");
-  const pending = transactions.filter((t) => t.status === "pending" || t.status === "projected");
+  const pending = transactions.filter((t) => t.status === "projected");
 
   let text = "## Completed Transactions\n";
   completed.forEach((t) => {

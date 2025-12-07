@@ -274,11 +274,11 @@ export const subscribeToStoredTransactions = (
   callback: (transactions: Transaction[]) => void
 ): (() => void) => {
   const transactionsRef = collection(db, "transactions");
-  // Fetch all non-projected transactions (completed, skipped, pending)
+  // Fetch all non-projected transactions (completed, skipped)
   const q = query(
     transactionsRef,
     where("userId", "==", userId),
-    where("status", "in", ["completed", "skipped", "pending"]),
+    where("status", "in", ["completed", "skipped"]),
     orderBy("scheduledDate", "asc")
   );
 

@@ -52,15 +52,27 @@ export const generateExpenseProjections = (
     viewEndDate
   );
 
-  return occurrences.map((date) =>
-    createProjectedTransaction(
-      rule,
-      date,
-      "expense",
-      "expense_rule",
-      undefined,
-      generateOccurrenceId(rule.id, rule.frequency, date, rule.startDate, rule.scheduleConfig)
-    )
-  );
+  return occurrences
+    .map((date) => {
+      const occurrenceId = generateOccurrenceId(
+        rule.id,
+        rule.frequency,
+        date,
+        rule.startDate,
+        rule.scheduleConfig
+      );
+      const override = rule.occurrenceOverrides?.[occurrenceId];
+
+      return createProjectedTransaction(
+        rule,
+        date,
+        "expense",
+        "expense_rule",
+        undefined,
+        occurrenceId,
+        override
+      );
+    })
+    .filter((t): t is NonNullable<typeof t> => t !== null);
 };
 

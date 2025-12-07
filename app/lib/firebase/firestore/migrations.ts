@@ -15,11 +15,19 @@ import {
 import { db } from "../config";
 import { DeletableDataType, Transaction } from "@/lib/types";
 import { getUserProfile, updateUserProfile } from "./users";
+import {
+  getIncomeSource,
+  getExpenseRule,
+  setIncomeSourceOverride,
+  setExpenseRuleOverride,
+} from "./index";
+import { parseDate } from "@/lib/utils/dateUtils";
+import { generateOccurrenceId } from "@/lib/logic/projectionEngine/occurrenceIdGenerator";
 
 /**
  * Delete all projected transactions for a user.
  * This is a one-time migration utility to clean up when switching to on-the-fly projections.
- * Only deletes transactions with status "projected" - completed, skipped, and pending are preserved.
+ * Only deletes transactions with status "projected" - completed and skipped are preserved.
  */
 export const deleteProjectedTransactions = async (userId: string): Promise<number> => {
   const transactionsRef = collection(db, "transactions");
@@ -90,6 +98,75 @@ export const deleteAllUserData = async (userId: string): Promise<void> => {
 };
 
 /**
+ * Migrate legacy pending transactions into occurrence overrides.
+ * For each pending transaction:
+ * - Create an override on the associated source/rule with the scheduledDate/amount/notes
+ * - Delete the pending transaction
+ */
+export const migratePendingToOverrides = async (userId: string): Promise<number> => {
+  const transactionsRef = collection(db, "transactions");
+  const pendingQuery = query(
+    transactionsRef,
+    where("userId", "==", userId),
+    where("status", "==", "pending")
+  );
+
+  const snapshot = await getDocs(pendingQuery);
+  if (snapshot.empty) return 0;
+
+  let migrated = 0;
+  const batch = writeBatch(db);
+
+  for (const docSnap of snapshot.docs) {
+    const txn = docSnap.data() as Transaction;
+    if (!txn.sourceId || !txn.sourceType) {
+      batch.delete(docSnap.ref);
+      migrated++;
+      continue;
+    }
+
+    const isIncome = txn.sourceType === "income_source";
+    const source = isIncome
+      ? await getIncomeSource(txn.sourceId)
+      : await getExpenseRule(txn.sourceId);
+
+    if (!source) {
+      batch.delete(docSnap.ref);
+      migrated++;
+      continue;
+    }
+
+    const occurrenceId =
+      txn.occurrenceId ||
+      generateOccurrenceId(
+        source.id,
+        source.frequency,
+        parseDate(txn.scheduledDate),
+        source.startDate,
+        source.scheduleConfig
+      );
+
+    const override = {
+      scheduledDate: txn.scheduledDate,
+      amount: txn.projectedAmount,
+      notes: txn.notes,
+    };
+
+    if (isIncome) {
+      await setIncomeSourceOverride(source.id, occurrenceId, override);
+    } else {
+      await setExpenseRuleOverride(source.id, occurrenceId, override);
+    }
+
+    batch.delete(docSnap.ref);
+    migrated++;
+  }
+
+  await batch.commit();
+  return migrated;
+};
+
+/**
  * Delete selected financial data collections for a user.
  * Resets balance to 0 only when transactions or balance history are deleted.
  */
@@ -150,7 +227,7 @@ export const migrateToInitialBalance = async (userId: string): Promise<void> => 
 
 /**
  * Cleanup legacy partial payments:
- * - Reclassify partial transactions to "pending"
+ * - Reclassify partial transactions to "projected"
  * - Clear actualAmount/notes that were stored for partials
  * - Delete child remainder transactions linked via parentTransactionId
  */
@@ -175,7 +252,7 @@ export const normalizePartialTransactions = async (userId: string): Promise<void
   partialSnapshot.forEach((docSnap) => {
     parentIds.push(docSnap.id);
     batch.update(docSnap.ref, {
-      status: "pending",
+      status: "projected",
       actualAmount: null,
       actualDate: null,
       notes: null,

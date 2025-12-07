@@ -8,6 +8,7 @@ import {
   Transaction,
   TransactionType,
   PaymentBreakdown,
+  OccurrenceOverride,
 } from "@/lib/types";
 import { formatDate } from "@/lib/utils/dateUtils";
 
@@ -19,6 +20,7 @@ import { formatDate } from "@/lib/utils/dateUtils";
  * @param sourceType - Source type identifier
  * @param paymentBreakdown - Optional payment breakdown for loans/credit cards
  * @param occurrenceId - Stable identifier for the logical occurrence
+ * @param override - Optional occurrence-level override (date/amount/skip)
  */
 export const createProjectedTransaction = (
   source: IncomeSource | ExpenseRule,
@@ -26,11 +28,19 @@ export const createProjectedTransaction = (
   type: TransactionType,
   sourceType: "income_source" | "expense_rule",
   paymentBreakdown?: PaymentBreakdown,
-  occurrenceId?: string
-): Omit<Transaction, "id" | "userId" | "createdAt" | "updatedAt"> => {
-  const amount = paymentBreakdown?.principalPaid
-    ? paymentBreakdown.principalPaid + paymentBreakdown.interestPaid
-    : source.amount;
+  occurrenceId?: string,
+  override?: OccurrenceOverride
+): Omit<Transaction, "id" | "userId" | "createdAt" | "updatedAt"> | null => {
+  // Skip projections explicitly marked as skipped
+  if (override?.skipped) return null;
+
+  const amount =
+    override?.amount ??
+    (paymentBreakdown?.principalPaid
+      ? paymentBreakdown.principalPaid + paymentBreakdown.interestPaid
+      : source.amount);
+
+  const scheduledDate = override?.scheduledDate ?? formatDate(date);
 
   return {
     name: source.name,
@@ -39,9 +49,10 @@ export const createProjectedTransaction = (
     sourceType,
     sourceId: source.id,
     projectedAmount: amount,
-    scheduledDate: formatDate(date),
+    scheduledDate,
     status: "projected",
     paymentBreakdown,
     occurrenceId,
+    notes: override?.notes ?? source.notes,
   };
 };

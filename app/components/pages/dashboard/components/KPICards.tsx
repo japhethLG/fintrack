@@ -47,7 +47,7 @@ const KPICards: React.FC<IProps> = ({ currentBalance, stats }) => {
           +{formatCurrency(stats.income, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
         </h2>
         <p className="text-xs text-gray-500 mt-1">
-          {stats.completedIncomeCount} completed, {stats.pendingIncomeCount} pending
+          {stats.completedIncomeCount} completed, {stats.pendingIncomeCount} projected
           {stats.skippedIncomeCount > 0 && `, ${stats.skippedIncomeCount} skipped`}
         </p>
       </Card>
@@ -58,7 +58,7 @@ const KPICards: React.FC<IProps> = ({ currentBalance, stats }) => {
           -{formatCurrency(stats.expenses, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
         </h2>
         <p className="text-xs text-gray-500 mt-1">
-          {stats.completedExpenseCount} completed, {stats.pendingExpenseCount} pending
+          {stats.completedExpenseCount} completed, {stats.pendingExpenseCount} projected
           {stats.skippedExpenseCount > 0 && `, ${stats.skippedExpenseCount} skipped`}
         </p>
       </Card>
