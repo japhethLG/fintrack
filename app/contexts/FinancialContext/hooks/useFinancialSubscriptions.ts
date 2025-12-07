@@ -72,7 +72,7 @@ export function useFinancialSubscriptions({
     });
     unsubscribers.push(unsubExpenses);
 
-    // Subscribe to stored transactions only (completed, skipped, partial, pending)
+    // Subscribe to stored transactions only (completed, skipped, pending)
     // Projections are computed on-the-fly, not stored
     const unsubTransactions = subscribeToStoredTransactions(user.uid, (txns) => {
       setStoredTransactions(txns);

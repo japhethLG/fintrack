@@ -1,10 +1,11 @@
 "use client";
 
 import React, { useState } from "react";
+import dayjs from "dayjs";
 import { useForm, Resolver } from "react-hook-form";
 import { yupResolver } from "@hookform/resolvers/yup";
 import { Transaction, CompleteTransactionData } from "@/lib/types";
-import { Button, Card, Icon, Alert } from "@/components/common";
+import { Button, Card, Icon, Alert, Badge } from "@/components/common";
 import { Form, FormInput } from "@/components/formElements";
 import { cn } from "@/lib/utils/cn";
 import { useCurrency } from "@/lib/hooks/useCurrency";
@@ -18,7 +19,6 @@ interface IProps {
   transaction: Transaction;
   onComplete: (data: CompleteTransactionData) => Promise<void>;
   onSkip: (notes?: string) => Promise<void>;
-  onPartial?: (amount: number, notes?: string) => Promise<void>;
   onClose: () => void;
 }
 
@@ -26,7 +26,6 @@ const CompleteTransactionModal: React.FC<IProps> = ({
   transaction,
   onComplete,
   onSkip,
-  onPartial,
   onClose,
 }) => {
   const { formatCurrency, formatCurrencyWithSign, currencySymbol } = useCurrency();
@@ -50,6 +49,17 @@ const CompleteTransactionModal: React.FC<IProps> = ({
   const isIncome = transaction.type === "income";
   const variance = parseFloat(actualAmount || "0") - transaction.projectedAmount;
   const hasVariance = variance !== 0;
+  const statusVariant: Record<
+    Transaction["status"],
+    React.ComponentProps<typeof Badge>["variant"]
+  > = {
+    completed: "success",
+    skipped: "default",
+    pending: "warning",
+    projected: "default",
+  };
+
+  const formatDisplayDate = (dateStr: string) => dayjs(dateStr).format("ddd, MMM D, YYYY");
 
   const handleSubmit = async (values: CompleteTransactionFormValues) => {
     setError(null);
@@ -64,8 +74,6 @@ const CompleteTransactionModal: React.FC<IProps> = ({
         });
       } else if (values.mode === "skip") {
         await onSkip(values.notes?.trim() || undefined);
-      } else if (values.mode === "partial" && onPartial) {
-        await onPartial(parseFloat(values.actualAmount), values.notes?.trim() || undefined);
       }
       onClose();
     } catch (err) {
@@ -103,16 +111,25 @@ const CompleteTransactionModal: React.FC<IProps> = ({
         </div>
 
         {/* Transaction Info */}
-        <div className="bg-gray-800/50 rounded-xl p-4 mb-6">
+        <div className="bg-gray-800/50 rounded-xl p-4 mb-6 space-y-3">
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <p className="text-xs text-gray-400">Status</p>
+              <Badge variant={statusVariant[transaction.status]} className="capitalize mt-1">
+                {transaction.status}
+              </Badge>
+            </div>
+            <div className="text-left">
+              <p className="text-xs text-gray-400">Type</p>
+              <p className="font-medium text-white capitalize">{isIncome ? "Income" : "Expense"}</p>
+            </div>
+          </div>
+
           <div className="grid grid-cols-2 gap-4">
             <div>
               <p className="text-xs text-gray-400">Scheduled Date</p>
               <p className="text-white font-medium">
-                {new Date(transaction.scheduledDate).toLocaleDateString("en-US", {
-                  weekday: "short",
-                  month: "short",
-                  day: "numeric",
-                })}
+                {formatDisplayDate(transaction.scheduledDate)}
               </p>
             </div>
             <div>
@@ -123,14 +140,40 @@ const CompleteTransactionModal: React.FC<IProps> = ({
               </p>
             </div>
           </div>
+
+          {(transaction.status === "completed" || transaction.status === "skipped") && (
+            <div className="grid grid-cols-2 gap-4">
+              {transaction.status === "completed" && (
+                <>
+                  <div>
+                    <p className="text-xs text-gray-400">Actual Date</p>
+                    <p className="text-white font-medium">
+                      {formatDisplayDate(transaction.actualDate || transaction.scheduledDate)}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-gray-400">Actual Amount</p>
+                    <p className={cn("font-bold", isIncome ? "text-success" : "text-danger")}>
+                      {isIncome ? "+" : "-"}
+                      {formatCurrency(transaction.actualAmount ?? transaction.projectedAmount)}
+                    </p>
+                  </div>
+                </>
+              )}
+            </div>
+          )}
         </div>
 
-        {/* Resubmission Warning */}
-        {(transaction.status === "completed" || transaction.status === "partial") && (
+        {/* Status Warning */}
+        {(transaction.status === "completed" || transaction.status === "skipped") && (
           <div className="mb-6">
-            <Alert variant="warning">
-              This transaction is already {transaction.status}. Resubmitting will update the amount and
-              adjust your balance accordingly. The previous adjustment will be reversed automatically.
+            <Alert
+              variant={transaction.status === "completed" ? "warning" : "info"}
+              title={transaction.status === "completed" ? "Already completed" : "Currently skipped"}
+            >
+              {transaction.status === "completed"
+                ? "Resubmitting will update the amount and adjust your balance; the previous adjustment will be reversed automatically."
+                : "This transaction is skipped and does not impact your balance. Marking it complete will apply its amount to your balance."}
             </Alert>
           </div>
         )}
@@ -156,17 +199,6 @@ const CompleteTransactionModal: React.FC<IProps> = ({
               <Icon name="skip_next" size="sm" className="mr-2" />
               Skip
             </Button>
-            {onPartial && (
-              <Button
-                type="button"
-                variant={mode === "partial" ? "secondary" : "ghost"}
-                className="flex-1"
-                onClick={() => setValue("mode", "partial")}
-              >
-                <Icon name="pending" size="sm" className="mr-2" />
-                Partial
-              </Button>
-            )}
           </div>
 
           {/* Complete Mode */}
@@ -211,28 +243,6 @@ const CompleteTransactionModal: React.FC<IProps> = ({
             </div>
           )}
 
-          {/* Partial Mode */}
-          {mode === "partial" && (
-            <div className="space-y-4">
-              <div className="bg-primary/10 border border-primary/30 rounded-lg p-4">
-                <p className="text-primary text-sm">
-                  Record a partial payment. The remaining balance will be tracked.
-                </p>
-              </div>
-              <FormInput
-                inputName="actualAmount"
-                type="number"
-                label="Amount Paid"
-                prefix={currencySymbol}
-                placeholder="0.00"
-              />
-              <div className="text-sm text-gray-400">
-                Remaining:{" "}
-                {formatCurrency(transaction.projectedAmount - parseFloat(actualAmount || "0"))}
-              </div>
-            </div>
-          )}
-
           {/* Notes */}
           <div className="mt-4">
             <FormInput inputName="notes" label="Notes (Optional)" placeholder="Add a note..." />
@@ -266,9 +276,7 @@ const CompleteTransactionModal: React.FC<IProps> = ({
                 ? "Processing..."
                 : mode === "complete"
                   ? "Mark Complete"
-                  : mode === "skip"
-                    ? "Skip Transaction"
-                    : "Record Partial"}
+                  : "Skip Transaction"}
             </Button>
           </div>
         </Form>

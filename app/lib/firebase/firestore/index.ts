@@ -62,7 +62,6 @@ export {
   updateTransaction,
   completeTransaction,
   skipTransaction,
-  partialPayTransaction,
   deleteTransaction,
   deleteTransactionsBySource,
   subscribeToTransactions,

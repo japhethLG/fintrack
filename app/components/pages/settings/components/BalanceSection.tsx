@@ -57,9 +57,7 @@ const BalanceSection: React.FC = () => {
   const { computedBalance, completedCount } = useMemo(() => {
     if (!userProfile) return { computedBalance: 0, completedCount: 0 };
 
-    const completed = transactions.filter(
-      (t) => t.status === "completed" || t.status === "partial"
-    );
+    const completed = transactions.filter((t) => t.status === "completed");
 
     const computed = computeBalanceFromTransactions(userProfile.initialBalance || 0, transactions);
 

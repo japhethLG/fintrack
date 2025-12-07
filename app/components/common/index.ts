@@ -89,6 +89,11 @@ export {
   type DropdownProps,
   type DropdownItem,
 } from "./Dropdown";
+export {
+  MultiSelectDropdown,
+  type MultiSelectDropdownProps,
+  type MultiSelectOption,
+} from "./MultiSelectDropdown";
 
 export {
   Drawer,

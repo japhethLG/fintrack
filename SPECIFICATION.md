@@ -125,7 +125,7 @@ interface Transaction {
   variance?: number;
   scheduledDate: string;
   actualDate?: string;
-  status: "projected" | "pending" | "completed" | "skipped" | "partial";
+  status: "projected" | "pending" | "completed" | "skipped";
   paymentBreakdown?: PaymentBreakdown;
   notes?: string;
   createdAt: Timestamp;
@@ -208,7 +208,6 @@ interface BalanceSnapshot {
   - Optional date adjustment
   - Notes field
 - **Skip Option**: Mark transactions as skipped with reason
-- **Partial Payment**: Pay portion, remainder scheduled for next week
 - **Balance Updates**: Automatic balance recalculation on completion
 
 ### 3.5 Dashboard & Alerts

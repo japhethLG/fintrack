@@ -3,12 +3,19 @@
 import React, { useState } from "react";
 import { useFinancial } from "@/contexts/FinancialContext";
 import { ExpenseRule, ExpenseRuleFormData } from "@/lib/types";
-import { Button, Card, PageHeader, Icon, LoadingSpinner } from "@/components/common";
+import {
+  Button,
+  Card,
+  PageHeader,
+  Icon,
+  LoadingSpinner,
+  MultiSelectDropdown,
+} from "@/components/common";
 import { useCurrency } from "@/lib/hooks/useCurrency";
 import ExpenseRuleForm from "./components/ExpenseRuleForm";
 import ExpenseRuleCard from "./components/ExpenseRuleCard";
 import ExpenseRuleDetail from "./components/ExpenseRuleDetail";
-import { getMonthlyExpenseMultiplier } from "./constants";
+import { EXPENSE_FILTER_OPTIONS, getMonthlyExpenseMultiplier } from "./constants";
 import UpcomingBillsWidget from "./components/UpcomingBillsWidget";
 
 const ExpenseManager: React.FC = () => {
@@ -25,16 +32,26 @@ const ExpenseManager: React.FC = () => {
   const [selectedRuleId, setSelectedRuleId] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false);
   const [editingRule, setEditingRule] = useState<ExpenseRule | null>(null);
-  const [filterType, setFilterType] = useState<string>("all");
+  const [filterTypes, setFilterTypes] = useState<string[]>(["all"]);
 
   const selectedRule = selectedRuleId ? expenseRules.find((r) => r.id === selectedRuleId) : null;
 
+  const isAllSelected = filterTypes.includes("all");
+
   const filteredRules = expenseRules.filter((rule) => {
-    if (filterType === "all") return true;
-    if (filterType === "priority") return rule.isPriority;
-    if (filterType === "debt")
-      return rule.expenseType === "cash_loan" || rule.expenseType === "credit_card";
-    return rule.expenseType === filterType;
+    if (isAllSelected || filterTypes.length === 0) return true;
+
+    const matchesPriority = filterTypes.includes("priority") && rule.isPriority;
+    const matchesDebt =
+      filterTypes.includes("debt") &&
+      (rule.expenseType === "cash_loan" || rule.expenseType === "credit_card");
+    const matchesType = filterTypes.some(
+      (type) =>
+        !["all", "priority", "debt"].includes(type) &&
+        rule.expenseType === (type as ExpenseRule["expenseType"])
+    );
+
+    return matchesPriority || matchesDebt || matchesType;
   });
 
   const handleCreateRule = async (data: ExpenseRuleFormData) => {
@@ -228,24 +245,17 @@ const ExpenseManager: React.FC = () => {
           <div className="lg:col-span-1">
             <Card padding="none">
               <div className="p-4 border-b border-gray-800">
-                <h3 className="font-bold text-white mb-3">Expenses</h3>
-                <div className="flex flex-wrap gap-2">
-                  {[
-                    { value: "all", label: "All" },
-                    { value: "priority", label: "Priority" },
-                    { value: "debt", label: "Debt" },
-                    { value: "fixed", label: "Fixed" },
-                    { value: "variable", label: "Variable" },
-                  ].map((filter) => (
-                    <Button
-                      key={filter.value}
-                      variant={filterType === filter.value ? "primary" : "ghost"}
-                      size="sm"
-                      onClick={() => setFilterType(filter.value)}
-                    >
-                      {filter.label}
-                    </Button>
-                  ))}
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                  <h3 className="font-bold text-white">Expenses</h3>
+                  <MultiSelectDropdown
+                    options={EXPENSE_FILTER_OPTIONS}
+                    value={filterTypes}
+                    onChange={setFilterTypes}
+                    allValue="all"
+                    placeholder="All expenses"
+                    triggerIcon={<Icon name="filter_list" size="sm" />}
+                    contentClassName="w-64"
+                  />
                 </div>
               </div>
 
@@ -253,9 +263,9 @@ const ExpenseManager: React.FC = () => {
                 <div className="p-8 text-center">
                   <Icon name="receipt_long" size={48} className="text-gray-600 mx-auto mb-4" />
                   <p className="text-gray-400 mb-4">
-                    {filterType === "all" ? "No expenses yet" : "No matching expenses"}
+                    {isAllSelected ? "No expenses yet" : "No matching expenses"}
                   </p>
-                  {filterType === "all" && (
+                  {isAllSelected && (
                     <Button variant="primary" size="sm" onClick={() => setShowForm(true)}>
                       Add Your First Expense
                     </Button>

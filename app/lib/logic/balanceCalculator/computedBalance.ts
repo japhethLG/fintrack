@@ -7,7 +7,7 @@ import { Transaction } from "@/lib/types";
 import { getUserProfile, updateUserBalance } from "@/lib/firebase/firestore";
 
 /**
- * Calculate balance from initial balance + all completed/partial transactions
+ * Calculate balance from initial balance + all completed transactions
  * This is the source of truth for balance calculation
  * @param initialBalance - User's starting balance baseline
  * @param transactions - All transactions to consider
@@ -20,7 +20,7 @@ export const computeBalanceFromTransactions = (
   let balance = initialBalance;
 
   transactions.forEach((t) => {
-    if (t.status === "completed" || t.status === "partial") {
+    if (t.status === "completed") {
       const amount = t.actualAmount ?? t.projectedAmount;
       if (t.type === "income") {
         balance += amount;
@@ -47,12 +47,8 @@ export const syncComputedBalance = async (
   const profile = await getUserProfile(userId);
   if (!profile) throw new Error("User profile not found");
 
-  const computedBalance = computeBalanceFromTransactions(
-    profile.initialBalance,
-    transactions
-  );
+  const computedBalance = computeBalanceFromTransactions(profile.initialBalance, transactions);
 
   await updateUserBalance(userId, computedBalance);
   return computedBalance;
 };
-

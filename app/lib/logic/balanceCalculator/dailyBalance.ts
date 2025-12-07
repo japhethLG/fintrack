@@ -29,7 +29,7 @@ export const calculateDailyBalances = (
   // we need to reverse their effect to get the balance before any transactions.
   let openingBalance = currentBalance;
   transactions.forEach((t) => {
-    if (t.status === "completed" || t.status === "partial") {
+    if (t.status === "completed") {
       const amount = t.actualAmount ?? t.projectedAmount;
       if (t.type === "income") {
         openingBalance -= amount; // Undo income (subtract it)

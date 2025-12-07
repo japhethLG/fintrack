@@ -6,7 +6,6 @@ export const STATUS_OPTIONS = [
   { value: "pending", label: "Pending" },
   { value: "completed", label: "Completed" },
   { value: "skipped", label: "Skipped" },
-  { value: "partial", label: "Partial" },
 ];
 
 export const TYPE_OPTIONS = [
@@ -22,13 +21,12 @@ export const SORT_OPTIONS = [
 
 export const STATUS_VARIANTS: Record<
   TransactionStatus,
-  "success" | "warning" | "danger" | "default" | "primary"
+  "success" | "warning" | "danger" | "default"
 > = {
   completed: "success",
   pending: "warning",
   projected: "default",
   skipped: "danger",
-  partial: "primary",
 };
 
 export const STATUS_ICONS: Record<TransactionStatus, string> = {
@@ -36,5 +34,4 @@ export const STATUS_ICONS: Record<TransactionStatus, string> = {
   pending: "schedule",
   projected: "event",
   skipped: "cancel",
-  partial: "pie_chart",
 };

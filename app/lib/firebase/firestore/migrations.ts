@@ -10,6 +10,7 @@ import {
   where,
   getDocs,
   writeBatch,
+  Timestamp,
 } from "firebase/firestore";
 import { db } from "../config";
 import { Transaction } from "@/lib/types";
@@ -18,7 +19,7 @@ import { getUserProfile, updateUserProfile } from "./users";
 /**
  * Delete all projected transactions for a user.
  * This is a one-time migration utility to clean up when switching to on-the-fly projections.
- * Only deletes transactions with status "projected" - completed, skipped, partial, and pending are preserved.
+ * Only deletes transactions with status "projected" - completed, skipped, and pending are preserved.
  */
 export const deleteProjectedTransactions = async (userId: string): Promise<number> => {
   const transactionsRef = collection(db, "transactions");
@@ -104,5 +105,58 @@ export const migrateToInitialBalance = async (userId: string): Promise<void> => 
       initialBalance: profile.currentBalance,
     });
   }
+};
+
+/**
+ * Cleanup legacy partial payments:
+ * - Reclassify partial transactions to "pending"
+ * - Clear actualAmount/notes that were stored for partials
+ * - Delete child remainder transactions linked via parentTransactionId
+ */
+export const normalizePartialTransactions = async (userId: string): Promise<void> => {
+  const transactionsRef = collection(db, "transactions");
+
+  // Fetch legacy partial transactions
+  const partialQuery = query(
+    transactionsRef,
+    where("userId", "==", userId),
+    where("status", "==", "partial")
+  );
+  const partialSnapshot = await getDocs(partialQuery);
+
+  if (partialSnapshot.empty) return;
+
+  const batch = writeBatch(db);
+
+  // Track parent ids to clean up remainder children
+  const parentIds: string[] = [];
+
+  partialSnapshot.forEach((docSnap) => {
+    parentIds.push(docSnap.id);
+    batch.update(docSnap.ref, {
+      status: "pending",
+      actualAmount: null,
+      actualDate: null,
+      notes: null,
+      updatedAt: Timestamp.now(),
+    });
+  });
+
+  // Delete remainder children linked to partial parents
+  if (parentIds.length > 0) {
+    // Firestore "in" queries allow up to 10 values; chunk if needed
+    for (let i = 0; i < parentIds.length; i += 10) {
+      const chunk = parentIds.slice(i, i + 10);
+      const remainderQuery = query(
+        transactionsRef,
+        where("userId", "==", userId),
+        where("parentTransactionId", "in", chunk)
+      );
+      const remainderSnapshot = await getDocs(remainderQuery);
+      remainderSnapshot.forEach((docSnap) => batch.delete(docSnap.ref));
+    }
+  }
+
+  await batch.commit();
 };
 

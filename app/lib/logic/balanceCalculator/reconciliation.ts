@@ -28,10 +28,7 @@ export const generateReconciliationReport = async (
   const profile = await getUserProfile(userId);
   if (!profile) throw new Error("User profile not found");
 
-  const computedBalance = computeBalanceFromTransactions(
-    profile.initialBalance,
-    transactions
-  );
+  const computedBalance = computeBalanceFromTransactions(profile.initialBalance, transactions);
 
   const difference = profile.currentBalance - computedBalance;
 
@@ -39,9 +36,7 @@ export const generateReconciliationReport = async (
     currentBalance: profile.currentBalance,
     computedBalance,
     difference,
-    affectedTransactions: transactions.filter(
-      (t) => t.status === "completed" || t.status === "partial"
-    ),
+    affectedTransactions: transactions.filter((t) => t.status === "completed"),
     canAutoFix: true, // Can always fix by syncing to computed
   };
 };
@@ -58,4 +53,3 @@ export const fixBalanceDiscrepancy = async (
 ): Promise<void> => {
   await syncComputedBalance(userId, transactions);
 };
-

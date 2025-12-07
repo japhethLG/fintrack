@@ -47,11 +47,6 @@ export interface FinancialContextValue {
   ) => Promise<Transaction>;
   markTransactionComplete: (id: string, data: CompleteTransactionData) => Promise<void>;
   markTransactionSkipped: (id: string, notes?: string) => Promise<void>;
-  markTransactionPartial: (
-    id: string,
-    partialAmount: number,
-    notes?: string
-  ) => Promise<Transaction>;
   removeTransaction: (id: string) => Promise<void>;
 
   // View date range for projections

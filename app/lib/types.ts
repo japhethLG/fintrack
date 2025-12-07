@@ -182,7 +182,7 @@ export interface ExpenseRule {
 // ============================================================================
 
 export type TransactionType = "income" | "expense";
-export type TransactionStatus = "projected" | "pending" | "completed" | "skipped" | "partial";
+export type TransactionStatus = "projected" | "pending" | "completed" | "skipped";
 
 export interface PaymentBreakdown {
   principalPaid: number;
@@ -198,7 +198,6 @@ export interface Transaction {
 
   sourceType: "income_source" | "expense_rule" | "manual";
   sourceId?: string;
-  parentTransactionId?: string;
 
   name: string;
   type: TransactionType;

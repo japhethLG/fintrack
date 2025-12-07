@@ -23,7 +23,6 @@ import {
   addManualTransactionAction,
   markTransactionCompleteAction,
   markTransactionSkippedAction,
-  markTransactionPartialAction,
   removeTransactionAction,
 } from "../actions/transactionActions";
 import { updateProfileAction, setCurrentBalanceAction } from "../actions/userActions";
@@ -177,23 +176,6 @@ export function useFinancialActions({
     [user, incomeSourcesRef, expenseRulesRef]
   );
 
-  const markTransactionPartial = useCallback(
-    async (id: string, partialAmount: number, notes?: string): Promise<Transaction> => {
-      if (!user) {
-        throw new Error("User not authenticated");
-      }
-      return markTransactionPartialAction(
-        id,
-        partialAmount,
-        notes,
-        user.uid,
-        incomeSourcesRef.current,
-        expenseRulesRef.current
-      );
-    },
-    [user, incomeSourcesRef, expenseRulesRef]
-  );
-
   const removeTransaction = useCallback(async (id: string) => {
     await removeTransactionAction(id);
   }, []);
@@ -225,7 +207,7 @@ export function useFinancialActions({
         getIncomeSources(user.uid),
         getExpenseRules(user.uid),
         getTransactions(user.uid, {
-          status: ["completed", "skipped", "partial", "pending"],
+          status: ["completed", "skipped", "pending"],
         }),
         getAlerts(user.uid),
       ]);
@@ -258,7 +240,6 @@ export function useFinancialActions({
     addManualTransaction,
     markTransactionComplete,
     markTransactionSkipped,
-    markTransactionPartial,
     removeTransaction,
     // Alert actions
     markAlertRead,

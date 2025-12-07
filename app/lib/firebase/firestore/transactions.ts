@@ -151,8 +151,8 @@ export const completeTransaction = async (
   const transaction = await getTransaction(id);
   if (!transaction) throw new Error("Transaction not found");
 
-  // REVERSAL LOGIC: If already completed/partial, reverse the old adjustment
-  if (transaction.status === "completed" || transaction.status === "partial") {
+  // REVERSAL LOGIC: If already completed, reverse the old adjustment
+  if (transaction.status === "completed") {
     const oldAmount = transaction.actualAmount ?? transaction.projectedAmount;
     const reversalDelta = transaction.type === "income" ? -oldAmount : oldAmount;
     await adjustUserBalance(transaction.userId, reversalDelta);
@@ -189,80 +189,20 @@ export const completeTransaction = async (
 };
 
 export const skipTransaction = async (id: string, notes?: string): Promise<void> => {
+  const transaction = await getTransaction(id);
+  if (!transaction) throw new Error("Transaction not found");
+
+  // If the transaction was previously completed, reverse its balance impact
+  if (transaction.status === "completed") {
+    const amount = transaction.actualAmount ?? transaction.projectedAmount;
+    const reversalDelta = transaction.type === "income" ? -amount : amount;
+    await adjustUserBalance(transaction.userId, reversalDelta);
+  }
+
   await updateTransaction(id, {
     status: "skipped",
     notes,
   });
-};
-
-/**
- * Delete remainder transactions created from a partial payment
- * @param parentTransactionId - ID of the parent partial transaction
- */
-const deleteRemainderTransactions = async (parentTransactionId: string): Promise<void> => {
-  const transactionsRef = collection(db, "transactions");
-  const q = query(
-    transactionsRef,
-    where("parentTransactionId", "==", parentTransactionId),
-    where("status", "==", "pending")
-  );
-  const snapshot = await getDocs(q);
-  await Promise.all(snapshot.docs.map((doc) => deleteDoc(doc.ref)));
-};
-
-export const partialPayTransaction = async (
-  id: string,
-  partialAmount: number,
-  notes?: string
-): Promise<Transaction> => {
-  const transaction = await getTransaction(id);
-  if (!transaction) throw new Error("Transaction not found");
-
-  // REVERSAL: If already partial, delete old remainder and reverse old adjustment
-  if (transaction.status === "partial") {
-    const oldAmount = transaction.actualAmount ?? 0;
-    const reversalDelta = transaction.type === "income" ? -oldAmount : oldAmount;
-    await adjustUserBalance(transaction.userId, reversalDelta);
-
-    // Delete old remainder transaction
-    await deleteRemainderTransactions(transaction.id);
-  }
-
-  // Update original transaction
-  await updateTransaction(id, {
-    actualAmount: partialAmount,
-    status: "partial",
-    notes,
-  });
-
-  // Apply new balance adjustment
-  const delta = transaction.type === "income" ? partialAmount : -partialAmount;
-  await adjustUserBalance(transaction.userId, delta);
-
-  // Create new remainder transaction
-  const remainder = transaction.projectedAmount - partialAmount;
-  const nextWeek = new Date(transaction.scheduledDate);
-  nextWeek.setDate(nextWeek.getDate() + 7);
-
-  // Format date as YYYY-MM-DD using local time
-  const year = nextWeek.getFullYear();
-  const month = String(nextWeek.getMonth() + 1).padStart(2, "0");
-  const day = String(nextWeek.getDate()).padStart(2, "0");
-  const nextWeekStr = `${year}-${month}-${day}`;
-
-  const remainderTransaction = await addTransaction(transaction.userId, {
-    name: `${transaction.name} (Remainder)`,
-    type: transaction.type,
-    category: transaction.category,
-    sourceType: transaction.sourceType,
-    sourceId: transaction.sourceId,
-    projectedAmount: remainder,
-    scheduledDate: nextWeekStr,
-    status: "pending",
-    parentTransactionId: id, // Link to parent for cleanup
-  });
-
-  return remainderTransaction;
 };
 
 export const deleteTransaction = async (id: string): Promise<void> => {
@@ -334,11 +274,11 @@ export const subscribeToStoredTransactions = (
   callback: (transactions: Transaction[]) => void
 ): (() => void) => {
   const transactionsRef = collection(db, "transactions");
-  // Fetch all non-projected transactions (completed, skipped, partial, pending)
+  // Fetch all non-projected transactions (completed, skipped, pending)
   const q = query(
     transactionsRef,
     where("userId", "==", userId),
-    where("status", "in", ["completed", "skipped", "partial", "pending"]),
+    where("status", "in", ["completed", "skipped", "pending"]),
     orderBy("scheduledDate", "asc")
   );
 
@@ -347,4 +287,3 @@ export const subscribeToStoredTransactions = (
     callback(transactions);
   });
 };
-

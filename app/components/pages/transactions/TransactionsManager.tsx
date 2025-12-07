@@ -14,7 +14,6 @@ const TransactionsManager: React.FC = () => {
     isLoading,
     markTransactionComplete,
     markTransactionSkipped,
-    markTransactionPartial,
   } = useFinancial();
 
   const [selectedTransaction, setSelectedTransaction] = useState<Transaction | null>(null);
@@ -80,11 +79,6 @@ const TransactionsManager: React.FC = () => {
   const handleSkip = async (notes?: string) => {
     if (!selectedTransaction) return;
     await markTransactionSkipped(selectedTransaction.id, notes);
-  };
-
-  const handlePartial = async (amount: number, notes?: string) => {
-    if (!selectedTransaction) return;
-    await markTransactionPartial(selectedTransaction.id, amount, notes);
   };
 
   if (isLoading) {
@@ -218,7 +212,6 @@ const TransactionsManager: React.FC = () => {
           transaction={selectedTransaction}
           onComplete={handleComplete}
           onSkip={handleSkip}
-          onPartial={selectedTransaction.type === "expense" ? handlePartial : undefined}
           onClose={() => setSelectedTransaction(null)}
         />
       )}

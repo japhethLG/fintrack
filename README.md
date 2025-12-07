@@ -112,7 +112,6 @@
 
 - **Mark Complete**: Record actual amounts with variance tracking
 - **Skip Transactions**: Mark as skipped with optional notes
-- **Partial Payments**: Pay portion now, schedule remainder
 - **Automatic Balance Updates**: Real-time balance recalculation
 - **Variance Analysis**: Track projected vs actual spending
 - **Filter & Sort**: By status, type, date, amount
@@ -321,7 +320,7 @@ View, filter, and manage all transactions (projected and actual).
 
 **Features:**
 
-- Complete/Skip/Partial payment
+- Complete/Skip payment
 - Variance tracking
 - Filter by status, type, date
 - Sort by date, amount

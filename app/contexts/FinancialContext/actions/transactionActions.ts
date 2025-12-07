@@ -3,7 +3,6 @@ import {
   addTransaction,
   completeTransaction,
   skipTransaction,
-  partialPayTransaction,
   deleteTransaction,
   updateExpenseRule,
   adjustUserBalance,
@@ -148,72 +147,6 @@ export async function markTransactionSkippedAction(
     });
   } else {
     await skipTransaction(id, notes);
-  }
-}
-
-/**
- * Mark transaction as partial payment
- * Handles both projected and stored transactions
- */
-export async function markTransactionPartialAction(
-  id: string,
-  partialAmount: number,
-  notes: string | undefined,
-  userId: string,
-  incomeSources: IncomeSource[],
-  expenseRules: ExpenseRule[]
-): Promise<Transaction> {
-  // Check if this is a projected transaction
-  if (id.startsWith("proj_")) {
-    const { sourceId, scheduledDate } = parseProjectionId(id);
-
-    const sourceInfo = findSource(sourceId, incomeSources, expenseRules);
-    if (!sourceInfo) {
-      throw new Error(`Source not found for projection. ID: ${sourceId}`);
-    }
-
-    const { source, isIncome } = sourceInfo;
-    const sourceType = isIncome ? "income_source" : "expense_rule";
-
-    // Create stored transaction as partial
-    const partialTx = await addTransaction(userId, {
-      name: source.name,
-      type: isIncome ? "income" : "expense",
-      category: source.category,
-      sourceType,
-      sourceId: source.id,
-      projectedAmount: source.amount,
-      actualAmount: partialAmount,
-      scheduledDate,
-      status: "partial",
-      notes,
-    });
-
-    // Update user balance
-    const delta = isIncome ? partialAmount : -partialAmount;
-    await adjustUserBalance(userId, delta);
-
-    // Create remainder transaction
-    const remainder = source.amount - partialAmount;
-    const nextWeek = new Date(scheduledDate);
-    nextWeek.setDate(nextWeek.getDate() + 7);
-    const nextWeekStr = nextWeek.toISOString().split("T")[0];
-
-    await addTransaction(userId, {
-      name: `${source.name} (Remainder)`,
-      type: isIncome ? "income" : "expense",
-      category: source.category,
-      sourceType,
-      sourceId: source.id,
-      projectedAmount: remainder,
-      scheduledDate: nextWeekStr,
-      status: "pending",
-      parentTransactionId: partialTx.id, // Link to parent for cleanup
-    });
-
-    return partialTx;
-  } else {
-    return partialPayTransaction(id, partialAmount, notes);
   }
 }
 
