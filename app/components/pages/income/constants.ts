@@ -15,6 +15,14 @@ export const INCOME_SOURCE_TYPES: {
   { value: "other", label: "Other", description: "Other income sources" },
 ];
 
+export const INCOME_FILTER_OPTIONS = [
+  { value: "all", label: "All" },
+  ...INCOME_SOURCE_TYPES.map((type) => ({
+    value: type.value,
+    label: type.label,
+  })),
+];
+
 export const FREQUENCY_OPTIONS: { value: IncomeFrequency; label: string }[] = [
   { value: "one-time", label: "One-time" },
   { value: "daily", label: "Daily" },

@@ -11,18 +11,23 @@ export interface CardProps extends React.HTMLAttributes<HTMLDivElement> {
   hover?: boolean;
   className?: string;
   children: React.ReactNode;
+  /** Optional ref to access the card's root element */
+  ref?: React.Ref<HTMLDivElement>;
 }
 
-export const Card: React.FC<CardProps> = ({
-  variant = "default",
-  padding = "md",
-  header,
-  footer,
-  hover = false,
-  className = "",
-  children,
-  ...rest
-}) => {
+export const Card = React.forwardRef<HTMLDivElement, CardProps>(function Card(
+  {
+    variant = "default",
+    padding = "md",
+    header,
+    footer,
+    hover = false,
+    className = "",
+    children,
+    ...rest
+  },
+  ref
+) {
   const baseStyles = "bg-[#1a2336] border border-gray-800 rounded-2xl";
 
   const variantStyles = {
@@ -46,7 +51,7 @@ export const Card: React.FC<CardProps> = ({
   );
 
   return (
-    <div className={combinedClassName} {...rest}>
+    <div ref={ref} className={combinedClassName} {...rest}>
       {header && <div className="border-b border-gray-800 bg-[#1e273b] p-4 md:p-6">{header}</div>}
       <div className={header || footer ? (header && footer ? "" : header ? "" : "") : ""}>
         {children}
@@ -58,4 +63,4 @@ export const Card: React.FC<CardProps> = ({
       )}
     </div>
   );
-};
+});

@@ -10,11 +10,12 @@ import {
   onAuthStateChanged,
   deleteCurrentUser,
 } from "@/lib/firebase/auth";
-import { UserProfile } from "@/lib/types";
+import { DeletableDataType, UserProfile } from "@/lib/types";
 import {
   getUserProfile,
   createUserProfile,
   deleteAllUserData,
+  deleteSelectiveUserData,
   deleteUserProfile,
   subscribeToUserProfile,
   migrateToInitialBalance,
@@ -30,6 +31,7 @@ interface AuthContextType {
   logout: () => Promise<void>;
   deleteAccount: () => Promise<void>;
   resetFinancialData: () => Promise<void>;
+  resetSelectiveFinancialData: (dataTypes: DeletableDataType[]) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -139,6 +141,18 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     }
   };
 
+  const resetSelectiveFinancialData = async (dataTypes: DeletableDataType[]) => {
+    if (!user) throw new Error("No user logged in");
+
+    await deleteSelectiveUserData(user.uid, dataTypes);
+
+    // Refresh user profile to get updated balance if it changed
+    const profile = await getUserProfile(user.uid);
+    if (profile) {
+      setUserProfile(profile);
+    }
+  };
+
   const value: AuthContextType = {
     user,
     userProfile,
@@ -149,6 +163,7 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     logout,
     deleteAccount,
     resetFinancialData,
+    resetSelectiveFinancialData,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

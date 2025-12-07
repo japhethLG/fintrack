@@ -13,7 +13,7 @@ import {
   Timestamp,
 } from "firebase/firestore";
 import { db } from "../config";
-import { Transaction } from "@/lib/types";
+import { DeletableDataType, Transaction } from "@/lib/types";
 import { getUserProfile, updateUserProfile } from "./users";
 
 /**
@@ -87,6 +87,47 @@ export const deleteAllUserData = async (userId: string): Promise<void> => {
     currentBalance: 0,
     balanceLastUpdatedAt: new Date().toISOString().split("T")[0],
   });
+};
+
+/**
+ * Delete selected financial data collections for a user.
+ * Resets balance to 0 only when transactions or balance history are deleted.
+ */
+export const deleteSelectiveUserData = async (
+  userId: string,
+  dataTypes: DeletableDataType[]
+): Promise<void> => {
+  if (dataTypes.length === 0) return;
+
+  const uniqueTypes = Array.from(new Set<DeletableDataType>(dataTypes));
+
+  for (const collectionName of uniqueTypes) {
+    const collRef = collection(db, collectionName);
+    const q = query(collRef, where("userId", "==", userId));
+    const snapshot = await getDocs(q);
+
+    const docs = snapshot.docs;
+    const batchSize = 500;
+
+    for (let i = 0; i < docs.length; i += batchSize) {
+      const batch = writeBatch(db);
+      const chunk = docs.slice(i, i + batchSize);
+      chunk.forEach((docSnapshot) => {
+        batch.delete(docSnapshot.ref);
+      });
+      await batch.commit();
+    }
+  }
+
+  const shouldResetBalance =
+    uniqueTypes.includes("transactions") || uniqueTypes.includes("balance_history");
+
+  if (shouldResetBalance) {
+    await updateUserProfile(userId, {
+      currentBalance: 0,
+      balanceLastUpdatedAt: new Date().toISOString().split("T")[0],
+    });
+  }
 };
 
 /**

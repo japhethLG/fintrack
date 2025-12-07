@@ -1,17 +1,55 @@
 "use client";
 
-import React, { useState, useMemo } from "react";
+import React, { useEffect, useMemo, useState } from "react";
+import { List as VirtualizedList, type RowComponentProps } from "react-window";
 import { useFinancial } from "@/contexts/FinancialContext";
 import { Transaction } from "@/lib/types";
-import { Button, Card, PageHeader, Icon, LoadingSpinner, Select } from "@/components/common";
+import {
+  Button,
+  Card,
+  PageHeader,
+  Icon,
+  LoadingSpinner,
+  Select,
+  DateRangePicker,
+  DateRange,
+} from "@/components/common";
 import CompleteTransactionModal from "./components/CompleteTransactionModal";
 import TransactionRow from "./components/TransactionRow";
-import { STATUS_OPTIONS, TYPE_OPTIONS, SORT_OPTIONS } from "./constants";
+import {
+  STATUS_OPTIONS,
+  TYPE_OPTIONS,
+  SORT_OPTIONS,
+  ORDER_OPTIONS,
+  DATE_RANGE_PRESETS,
+} from "./constants";
 
 const TransactionsManager: React.FC = () => {
+  type VirtualRowProps = {
+    transactions: Transaction[];
+    onSelect: (transaction: Transaction) => void;
+  };
+
+  const VirtualRow = ({
+    index,
+    style,
+    transactions,
+    onSelect,
+  }: RowComponentProps<VirtualRowProps>) => {
+    const transaction = transactions[index];
+
+    return (
+      <div style={style}>
+        <TransactionRow transaction={transaction} onAction={() => onSelect(transaction)} />
+      </div>
+    );
+  };
+
   const {
     transactions,
     isLoading,
+    viewDateRange,
+    setViewDateRange,
     markTransactionComplete,
     markTransactionSkipped,
   } = useFinancial();
@@ -21,10 +59,27 @@ const TransactionsManager: React.FC = () => {
   const [filterType, setFilterType] = useState("all");
   const [sortBy, setSortBy] = useState<"date" | "amount">("date");
   const [sortOrder, setSortOrder] = useState<"asc" | "desc">("asc");
+  const [dateRange, setDateRange] = useState<DateRange | null>(null);
+
+  const dateFilteredTransactions = useMemo(() => {
+    let result = [...transactions];
+
+    // Filter by date range (optional)
+    if (dateRange?.[0] && dateRange?.[1]) {
+      const startDate = dateRange[0].format("YYYY-MM-DD");
+      const endDate = dateRange[1].format("YYYY-MM-DD");
+      result = result.filter((t) => {
+        const txDate = t.actualDate || t.scheduledDate;
+        return txDate >= startDate && txDate <= endDate;
+      });
+    }
+
+    return result;
+  }, [transactions, dateRange]);
 
   // Filter and sort transactions
   const filteredTransactions = useMemo(() => {
-    let result = [...transactions];
+    let result = [...dateFilteredTransactions];
 
     // Filter by status
     if (filterStatus !== "all") {
@@ -50,22 +105,23 @@ const TransactionsManager: React.FC = () => {
     });
 
     return result;
-  }, [transactions, filterStatus, filterType, sortBy, sortOrder]);
+  }, [dateFilteredTransactions, filterStatus, filterType, sortBy, sortOrder]);
 
   // Summary stats
   const stats = useMemo(() => {
     const today = new Date().toISOString().split("T")[0];
 
     return {
-      total: transactions.length,
-      completed: transactions.filter((t) => t.status === "completed").length,
-      pending: transactions.filter((t) => t.status === "pending" || t.status === "projected")
-        .length,
-      overdue: transactions.filter(
+      total: dateFilteredTransactions.length,
+      completed: dateFilteredTransactions.filter((t) => t.status === "completed").length,
+      pending: dateFilteredTransactions.filter(
+        (t) => t.status === "pending" || t.status === "projected"
+      ).length,
+      overdue: dateFilteredTransactions.filter(
         (t) => (t.status === "pending" || t.status === "projected") && t.scheduledDate < today
       ).length,
     };
-  }, [transactions]);
+  }, [dateFilteredTransactions]);
 
   const handleComplete = async (data: {
     actualAmount: number;
@@ -79,6 +135,27 @@ const TransactionsManager: React.FC = () => {
   const handleSkip = async (notes?: string) => {
     if (!selectedTransaction) return;
     await markTransactionSkipped(selectedTransaction.id, notes);
+  };
+
+  // Expand view date range if user selects outside current window
+  useEffect(() => {
+    if (dateRange?.[0] && dateRange?.[1]) {
+      const selectedStart = dateRange[0].format("YYYY-MM-DD");
+      const selectedEnd = dateRange[1].format("YYYY-MM-DD");
+
+      if (selectedStart < viewDateRange.start || selectedEnd > viewDateRange.end) {
+        setViewDateRange(selectedStart, selectedEnd);
+      }
+    }
+  }, [dateRange, viewDateRange, setViewDateRange]);
+
+  const hasActiveFilters =
+    filterStatus !== "all" || filterType !== "all" || (dateRange?.[0] && dateRange?.[1]);
+
+  const handleClearFilters = () => {
+    setFilterStatus("all");
+    setFilterType("all");
+    setDateRange(null);
   };
 
   if (isLoading) {
@@ -148,17 +225,29 @@ const TransactionsManager: React.FC = () => {
               onChange={(v) => setSortBy(v as "date" | "amount")}
             />
           </div>
-          <div className="flex items-end">
-            <Button
-              variant="ghost"
-              size="sm"
-              icon={
-                <Icon name={sortOrder === "asc" ? "arrow_upward" : "arrow_downward"} size="sm" />
-              }
-              onClick={() => setSortOrder(sortOrder === "asc" ? "desc" : "asc")}
-            >
-              {sortOrder === "asc" ? "Oldest First" : "Newest First"}
-            </Button>
+          <div className="flex-1 min-w-[150px]">
+            <Select
+              label="Order By"
+              options={ORDER_OPTIONS}
+              value={sortOrder}
+              onChange={(v) => setSortOrder(v as "asc" | "desc")}
+            />
+          </div>
+          <div className="flex-1 min-w-[220px]">
+            <DateRangePicker
+              label="Date Range"
+              value={dateRange ?? [null, null]}
+              allowClear
+              showQuickSelect
+              presets={DATE_RANGE_PRESETS}
+              onChange={(range) => {
+                if (!range?.[0] || !range?.[1]) {
+                  setDateRange(null);
+                } else {
+                  setDateRange(range);
+                }
+              }}
+            />
           </div>
         </div>
       </Card>
@@ -168,15 +257,8 @@ const TransactionsManager: React.FC = () => {
         {/* Header */}
         <div className="p-4 border-b border-gray-800 flex items-center justify-between">
           <h3 className="font-bold text-white">Transactions ({filteredTransactions.length})</h3>
-          {filterStatus !== "all" || filterType !== "all" ? (
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => {
-                setFilterStatus("all");
-                setFilterType("all");
-              }}
-            >
+          {hasActiveFilters ? (
+            <Button variant="ghost" size="sm" onClick={handleClearFilters}>
               Clear Filters
             </Button>
           ) : null}
@@ -184,15 +266,16 @@ const TransactionsManager: React.FC = () => {
 
         {/* List */}
         {filteredTransactions.length > 0 ? (
-          <div className="max-h-[600px] overflow-y-auto">
-            {filteredTransactions.map((transaction) => (
-              <TransactionRow
-                key={transaction.id}
-                transaction={transaction}
-                onAction={() => setSelectedTransaction(transaction)}
-              />
-            ))}
-          </div>
+          <VirtualizedList
+            rowCount={filteredTransactions.length}
+            rowHeight={96}
+            rowComponent={VirtualRow}
+            rowProps={{
+              transactions: filteredTransactions,
+              onSelect: (t: Transaction) => setSelectedTransaction(t),
+            }}
+            style={{ height: 600, width: "100%" }}
+          />
         ) : (
           <div className="p-12 text-center">
             <Icon name="receipt_long" size={64} className="text-gray-600 mx-auto mb-4" />

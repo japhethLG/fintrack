@@ -47,7 +47,7 @@ const WeekDayCell: React.FC<IProps> = ({ day, isSelected, onClick, onTransaction
       {/* Date header */}
       <div
         className={cn(
-          "p-3 border-b border-gray-800 flex items-center justify-between",
+          "p-3 border-b border-gray-800 flex flex-col items-center justify-between",
           isToday && "bg-primary/10"
         )}
       >

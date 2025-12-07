@@ -3,12 +3,19 @@
 import React, { useState } from "react";
 import { useFinancial } from "@/contexts/FinancialContext";
 import { IncomeSource, IncomeSourceFormData } from "@/lib/types";
-import { Button, Card, PageHeader, Icon, LoadingSpinner } from "@/components/common";
+import {
+  Button,
+  Card,
+  PageHeader,
+  Icon,
+  LoadingSpinner,
+  MultiSelectDropdown,
+} from "@/components/common";
 import { useCurrency } from "@/lib/hooks/useCurrency";
 import IncomeSourceForm from "./components/IncomeSourceForm";
 import IncomeSourceCard from "./components/IncomeSourceCard";
 import IncomeSourceDetail from "./components/IncomeSourceDetail";
-import { getMonthlyMultiplier } from "./constants";
+import { getMonthlyMultiplier, INCOME_FILTER_OPTIONS } from "./constants";
 import UpcomingPaymentsWidget from "./components/UpcomingPaymentsWidget";
 
 const IncomeManager: React.FC = () => {
@@ -25,10 +32,18 @@ const IncomeManager: React.FC = () => {
   const [selectedSourceId, setSelectedSourceId] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false);
   const [editingSource, setEditingSource] = useState<IncomeSource | null>(null);
+  const [filterTypes, setFilterTypes] = useState<string[]>(["all"]);
 
   const selectedSource = selectedSourceId
     ? incomeSources.find((s) => s.id === selectedSourceId)
     : null;
+
+  const isAllSelected = filterTypes.includes("all");
+
+  const filteredSources = incomeSources.filter((source) => {
+    if (isAllSelected || filterTypes.length === 0) return true;
+    return filterTypes.includes(source.sourceType);
+  });
 
   const handleCreateSource = async (data: IncomeSourceFormData) => {
     const source = await createIncomeSource(data);
@@ -169,24 +184,39 @@ const IncomeManager: React.FC = () => {
           <div className="lg:col-span-1">
             <Card padding="none">
               <div className="p-4 border-b border-gray-800">
-                <h3 className="font-bold text-white">Income Sources</h3>
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                  <h3 className="font-bold text-white">Income Sources</h3>
+                  <MultiSelectDropdown
+                    options={INCOME_FILTER_OPTIONS}
+                    value={filterTypes}
+                    onChange={setFilterTypes}
+                    allValue="all"
+                    placeholder="All income"
+                    triggerIcon={<Icon name="filter_list" size="sm" />}
+                    contentClassName="w-64"
+                  />
+                </div>
               </div>
 
-              {incomeSources.length === 0 ? (
+              {filteredSources.length === 0 ? (
                 <div className="p-8 text-center">
                   <Icon
                     name="account_balance_wallet"
                     size={48}
                     className="text-gray-600 mx-auto mb-4"
                   />
-                  <p className="text-gray-400 mb-4">No income sources yet</p>
-                  <Button variant="primary" size="sm" onClick={() => setShowForm(true)}>
-                    Add Your First Income
-                  </Button>
+                  <p className="text-gray-400 mb-4">
+                    {isAllSelected ? "No income sources yet" : "No matching income sources"}
+                  </p>
+                  {isAllSelected && (
+                    <Button variant="primary" size="sm" onClick={() => setShowForm(true)}>
+                      Add Your First Income
+                    </Button>
+                  )}
                 </div>
               ) : (
                 <div className="max-h-[600px] overflow-y-auto">
-                  {incomeSources.map((source) => (
+                  {filteredSources.map((source) => (
                     <IncomeSourceCard
                       key={source.id}
                       source={source}

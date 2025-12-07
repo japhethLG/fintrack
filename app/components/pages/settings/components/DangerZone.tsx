@@ -1,32 +1,61 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button, Card, Icon, Alert } from "@/components/common";
 import { useAuth } from "@/contexts/AuthContext";
+import { useFinancial } from "@/contexts/FinancialContext";
+import { DeletableDataType } from "@/lib/types";
 import ConfirmationModal from "./ConfirmationModal";
+import SelectiveResetModal from "./SelectiveResetModal";
 
-type ModalType = "reset" | "delete" | null;
+type ModalType = "delete" | "selective" | "selectiveConfirm" | null;
+
+const DATA_LABELS: Record<DeletableDataType, string> = {
+  income_sources: "Income Sources",
+  expense_rules: "Expense Rules",
+  transactions: "Transactions",
+  balance_history: "Balance History",
+  alerts: "Alerts",
+};
 
 const DangerZone: React.FC = () => {
   const router = useRouter();
-  const { user, resetFinancialData, deleteAccount } = useAuth();
+  const { user, resetSelectiveFinancialData, deleteAccount } = useAuth();
+  const { incomeSources, expenseRules, transactions, alerts } = useFinancial();
   const [activeModal, setActiveModal] = useState<ModalType>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
+  const [selectedTypes, setSelectedTypes] = useState<DeletableDataType[]>([]);
 
-  const handleResetData = async () => {
+  const dataCounts = useMemo(
+    () => ({
+      income_sources: incomeSources.length,
+      expense_rules: expenseRules.length,
+      transactions: transactions.length,
+      balance_history: 0,
+      alerts: alerts.length,
+    }),
+    [alerts.length, expenseRules.length, incomeSources.length, transactions.length]
+  );
+
+  const resetSuccess = (message: string) => {
+    setSuccess(message);
+    setTimeout(() => setSuccess(null), 5000);
+  };
+
+  const handleResetSelectiveData = async () => {
     setIsLoading(true);
     setError(null);
 
     try {
-      await resetFinancialData();
+      await resetSelectiveFinancialData(selectedTypes);
       setActiveModal(null);
-      setSuccess("All financial data has been reset successfully.");
-      setTimeout(() => setSuccess(null), 5000);
+      resetSuccess("Selected financial data has been reset successfully.");
+      setSelectedTypes([]);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to reset data");
+      setError(err instanceof Error ? err.message : "Failed to reset selected data");
     } finally {
       setIsLoading(false);
     }
@@ -72,23 +101,23 @@ const DangerZone: React.FC = () => {
         )}
 
         <div className="space-y-4">
-          {/* Reset Financial Data */}
+          {/* Reset Financial Data (All or Selective) */}
           <div className="p-4 bg-gray-800/50 rounded-lg border border-gray-700">
             <div className="flex items-start justify-between gap-4">
               <div>
                 <h4 className="font-medium text-white">Reset Financial Data</h4>
                 <p className="text-sm text-gray-400 mt-1">
-                  Delete all income sources, expense rules, transactions, and reset your balance to
-                  zero. Your account and preferences will be preserved.
+                  Choose exactly what to delete or pick “All Financial Data” to wipe everything.
+                  Balance resets to $0 when transactions or balance history are removed.
                 </p>
               </div>
               <Button
                 variant="secondary"
                 size="sm"
                 className="shrink-0 border-warning/50 text-warning hover:bg-warning/10"
-                onClick={() => setActiveModal("reset")}
+                onClick={() => setActiveModal("selective")}
               >
-                Reset Data
+                Selective Reset
               </Button>
             </div>
           </div>
@@ -116,17 +145,40 @@ const DangerZone: React.FC = () => {
         </div>
       </Card>
 
-      {/* Reset Data Modal */}
-      {activeModal === "reset" && (
+      {/* Selective Reset Modal */}
+      {activeModal === "selective" && (
+        <SelectiveResetModal
+          counts={dataCounts}
+          onConfirm={(types) => {
+            setSelectedTypes(types);
+            setActiveModal("selectiveConfirm");
+          }}
+          onCancel={() => {
+            setSelectedTypes([]);
+            setActiveModal(null);
+          }}
+          isSubmitting={isLoading}
+        />
+      )}
+
+      {/* Selective Confirmation Modal */}
+      {activeModal === "selectiveConfirm" && (
         <ConfirmationModal
-          title="Reset Financial Data"
-          description="This will permanently delete all your income sources, expense rules, transactions, balance history, and alerts. Your balance will be reset to $0. This action cannot be undone."
+          title="Confirm Selected Reset"
+          description={`This will delete: ${
+            selectedTypes.length > 0
+              ? selectedTypes.map((type) => DATA_LABELS[type]).join(", ")
+              : "no selections"
+          }. Type DELETE to confirm.`}
           confirmText="DELETE"
-          confirmButtonText="Reset All Data"
+          confirmButtonText="Reset Selected Data"
           variant="warning"
           isLoading={isLoading}
-          onConfirm={handleResetData}
-          onCancel={() => setActiveModal(null)}
+          onConfirm={handleResetSelectiveData}
+          onCancel={() => {
+            setSelectedTypes([]);
+            setActiveModal(null);
+          }}
         />
       )}
 
