@@ -4,6 +4,7 @@
 
 import { IncomeSource, Transaction } from "@/lib/types";
 import { calculateOccurrences } from "./occurrenceCalculator";
+import { generateOccurrenceId } from "./occurrenceIdGenerator";
 import { createProjectedTransaction } from "./transactionFactory";
 
 /**
@@ -33,7 +34,14 @@ export const generateIncomeProjections = (
   );
 
   return occurrences.map((date) =>
-    createProjectedTransaction(source, date, "income", "income_source")
+    createProjectedTransaction(
+      source,
+      date,
+      "income",
+      "income_source",
+      undefined,
+      generateOccurrenceId(source.id, source.frequency, date, source.startDate, source.scheduleConfig)
+    )
   );
 };
 

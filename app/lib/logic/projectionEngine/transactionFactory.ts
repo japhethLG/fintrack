@@ -18,13 +18,15 @@ import { formatDate } from "@/lib/utils/dateUtils";
  * @param type - Transaction type (income or expense)
  * @param sourceType - Source type identifier
  * @param paymentBreakdown - Optional payment breakdown for loans/credit cards
+ * @param occurrenceId - Stable identifier for the logical occurrence
  */
 export const createProjectedTransaction = (
   source: IncomeSource | ExpenseRule,
   date: Date,
   type: TransactionType,
   sourceType: "income_source" | "expense_rule",
-  paymentBreakdown?: PaymentBreakdown
+  paymentBreakdown?: PaymentBreakdown,
+  occurrenceId?: string
 ): Omit<Transaction, "id" | "userId" | "createdAt" | "updatedAt"> => {
   const amount = paymentBreakdown?.principalPaid
     ? paymentBreakdown.principalPaid + paymentBreakdown.interestPaid
@@ -40,5 +42,6 @@ export const createProjectedTransaction = (
     scheduledDate: formatDate(date),
     status: "projected",
     paymentBreakdown,
+    occurrenceId,
   };
 };

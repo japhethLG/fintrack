@@ -5,6 +5,7 @@
 import { ExpenseRule, Transaction } from "@/lib/types";
 import { parseDate } from "@/lib/utils/dateUtils";
 import { calculateAmortizationSchedule } from "../amortization";
+import { generateOccurrenceId } from "./occurrenceIdGenerator";
 import { createProjectedTransaction } from "./transactionFactory";
 
 /**
@@ -52,7 +53,8 @@ export const generateLoanProjections = (
           remainingBalance: step.remainingBalance,
           paymentNumber,
           totalPayments: loanConfig.termMonths,
-        }
+        },
+        generateOccurrenceId(rule.id, rule.frequency, step.date, rule.startDate, rule.scheduleConfig)
       );
     });
 };

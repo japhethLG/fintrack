@@ -12,6 +12,9 @@ export function mergeTransactionsWithProjections(
   viewDateRange: { start: string; end: string },
   userId: string | undefined
 ): Transaction[] {
+  const getKey = (t: { sourceId?: string; scheduledDate: string; occurrenceId?: string }) =>
+    t.occurrenceId || (t.sourceId ? `${t.sourceId}-${t.scheduledDate}` : t.scheduledDate);
+
   // Filter active sources and rules
   const activeIncomeSources = incomeSources.filter((s) => s.isActive);
   const activeExpenseRules = expenseRules.filter((r) => r.isActive);
@@ -34,14 +37,14 @@ export function mergeTransactionsWithProjections(
   const storedByKey = new Map<string, Transaction>();
   storedTransactions.forEach((t) => {
     if (t.sourceId) {
-      const key = `${t.sourceId}-${t.scheduledDate}`;
+      const key = getKey(t);
       storedByKey.set(key, t);
     }
   });
 
   // Merge: stored transactions take precedence over projections
   const mergedTransactions: Transaction[] = projections.map((proj) => {
-    const key = `${proj.sourceId}-${proj.scheduledDate}`;
+    const key = getKey(proj);
     const stored = storedByKey.get(key);
 
     if (stored) {
@@ -51,9 +54,14 @@ export function mergeTransactionsWithProjections(
     }
 
     // Return projection with deterministic ID
+    const projectionIdParts = [proj.sourceId, proj.scheduledDate, proj.occurrenceId || ""].filter(
+      Boolean
+    );
+    const projectionId = projectionIdParts.join("::");
+
     return {
       ...proj,
-      id: `proj_${key}`, // Deterministic ID for projections
+      id: `proj_${projectionId}`, // Deterministic ID for projections (occurrence-aware)
       userId: userId || "",
       createdAt: null as unknown as Transaction["createdAt"],
       updatedAt: null as unknown as Transaction["updatedAt"],
@@ -67,7 +75,7 @@ export function mergeTransactionsWithProjections(
       // Manual transaction - always include
       mergedTransactions.push(t);
     } else {
-      const key = `${t.sourceId}-${t.scheduledDate}`;
+      const key = getKey(t);
       if (storedByKey.has(key)) {
         // Stored transaction that didn't match any projection - include it
         mergedTransactions.push(t);

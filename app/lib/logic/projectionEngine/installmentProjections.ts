@@ -5,6 +5,7 @@
 import { ExpenseRule, Transaction } from "@/lib/types";
 import { parseDate, addMonths } from "@/lib/utils/dateUtils";
 import { adjustForWeekend } from "./dateUtils";
+import { generateOccurrenceId } from "./occurrenceIdGenerator";
 import { createProjectedTransaction } from "./transactionFactory";
 
 /**
@@ -56,7 +57,14 @@ export const generateInstallmentProjections = (
               installmentConfig.installmentAmount,
             paymentNumber,
             totalPayments: installmentConfig.installmentCount,
-          }
+          },
+          generateOccurrenceId(
+            rule.id,
+            rule.frequency,
+            adjustedDate,
+            rule.startDate,
+            rule.scheduleConfig
+          )
         )
       );
     }

@@ -23,6 +23,7 @@ import {
   addManualTransactionAction,
   markTransactionCompleteAction,
   markTransactionSkippedAction,
+  rescheduleTransactionAction,
   removeTransactionAction,
 } from "../actions/transactionActions";
 import { updateProfileAction, setCurrentBalanceAction } from "../actions/userActions";
@@ -176,6 +177,22 @@ export function useFinancialActions({
     [user, incomeSourcesRef, expenseRulesRef]
   );
 
+  const rescheduleTransaction = useCallback(
+    async (id: string, newDate: string) => {
+      if (!user) {
+        throw new Error("User not authenticated");
+      }
+      await rescheduleTransactionAction(
+        id,
+        newDate,
+        user.uid,
+        incomeSourcesRef.current,
+        expenseRulesRef.current
+      );
+    },
+    [user, incomeSourcesRef, expenseRulesRef]
+  );
+
   const removeTransaction = useCallback(async (id: string) => {
     await removeTransactionAction(id);
   }, []);
@@ -240,6 +257,7 @@ export function useFinancialActions({
     addManualTransaction,
     markTransactionComplete,
     markTransactionSkipped,
+    rescheduleTransaction,
     removeTransaction,
     // Alert actions
     markAlertRead,

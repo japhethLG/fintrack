@@ -4,6 +4,7 @@
 
 import { ExpenseRule, Transaction } from "@/lib/types";
 import { calculateOccurrences } from "./occurrenceCalculator";
+import { generateOccurrenceId } from "./occurrenceIdGenerator";
 import { createProjectedTransaction } from "./transactionFactory";
 import { generateLoanProjections } from "./loanProjections";
 import { generateCreditProjections } from "./creditProjections";
@@ -52,7 +53,14 @@ export const generateExpenseProjections = (
   );
 
   return occurrences.map((date) =>
-    createProjectedTransaction(rule, date, "expense", "expense_rule")
+    createProjectedTransaction(
+      rule,
+      date,
+      "expense",
+      "expense_rule",
+      undefined,
+      generateOccurrenceId(rule.id, rule.frequency, date, rule.startDate, rule.scheduleConfig)
+    )
   );
 };
 

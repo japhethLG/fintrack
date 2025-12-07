@@ -6,23 +6,28 @@ import {
   deleteTransaction,
   updateExpenseRule,
   adjustUserBalance,
+  updateTransaction,
+  getTransaction,
 } from "@/lib/firebase/firestore";
+import { generateOccurrenceId } from "@/lib/logic/projectionEngine/occurrenceIdGenerator";
+import { parseDate } from "@/lib/utils/dateUtils";
 
 /**
  * Helper to parse projection ID
- * Format: proj_${sourceId}-${scheduledDate}
+ * Format: proj_${sourceId}::{scheduledDate}[::{occurrenceId}]
  */
-function parseProjectionId(id: string): { sourceId: string; scheduledDate: string } {
+function parseProjectionId(id: string): {
+  sourceId: string;
+  scheduledDate: string;
+  occurrenceId?: string;
+} {
   const keyPart = id.substring(5); // Remove "proj_" prefix
-  if (keyPart.length < 12) {
+  const segments = keyPart.split("::");
+  if (segments.length < 2) {
     throw new Error("Invalid projection ID format");
   }
-  // Date is always last 10 characters (YYYY-MM-DD)
-  const scheduledDate = keyPart.substring(keyPart.length - 10);
-  // Source ID is everything before the last dash
-  const sourceId = keyPart.substring(0, keyPart.length - 11);
-
-  return { sourceId, scheduledDate };
+  const [sourceId, scheduledDate, occurrenceId] = segments;
+  return { sourceId, scheduledDate, occurrenceId };
 }
 
 /**
@@ -57,7 +62,7 @@ export async function markTransactionCompleteAction(
 ): Promise<void> {
   // Check if this is a projected transaction
   if (id.startsWith("proj_")) {
-    const { sourceId, scheduledDate } = parseProjectionId(id);
+    const { sourceId, scheduledDate, occurrenceId: parsedOccurrenceId } = parseProjectionId(id);
 
     const sourceInfo = findSource(sourceId, incomeSources, expenseRules);
     if (!sourceInfo) {
@@ -80,6 +85,9 @@ export async function markTransactionCompleteAction(
       actualDate: data.actualDate || scheduledDate,
       status: "completed",
       notes: data.notes,
+      occurrenceId:
+        parsedOccurrenceId ||
+        generateOccurrenceId(source.id, source.frequency, parseDate(scheduledDate), source.startDate, source.scheduleConfig),
     });
 
     // Update user balance
@@ -124,7 +132,7 @@ export async function markTransactionSkippedAction(
 ): Promise<void> {
   // Check if this is a projected transaction
   if (id.startsWith("proj_")) {
-    const { sourceId, scheduledDate } = parseProjectionId(id);
+    const { sourceId, scheduledDate, occurrenceId: parsedOccurrenceId } = parseProjectionId(id);
 
     const sourceInfo = findSource(sourceId, incomeSources, expenseRules);
     if (!sourceInfo) {
@@ -144,10 +152,88 @@ export async function markTransactionSkippedAction(
       scheduledDate,
       status: "skipped",
       notes,
+      occurrenceId:
+        parsedOccurrenceId ||
+        generateOccurrenceId(source.id, source.frequency, parseDate(scheduledDate), source.startDate, source.scheduleConfig),
     });
   } else {
     await skipTransaction(id, notes);
   }
+}
+
+/**
+ * Reschedule transaction (projected or stored)
+ */
+export async function rescheduleTransactionAction(
+  id: string,
+  newDate: string,
+  userId: string,
+  incomeSources: IncomeSource[],
+  expenseRules: ExpenseRule[]
+): Promise<void> {
+  if (id.startsWith("proj_")) {
+    const { sourceId, scheduledDate, occurrenceId: parsedOccurrenceId } = parseProjectionId(id);
+    const sourceInfo = findSource(sourceId, incomeSources, expenseRules);
+    if (!sourceInfo) {
+      throw new Error(`Source not found for projection. ID: ${sourceId}`);
+    }
+    const { source, isIncome } = sourceInfo;
+    const occurrenceId =
+      parsedOccurrenceId ||
+      generateOccurrenceId(
+        source.id,
+        source.frequency,
+        parseDate(scheduledDate),
+        source.startDate,
+        source.scheduleConfig
+      );
+
+    await addTransaction(userId, {
+      name: source.name,
+      type: isIncome ? "income" : "expense",
+      category: source.category,
+      sourceType: isIncome ? "income_source" : "expense_rule",
+      sourceId: source.id,
+      projectedAmount: source.amount,
+      scheduledDate: newDate,
+      status: "pending",
+      occurrenceId,
+    });
+    return;
+  }
+
+  // Stored transaction: update scheduledDate (and actualDate if completed)
+  const existing = await getTransaction(id);
+  if (!existing) {
+    throw new Error("Transaction not found");
+  }
+
+  const sourceInfo =
+    existing.sourceId && findSource(existing.sourceId, incomeSources, expenseRules);
+
+  const occurrenceId =
+    existing.occurrenceId && existing.occurrenceId.length > 0
+      ? existing.occurrenceId
+      : existing.sourceId && sourceInfo
+        ? generateOccurrenceId(
+            sourceInfo.source.id,
+            sourceInfo.source.frequency,
+            parseDate(existing.scheduledDate),
+            sourceInfo.source.startDate,
+            sourceInfo.source.scheduleConfig
+          )
+        : existing.occurrenceId;
+
+  const updates: Partial<Transaction> = {
+    scheduledDate: newDate,
+    occurrenceId,
+  };
+
+  if (existing.status === "completed") {
+    updates.actualDate = newDate;
+  }
+
+  await updateTransaction(id, updates);
 }
 
 /**

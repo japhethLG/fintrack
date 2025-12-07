@@ -7,6 +7,7 @@ import { cn } from "@/lib/utils/cn";
 import { useCurrency } from "@/lib/hooks/useCurrency";
 import { STATUS_COLORS, STATUS_BG_COLORS } from "../constants";
 import TransactionItem from "./TransactionItem";
+import DraggableTransaction from "./DraggableTransaction";
 
 interface IProps {
   selectedDate: Date | null;
@@ -73,7 +74,9 @@ const DetailPanel: React.FC<DetailPanelProps> = ({
       <h4 className="text-sm font-medium text-gray-400">Transactions ({transactions.length})</h4>
       {transactions.length > 0 ? (
         transactions.map((t) => (
-          <TransactionItem key={t.id} transaction={t} onClick={() => onTransactionClick?.(t)} />
+          <DraggableTransaction key={t.id} transaction={t}>
+            <TransactionItem transaction={t} onClick={() => onTransactionClick?.(t)} />
+          </DraggableTransaction>
         ))
       ) : (
         <div className="py-8 text-center">

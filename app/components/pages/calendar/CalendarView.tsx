@@ -1,6 +1,16 @@
 "use client";
 
 import React, { useState, useMemo, useRef } from "react";
+import {
+  DndContext,
+  DragEndEvent,
+  DragStartEvent,
+  DragOverlay,
+  MouseSensor,
+  TouchSensor,
+  useSensor,
+  useSensors,
+} from "@dnd-kit/core";
 import { useFinancial } from "@/contexts/FinancialContext";
 import { Transaction, CompleteTransactionData } from "@/lib/types";
 import { Button, Card, PageHeader, Icon, LoadingSpinner } from "@/components/common";
@@ -14,6 +24,7 @@ import WeekDayCell from "./components/WeekDayCell";
 import MonthSummary from "./components/MonthSummary";
 import PeriodBalanceSummary from "./components/PeriodBalanceSummary";
 import DayDetailSidebar from "./components/DayDetailSidebar";
+import TransactionItem from "./components/TransactionItem";
 
 const CalendarView: React.FC = () => {
   const {
@@ -22,6 +33,7 @@ const CalendarView: React.FC = () => {
     isLoading,
     markTransactionComplete,
     markTransactionSkipped,
+    rescheduleTransaction,
     setViewDateRange,
     userProfile,
   } = useFinancial();
@@ -31,6 +43,15 @@ const CalendarView: React.FC = () => {
   const [viewMode, setViewMode] = useState<"month" | "week">("month");
   const [selectedTransaction, setSelectedTransaction] = useState<Transaction | null>(null);
   const calendarCardRef = useRef<HTMLDivElement | null>(null);
+  const [draggingTransaction, setDraggingTransaction] = useState<Transaction | null>(null);
+  const sensors = useSensors(
+    useSensor(MouseSensor, {
+      activationConstraint: { distance: 8 },
+    }),
+    useSensor(TouchSensor, {
+      activationConstraint: { delay: 150, tolerance: 5 },
+    })
+  );
 
   // Calculate calendar days
   const calendarDays = useMemo((): CalendarDay[] => {
@@ -256,6 +277,25 @@ const CalendarView: React.FC = () => {
     setSelectedTransaction(null);
   };
 
+  const handleDragStart = (event: DragStartEvent) => {
+    const txn = event.active.data.current?.transaction as Transaction | undefined;
+    if (txn) {
+      setDraggingTransaction(txn);
+    }
+  };
+
+  const handleDragEnd = async (event: DragEndEvent) => {
+    const txn = event.active.data.current?.transaction as Transaction | undefined;
+    const targetDate = (event.over?.id as string) || null;
+    setDraggingTransaction(null);
+    if (!txn || !targetDate) return;
+
+    const currentDate = txn.actualDate || txn.scheduledDate;
+    if (currentDate === targetDate) return;
+
+    await rescheduleTransaction(txn.id, targetDate);
+  };
+
   // Month summary
   const monthSummary = useMemo(() => {
     let income = 0;
@@ -353,100 +393,120 @@ const CalendarView: React.FC = () => {
   }
 
   return (
-    <div className="p-6 lg:p-10 max-w-7xl mx-auto animate-fade-in">
-      <PageHeader
-        title="Financial Calendar"
-        description="Visualize your cash flow and upcoming transactions."
-        actions={
-          <div className="flex items-center gap-4">
-            <Button variant="secondary" size="sm" onClick={goToToday}>
-              Today
-            </Button>
-            <div className="flex items-center gap-2 bg-gray-800 p-1 rounded-lg">
-              <Button
-                variant={viewMode === "month" ? "primary" : "ghost"}
-                size="sm"
-                onClick={() => {
-                  setViewMode("month");
-                  setSelectedDate(null);
-                }}
-              >
-                Month
+    <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
+      <div className="p-6 lg:p-10 max-w-7xl mx-auto animate-fade-in">
+        <PageHeader
+          title="Financial Calendar"
+          description="Visualize your cash flow and upcoming transactions."
+          actions={
+            <div className="flex items-center gap-4">
+              <Button variant="secondary" size="sm" onClick={goToToday}>
+                Today
               </Button>
-              <Button
-                variant={viewMode === "week" ? "primary" : "ghost"}
-                size="sm"
-                onClick={() => {
-                  setViewMode("week");
-                  setSelectedDate(null);
-                }}
-              >
-                Week
-              </Button>
+              <div className="flex items-center gap-2 bg-gray-800 p-1 rounded-lg">
+                <Button
+                  variant={viewMode === "month" ? "primary" : "ghost"}
+                  size="sm"
+                  onClick={() => {
+                    setViewMode("month");
+                    setSelectedDate(null);
+                  }}
+                >
+                  Month
+                </Button>
+                <Button
+                  variant={viewMode === "week" ? "primary" : "ghost"}
+                  size="sm"
+                  onClick={() => {
+                    setViewMode("week");
+                    setSelectedDate(null);
+                  }}
+                >
+                  Week
+                </Button>
+              </div>
             </div>
-          </div>
-        }
-      />
+          }
+        />
 
-      {/* Month Summary */}
-      <MonthSummary
-        income={monthSummary.income}
-        expenses={monthSummary.expenses}
-        net={monthSummary.net}
-        projected={monthSummary.projected}
-        completed={monthSummary.completed}
-      />
+        {/* Month Summary */}
+        <MonthSummary
+          income={monthSummary.income}
+          expenses={monthSummary.expenses}
+          net={monthSummary.net}
+          projected={monthSummary.projected}
+          completed={monthSummary.completed}
+        />
 
-      {/* Period Balance Summary (Opening/Closing) */}
-      <PeriodBalanceSummary
-        openingBalance={periodBalance.openingBalance}
-        closingBalance={periodBalance.closingBalance}
-        viewMode={viewMode}
-        startDateLabel={periodBalance.startDateLabel}
-        endDateLabel={periodBalance.endDateLabel}
-      />
+        {/* Period Balance Summary (Opening/Closing) */}
+        <PeriodBalanceSummary
+          openingBalance={periodBalance.openingBalance}
+          closingBalance={periodBalance.closingBalance}
+          viewMode={viewMode}
+          startDateLabel={periodBalance.startDateLabel}
+          endDateLabel={periodBalance.endDateLabel}
+        />
 
-      <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-        {/* Calendar Grid */}
-        <div className="lg:col-span-3">
-          <Card padding="none" ref={calendarCardRef}>
-            {/* Header */}
-            <div className="p-4 border-b border-gray-800 flex items-center justify-between">
-              <Button
-                variant="icon"
-                size="sm"
-                icon={<Icon name="chevron_left" />}
-                onClick={viewMode === "week" ? goToPrevWeek : goToPrevMonth}
-              />
-              <h2 className="text-xl font-bold text-white">
-                {viewMode === "week"
-                  ? weekDateRange
-                  : currentDate.toLocaleDateString("en-US", { month: "long", year: "numeric" })}
-              </h2>
-              <Button
-                variant="icon"
-                size="sm"
-                icon={<Icon name="chevron_right" />}
-                onClick={viewMode === "week" ? goToNextWeek : goToNextMonth}
-              />
-            </div>
+        <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+          {/* Calendar Grid */}
+          <div className="lg:col-span-3">
+            <Card padding="none" ref={calendarCardRef}>
+              {/* Header */}
+              <div className="p-4 border-b border-gray-800 flex items-center justify-between">
+                <Button
+                  variant="icon"
+                  size="sm"
+                  icon={<Icon name="chevron_left" />}
+                  onClick={viewMode === "week" ? goToPrevWeek : goToPrevMonth}
+                />
+                <h2 className="text-xl font-bold text-white">
+                  {viewMode === "week"
+                    ? weekDateRange
+                    : currentDate.toLocaleDateString("en-US", { month: "long", year: "numeric" })}
+                </h2>
+                <Button
+                  variant="icon"
+                  size="sm"
+                  icon={<Icon name="chevron_right" />}
+                  onClick={viewMode === "week" ? goToNextWeek : goToNextMonth}
+                />
+              </div>
 
-            {/* Month View */}
-            {viewMode === "month" && (
-              <>
-                {/* Weekday headers */}
-                <div className="grid grid-cols-7 border-b border-gray-800">
-                  {WEEKDAYS.map((day) => (
-                    <div key={day} className="p-2 text-center text-sm font-medium text-gray-400">
-                      {day}
-                    </div>
-                  ))}
-                </div>
+              {/* Month View */}
+              {viewMode === "month" && (
+                <>
+                  {/* Weekday headers */}
+                  <div className="grid grid-cols-7 border-b border-gray-800">
+                    {WEEKDAYS.map((day) => (
+                      <div key={day} className="p-2 text-center text-sm font-medium text-gray-400">
+                        {day}
+                      </div>
+                    ))}
+                  </div>
 
-                {/* Calendar grid */}
+                  {/* Calendar grid */}
+                  <div className="grid grid-cols-7">
+                    {calendarDays.map((day, i) => (
+                      <DayCell
+                        key={i}
+                        day={day}
+                        isSelected={selectedDate ? isSameDay(selectedDate, day.date) : false}
+                        onClick={() =>
+                          setSelectedDate((prev) =>
+                            prev && isSameDay(prev, day.date) ? null : day.date
+                          )
+                        }
+                      />
+                    ))}
+                  </div>
+                </>
+              )}
+
+              {/* Week View */}
+              {viewMode === "week" && (
                 <div className="grid grid-cols-7">
-                  {calendarDays.map((day, i) => (
-                    <DayCell
+                  {calendarWeekDays.map((day, i) => (
+                    <WeekDayCell
                       key={i}
                       day={day}
                       isSelected={selectedDate ? isSameDay(selectedDate, day.date) : false}
@@ -455,84 +515,70 @@ const CalendarView: React.FC = () => {
                           prev && isSameDay(prev, day.date) ? null : day.date
                         )
                       }
+                      onTransactionClick={setSelectedTransaction}
                     />
                   ))}
                 </div>
-              </>
-            )}
+              )}
 
-            {/* Week View */}
-            {viewMode === "week" && (
-              <div className="grid grid-cols-7">
-                {calendarWeekDays.map((day, i) => (
-                  <WeekDayCell
-                    key={i}
-                    day={day}
-                    isSelected={selectedDate ? isSameDay(selectedDate, day.date) : false}
-                    onClick={() =>
-                      setSelectedDate((prev) =>
-                        prev && isSameDay(prev, day.date) ? null : day.date
-                      )
-                    }
-                    onTransactionClick={setSelectedTransaction}
-                  />
-                ))}
+              {/* Legend */}
+              <div className="p-4 border-t border-gray-800 flex gap-6 text-sm">
+                <div className="flex items-center gap-2">
+                  <div className="w-3 h-3 rounded-full bg-success" />
+                  <span className="text-gray-300">Income</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="w-3 h-3 rounded-full bg-danger" />
+                  <span className="text-gray-300">Expense</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <div className="w-3 h-3 rounded bg-primary" />
+                  <span className="text-gray-300">Today</span>
+                </div>
               </div>
-            )}
+            </Card>
+          </div>
 
-            {/* Legend */}
-            <div className="p-4 border-t border-gray-800 flex gap-6 text-sm">
-              <div className="flex items-center gap-2">
-                <div className="w-3 h-3 rounded-full bg-success" />
-                <span className="text-gray-300">Income</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <div className="w-3 h-3 rounded-full bg-danger" />
-                <span className="text-gray-300">Expense</span>
-              </div>
-              <div className="flex items-center gap-2">
-                <div className="w-3 h-3 rounded bg-primary" />
-                <span className="text-gray-300">Today</span>
-              </div>
-            </div>
-          </Card>
+          {/* Day Detail Sidebar */}
+          <div className="lg:col-span-1">
+            <DayDetailSidebar
+              selectedDate={selectedDate}
+              dayBalance={selectedDayBalance || null}
+              transactions={selectedDayTransactions}
+              onTransactionClick={setSelectedTransaction}
+              rangeLabel={
+                viewMode === "month"
+                  ? `${periodBalance.startDateLabel} - ${periodBalance.endDateLabel}`
+                  : weekDateRange
+              }
+              rangeOpening={periodBalance.openingBalance}
+              rangeClosing={periodBalance.closingBalance}
+              viewMode={viewMode}
+              rangeIncome={rangeInfo.income}
+              rangeExpenses={rangeInfo.expenses}
+              rangeTransactions={rangeInfo.transactions}
+              rangeStatus={rangeStatus}
+              dayOpeningStatus={dayOpeningStatus}
+              rangeOpeningStatus={rangeOpeningStatus}
+            />
+          </div>
         </div>
 
-        {/* Day Detail Sidebar */}
-        <div className="lg:col-span-1">
-          <DayDetailSidebar
-            selectedDate={selectedDate}
-            dayBalance={selectedDayBalance || null}
-            transactions={selectedDayTransactions}
-            onTransactionClick={setSelectedTransaction}
-            rangeLabel={
-              viewMode === "month"
-                ? `${periodBalance.startDateLabel} - ${periodBalance.endDateLabel}`
-                : weekDateRange
-            }
-            rangeOpening={periodBalance.openingBalance}
-            rangeClosing={periodBalance.closingBalance}
-            viewMode={viewMode}
-            rangeIncome={rangeInfo.income}
-            rangeExpenses={rangeInfo.expenses}
-            rangeTransactions={rangeInfo.transactions}
-            rangeStatus={rangeStatus}
-            dayOpeningStatus={dayOpeningStatus}
-            rangeOpeningStatus={rangeOpeningStatus}
+        {/* Transaction Modal */}
+        {selectedTransaction && (
+          <CompleteTransactionModal
+            transaction={selectedTransaction}
+            onComplete={handleComplete}
+            onSkip={handleSkip}
+            onClose={() => setSelectedTransaction(null)}
           />
-        </div>
+        )}
       </div>
 
-      {/* Transaction Modal */}
-      {selectedTransaction && (
-        <CompleteTransactionModal
-          transaction={selectedTransaction}
-          onComplete={handleComplete}
-          onSkip={handleSkip}
-          onClose={() => setSelectedTransaction(null)}
-        />
-      )}
-    </div>
+      <DragOverlay>
+        {draggingTransaction ? <TransactionItem transaction={draggingTransaction} /> : null}
+      </DragOverlay>
+    </DndContext>
   );
 };
 

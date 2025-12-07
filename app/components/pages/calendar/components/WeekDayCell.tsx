@@ -1,12 +1,15 @@
 "use client";
 
 import React from "react";
+import { useDroppable } from "@dnd-kit/core";
 import { cn } from "@/lib/utils/cn";
 import { Icon, Badge } from "@/components/common";
 import { useCurrency } from "@/lib/hooks/useCurrency";
+import { formatDate } from "@/lib/utils/dateUtils";
 import { STATUS_COLORS } from "../constants";
 import type { CalendarDay } from "../types";
 import { Transaction } from "@/lib/types";
+import DraggableTransaction from "./DraggableTransaction";
 
 interface IProps {
   day: CalendarDay;
@@ -19,6 +22,11 @@ const WeekDayCell: React.FC<IProps> = ({ day, isSelected, onClick, onTransaction
   const { formatCurrency, formatCurrencyWithSign } = useCurrency();
   const { date, isToday, dayBalance } = day;
   const transactions = dayBalance?.transactions || [];
+  const dateKey = formatDate(date);
+  const { isOver, setNodeRef } = useDroppable({
+    id: dateKey,
+    data: { date: dateKey },
+  });
 
   // Get status variant for badge
   const getStatusVariant = (status: string) => {
@@ -36,9 +44,11 @@ const WeekDayCell: React.FC<IProps> = ({ day, isSelected, onClick, onTransaction
 
   return (
     <div
+      ref={setNodeRef}
       className={cn(
         "min-h-[200px] flex flex-col border border-gray-800 cursor-pointer transition-all",
         isSelected && "ring-2 ring-primary bg-primary/10",
+        isOver && "ring-2 ring-primary/80",
         isToday && "border-primary",
         "hover:bg-gray-800/30"
       )}
@@ -95,56 +105,57 @@ const WeekDayCell: React.FC<IProps> = ({ day, isSelected, onClick, onTransaction
             const isSkipped = t.status === "skipped";
 
             return (
-              <div
-                key={t.id}
-                className={cn(
-                  "p-2 rounded-lg cursor-pointer transition-colors",
-                  isSkipped
-                    ? "bg-gray-700/30 hover:bg-gray-700/50"
-                    : isIncome
-                      ? "bg-success/10 hover:bg-success/20"
-                      : "bg-danger/10 hover:bg-danger/20"
-                )}
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onTransactionClick?.(t);
-                }}
-              >
-                <div className="flex items-center justify-between gap-2">
-                  <div className="flex items-center gap-2 min-w-0">
-                    <Icon
-                      name={isIncome ? "arrow_downward" : "arrow_upward"}
-                      size="sm"
-                      className={cn(
-                        isSkipped ? "text-gray-500" : isIncome ? "text-success" : "text-danger"
-                      )}
-                    />
+              <DraggableTransaction key={t.id} transaction={t}>
+                <div
+                  className={cn(
+                    "p-2 rounded-lg cursor-pointer transition-colors",
+                    isSkipped
+                      ? "bg-gray-700/30 hover:bg-gray-700/50"
+                      : isIncome
+                        ? "bg-success/10 hover:bg-success/20"
+                        : "bg-danger/10 hover:bg-danger/20"
+                  )}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onTransactionClick?.(t);
+                  }}
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <div className="flex items-center gap-2 min-w-0">
+                      <Icon
+                        name={isIncome ? "arrow_downward" : "arrow_upward"}
+                        size="sm"
+                        className={cn(
+                          isSkipped ? "text-gray-500" : isIncome ? "text-success" : "text-danger"
+                        )}
+                      />
+                      <span
+                        className={cn(
+                          "text-sm font-medium truncate",
+                          isSkipped ? "text-gray-500" : "text-white"
+                        )}
+                      >
+                        {t.name}
+                      </span>
+                    </div>
                     <span
                       className={cn(
-                        "text-sm font-medium truncate",
-                        isSkipped ? "text-gray-500" : "text-white"
+                        "text-sm font-bold whitespace-nowrap",
+                        isSkipped ? "text-gray-500" : isIncome ? "text-success" : "text-danger"
                       )}
                     >
-                      {t.name}
+                      {isIncome ? "+" : "-"}
+                      {formatCurrency(t.actualAmount ?? t.projectedAmount)}
                     </span>
                   </div>
-                  <span
-                    className={cn(
-                      "text-sm font-bold whitespace-nowrap",
-                      isSkipped ? "text-gray-500" : isIncome ? "text-success" : "text-danger"
-                    )}
-                  >
-                    {isIncome ? "+" : "-"}
-                    {formatCurrency(t.actualAmount ?? t.projectedAmount)}
-                  </span>
+                  <div className="flex items-center justify-between mt-1">
+                    <span className="text-xs text-gray-500">{t.category}</span>
+                    <Badge variant={getStatusVariant(t.status)} className="text-xs">
+                      {t.status}
+                    </Badge>
+                  </div>
                 </div>
-                <div className="flex items-center justify-between mt-1">
-                  <span className="text-xs text-gray-500">{t.category}</span>
-                  <Badge variant={getStatusVariant(t.status)} className="text-xs">
-                    {t.status}
-                  </Badge>
-                </div>
-              </div>
+              </DraggableTransaction>
             );
           })
         ) : (

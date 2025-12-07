@@ -211,6 +211,7 @@ export interface Transaction {
   actualDate?: string;
 
   status: TransactionStatus;
+  occurrenceId?: string;
 
   paymentBreakdown?: PaymentBreakdown;
 

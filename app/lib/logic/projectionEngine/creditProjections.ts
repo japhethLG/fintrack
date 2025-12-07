@@ -5,6 +5,7 @@
 import { ExpenseRule, Transaction } from "@/lib/types";
 import { parseDate, addMonths } from "@/lib/utils/dateUtils";
 import { calculateCreditCardProjection } from "../amortization";
+import { generateOccurrenceId } from "./occurrenceIdGenerator";
 import { createProjectedTransaction } from "./transactionFactory";
 
 /**
@@ -104,7 +105,14 @@ export const generateCreditProjections = (
               remainingBalance: Math.max(0, balance - principal),
               paymentNumber: paymentNum,
               totalPayments: 0, // Unknown for credit cards
-            }
+          },
+          generateOccurrenceId(
+            rule.id,
+            rule.frequency,
+            currentDate,
+            rule.startDate,
+            rule.scheduleConfig
+          )
           )
         );
 
@@ -135,7 +143,8 @@ export const generateCreditProjections = (
           remainingBalance: step.remainingBalance,
           paymentNumber: index + 1,
           totalPayments: 0,
-        }
+        },
+        generateOccurrenceId(rule.id, rule.frequency, step.date, rule.startDate, rule.scheduleConfig)
       )
     );
 };

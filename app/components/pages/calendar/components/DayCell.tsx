@@ -1,7 +1,9 @@
 "use client";
 
 import React from "react";
+import { useDroppable } from "@dnd-kit/core";
 import { cn } from "@/lib/utils/cn";
+import { formatDate } from "@/lib/utils/dateUtils";
 import { STATUS_COLORS } from "../constants";
 import type { CalendarDay } from "../types";
 
@@ -15,6 +17,11 @@ const DayCell: React.FC<IProps> = ({ day, isSelected, onClick }) => {
   const { date, isCurrentMonth, isToday, isPast, dayBalance } = day;
   const transactions = dayBalance?.transactions || [];
   const hasTransactions = transactions.length > 0;
+  const dateKey = formatDate(date);
+  const { isOver, setNodeRef } = useDroppable({
+    id: dateKey,
+    data: { date: dateKey },
+  });
 
   // Count only non-skipped transactions for the dots
   const activeTransactions = transactions.filter((t) => t.status !== "skipped");
@@ -29,11 +36,13 @@ const DayCell: React.FC<IProps> = ({ day, isSelected, onClick }) => {
 
   return (
     <div
+      ref={setNodeRef}
       className={cn(
         "min-h-[100px] p-2 border border-gray-800 cursor-pointer transition-all",
         isCurrentMonth ? "bg-gray-900/50" : "bg-gray-900/20",
         isSelected && "ring-2 ring-primary bg-primary/10",
         isToday && "border-primary",
+        isOver && "ring-2 ring-primary/80",
         !isCurrentMonth && "opacity-50"
       )}
       onClick={onClick}
