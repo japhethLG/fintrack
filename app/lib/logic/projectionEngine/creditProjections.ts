@@ -83,7 +83,12 @@ export const generateCreditProjections = (
     if (currentDate < startDateParsed) {
       currentDate = addMonths(currentDate, 1);
       // Re-set the day in case month length differs
-      currentDate.setDate(Math.min(creditConfig.dueDate, new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0).getDate()));
+      currentDate.setDate(
+        Math.min(
+          creditConfig.dueDate,
+          new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0).getDate()
+        )
+      );
     }
 
     let paymentNum = 1;
@@ -101,23 +106,25 @@ export const generateCreditProjections = (
         const actualPayment = Math.min(paymentAmount, balance + interest);
         const principal = actualPayment - interest;
 
-        projections.push(
-          createProjectedTransaction(
-            { ...rule, amount: actualPayment },
-            new Date(currentDate),
-            "expense",
-            "expense_rule",
-            {
-              principalPaid: principal,
-              interestPaid: interest,
-              remainingBalance: Math.max(0, balance - principal),
-              paymentNumber: paymentNum,
-              totalPayments: 0, // Unknown for credit cards
-            },
-            occurrenceId,
-            override
-          )
+        const transaction = createProjectedTransaction(
+          { ...rule, amount: actualPayment },
+          new Date(currentDate),
+          "expense",
+          "expense_rule",
+          {
+            principalPaid: principal,
+            interestPaid: interest,
+            remainingBalance: Math.max(0, balance - principal),
+            paymentNumber: paymentNum,
+            totalPayments: 0, // Unknown for credit cards
+          },
+          occurrenceId,
+          override
         );
+
+        if (transaction) {
+          projections.push(transaction);
+        }
 
         balance = Math.max(0, balance - principal);
         paymentNum++;
@@ -125,7 +132,12 @@ export const generateCreditProjections = (
 
       currentDate = addMonths(currentDate, 1);
       // Re-set the day in case month length differs
-      currentDate.setDate(Math.min(creditConfig.dueDate, new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0).getDate()));
+      currentDate.setDate(
+        Math.min(
+          creditConfig.dueDate,
+          new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 0).getDate()
+        )
+      );
     }
 
     return projections;
@@ -134,34 +146,31 @@ export const generateCreditProjections = (
   // Use minimum payment schedule
   return schedule
     .filter((step) => step.date >= viewStartDate && step.date <= viewEndDate)
-    .map((step, index) =>
-      {
-        const occurrenceId = generateOccurrenceId(
-          rule.id,
-          rule.frequency,
-          step.date,
-          rule.startDate,
-          rule.scheduleConfig
-        );
-        const override = rule.occurrenceOverrides?.[occurrenceId];
+    .map((step, index) => {
+      const occurrenceId = generateOccurrenceId(
+        rule.id,
+        rule.frequency,
+        step.date,
+        rule.startDate,
+        rule.scheduleConfig
+      );
+      const override = rule.occurrenceOverrides?.[occurrenceId];
 
-        return createProjectedTransaction(
-          { ...rule, amount: step.payment },
-          step.date,
-          "expense",
-          "expense_rule",
-          {
-            principalPaid: step.principal,
-            interestPaid: step.interest,
-            remainingBalance: step.remainingBalance,
-            paymentNumber: index + 1,
-            totalPayments: 0,
-          },
-          occurrenceId,
-          override
-        );
-      }
-    )
+      return createProjectedTransaction(
+        { ...rule, amount: step.payment },
+        step.date,
+        "expense",
+        "expense_rule",
+        {
+          principalPaid: step.principal,
+          interestPaid: step.interest,
+          remainingBalance: step.remainingBalance,
+          paymentNumber: index + 1,
+          totalPayments: 0,
+        },
+        occurrenceId,
+        override
+      );
+    })
     .filter((t): t is NonNullable<typeof t> => t !== null);
 };
-
