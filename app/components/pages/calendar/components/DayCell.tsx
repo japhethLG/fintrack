@@ -86,11 +86,9 @@ const DayCell: React.FC<IProps> = ({ day, isSelected, onClick, onTransactionClic
               transaction={t}
               onClick={() => onTransactionClick?.(t)}
             >
-              <div
-              className={cn("text-xs px-1.5 py-0.5 rounded truncate", getTransactionColor(t))}
-            >
-              {t.name}
-            </div>
+              <div className={cn("text-xs px-1.5 py-0.5 rounded truncate", getTransactionColor(t))}>
+                {t.name}
+              </div>
             </DraggableDayChip>
           ))}
           {transactions.length > 2 && (

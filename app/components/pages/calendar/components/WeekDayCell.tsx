@@ -9,7 +9,7 @@ import { formatDate } from "@/lib/utils/dateUtils";
 import { STATUS_COLORS } from "../constants";
 import type { CalendarDay } from "../types";
 import { Transaction } from "@/lib/types";
-import DraggableTransaction from "./DraggableTransaction";
+import DraggableDayChip from "./DraggableDayChip";
 
 interface IProps {
   day: CalendarDay;
@@ -19,7 +19,7 @@ interface IProps {
 }
 
 const WeekDayCell: React.FC<IProps> = ({ day, isSelected, onClick, onTransactionClick }) => {
-  const { formatCurrency, formatCurrencyWithSign } = useCurrency();
+  const { formatCurrency } = useCurrency();
   const { date, isToday, dayBalance } = day;
   const transactions = dayBalance?.transactions || [];
   const dateKey = formatDate(date);
@@ -83,18 +83,6 @@ const WeekDayCell: React.FC<IProps> = ({ day, isSelected, onClick, onTransaction
         )}
       </div>
 
-      {/* Day totals */}
-      {dayBalance && (dayBalance.totalIncome > 0 || dayBalance.totalExpenses > 0) && (
-        <div className="px-3 py-2 border-b border-gray-800/50 flex gap-3 text-xs">
-          {dayBalance.totalIncome > 0 && (
-            <span className="text-success">{formatCurrencyWithSign(dayBalance.totalIncome)}</span>
-          )}
-          {dayBalance.totalExpenses > 0 && (
-            <span className="text-danger">-{formatCurrency(dayBalance.totalExpenses)}</span>
-          )}
-        </div>
-      )}
-
       {/* Transactions list */}
       <div className="flex-1 p-2 space-y-1.5 overflow-y-auto max-h-[300px]">
         {transactions.length > 0 ? (
@@ -103,7 +91,11 @@ const WeekDayCell: React.FC<IProps> = ({ day, isSelected, onClick, onTransaction
             const isSkipped = t.status === "skipped";
 
             return (
-              <DraggableTransaction key={t.id} transaction={t}>
+              <DraggableDayChip
+                key={`${t.id}-chip`}
+                transaction={t}
+                onClick={() => onTransactionClick?.(t)}
+              >
                 <div
                   className={cn(
                     "p-2 rounded-lg cursor-pointer transition-colors",
@@ -113,10 +105,6 @@ const WeekDayCell: React.FC<IProps> = ({ day, isSelected, onClick, onTransaction
                         ? "bg-success/10 hover:bg-success/20"
                         : "bg-danger/10 hover:bg-danger/20"
                   )}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    onTransactionClick?.(t);
-                  }}
                 >
                   <div className="flex items-center justify-between gap-2">
                     <div className="flex items-center gap-2 min-w-0">
@@ -127,14 +115,6 @@ const WeekDayCell: React.FC<IProps> = ({ day, isSelected, onClick, onTransaction
                           isSkipped ? "text-gray-500" : isIncome ? "text-success" : "text-danger"
                         )}
                       />
-                      <span
-                        className={cn(
-                          "text-sm font-medium truncate",
-                          isSkipped ? "text-gray-500" : "text-white"
-                        )}
-                      >
-                        {t.name}
-                      </span>
                     </div>
                     <span
                       className={cn(
@@ -146,14 +126,22 @@ const WeekDayCell: React.FC<IProps> = ({ day, isSelected, onClick, onTransaction
                       {formatCurrency(t.actualAmount ?? t.projectedAmount)}
                     </span>
                   </div>
-                  <div className="flex items-center justify-between mt-1">
+                  <span
+                    className={cn(
+                      "text-sm font-medium truncate",
+                      isSkipped ? "text-gray-500" : "text-white"
+                    )}
+                  >
+                    {t.name}
+                  </span>
+                  <div className="flex flex-col items-start justify-center gap-2 mt-1">
                     <span className="text-xs text-gray-500">{t.category}</span>
                     <Badge variant={getStatusVariant(t.status)} className="text-xs">
                       {t.status}
                     </Badge>
                   </div>
                 </div>
-              </DraggableTransaction>
+              </DraggableDayChip>
             );
           })
         ) : (

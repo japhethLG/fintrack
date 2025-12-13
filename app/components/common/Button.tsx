@@ -6,6 +6,7 @@ import { cva, type VariantProps } from "class-variance-authority";
 import { ReloadIcon } from "@radix-ui/react-icons";
 
 import { cn } from "@/lib/utils/cn";
+import { Tooltip } from "./Tooltip";
 
 const buttonVariants = cva(
   "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-lg font-semibold transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-[#101622] disabled:pointer-events-none disabled:opacity-50 disabled:cursor-not-allowed select-none h-11",
@@ -49,6 +50,14 @@ export interface ButtonProps
   icon?: React.ReactNode;
   /** @deprecated Use startIcon/endIcon instead */
   iconPosition?: "left" | "right";
+  /** Tooltip content to show on hover (string or ReactNode) */
+  tooltip?: React.ReactNode;
+  /** Tooltip position */
+  tooltipPosition?: "top" | "bottom" | "left" | "right";
+  /** Tooltip delay in ms */
+  tooltipDelay?: number;
+  /** Tooltip alignment */
+  tooltipAlign?: "start" | "center" | "end";
 }
 
 const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
@@ -66,6 +75,10 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
       iconPosition = "left",
       disabled,
       children,
+      tooltip,
+      tooltipPosition = "right",
+      tooltipDelay,
+      tooltipAlign = "center",
       ...props
     },
     ref
@@ -77,7 +90,7 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
     const effectiveStartIcon = startIcon || (icon && iconPosition === "left" ? icon : undefined);
     const effectiveEndIcon = endIcon || (icon && iconPosition === "right" ? icon : undefined);
 
-    return (
+    const buttonContent = (
       <Comp
         className={cn(
           buttonVariants({ variant, size, className }),
@@ -113,6 +126,22 @@ const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
         </>
       </Comp>
     );
+
+    // Wrap with tooltip if provided
+    if (tooltip) {
+      return (
+        <Tooltip
+          content={tooltip}
+          position={tooltipPosition}
+          delay={tooltipDelay}
+          align={tooltipAlign}
+        >
+          {buttonContent}
+        </Tooltip>
+      );
+    }
+
+    return buttonContent;
   }
 );
 

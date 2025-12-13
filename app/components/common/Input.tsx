@@ -1,8 +1,9 @@
 "use client";
 
-import React from "react";
+import React, { useState } from "react";
 import { cn } from "@/lib/utils/cn";
 import { Tooltip } from "./Tooltip";
+import { Icon } from "./Icon";
 
 export interface InputProps
   extends Omit<React.InputHTMLAttributes<HTMLInputElement>, "prefix" | "suffix"> {
@@ -23,9 +24,13 @@ export const Input: React.FC<InputProps> = ({
   className = "",
   disabled,
   id,
+  type,
   ...props
 }) => {
   const inputId = id || (label ? `input-${label.toLowerCase().replace(/\s+/g, "-")}` : undefined);
+  const isPassword = type === "password";
+  const [showPassword, setShowPassword] = useState(false);
+  const inputType = isPassword && showPassword ? "text" : type;
 
   const baseInputStyles =
     "h-11 w-full bg-[#151c2c] border rounded-lg text-white focus:outline-none transition-colors duration-200 placeholder:text-gray-500";
@@ -37,7 +42,7 @@ export const Input: React.FC<InputProps> = ({
       ? "border-danger focus:border-danger focus:ring-2 focus:ring-danger/20"
       : "border-gray-700 focus:border-primary focus:ring-2 focus:ring-primary/20",
     prefix && "pl-6",
-    suffix && "pr-6",
+    (suffix || isPassword) && "pr-10",
     disabled && "opacity-50 cursor-not-allowed",
     className
   );
@@ -79,13 +84,29 @@ export const Input: React.FC<InputProps> = ({
         )}
         <input
           id={inputId}
+          type={inputType}
           className={combinedInputClassName}
           disabled={disabled}
           aria-invalid={error ? "true" : "false"}
           aria-describedby={error ? `${inputId}-error` : undefined}
           {...props}
         />
-        {suffix && (
+        {isPassword && (
+          <button
+            type="button"
+            onClick={() => setShowPassword(!showPassword)}
+            className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-300 transition-colors focus:outline-none focus:text-primary"
+            aria-label={showPassword ? "Hide password" : "Show password"}
+            tabIndex={0}
+          >
+            <Icon
+              name={showPassword ? "visibility_off" : "visibility"}
+              size="sm"
+              className="text-current"
+            />
+          </button>
+        )}
+        {suffix && !isPassword && (
           <div className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 pointer-events-none">
             {suffix}
           </div>

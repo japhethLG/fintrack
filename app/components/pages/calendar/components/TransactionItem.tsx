@@ -38,7 +38,12 @@ const TransactionItem: React.FC<IProps> = ({ transaction, onClick }) => {
       onClick={onClick}
     >
       {/* Icon */}
-      <div className={cn("w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0", iconBgColor)}>
+      <div
+        className={cn(
+          "w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0",
+          iconBgColor
+        )}
+      >
         <Icon name={isIncome ? "arrow_downward" : "arrow_upward"} size="sm" />
       </div>
 
@@ -46,7 +51,12 @@ const TransactionItem: React.FC<IProps> = ({ transaction, onClick }) => {
       <div className="flex-1 min-w-0">
         {/* Top row: Name and Amount */}
         <div className="flex items-start justify-between gap-2 mb-1">
-          <p className={cn("font-medium text-sm truncate", isSkipped ? "text-gray-500" : "text-white")}>
+          <p
+            className={cn(
+              "font-medium text-sm truncate",
+              isSkipped ? "text-gray-500" : "text-white"
+            )}
+          >
             {transaction.name}
           </p>
           <p className={cn("font-bold text-sm whitespace-nowrap flex-shrink-0", amountColor)}>
