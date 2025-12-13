@@ -51,25 +51,27 @@ export const generateInstallmentProjections = (
       );
       const override = rule.occurrenceOverrides?.[occurrenceId];
 
-      projections.push(
-        createProjectedTransaction(
-          { ...rule, amount: installmentConfig.installmentAmount },
-          adjustedDate,
-          "expense",
-          "expense_rule",
-          {
-            principalPaid: installmentConfig.installmentAmount,
-            interestPaid: 0,
-            remainingBalance:
-              (installmentConfig.installmentCount - paymentNumber) *
-              installmentConfig.installmentAmount,
-            paymentNumber,
-            totalPayments: installmentConfig.installmentCount,
-          },
-          occurrenceId,
-          override
-        )
+      const transaction = createProjectedTransaction(
+        { ...rule, amount: installmentConfig.installmentAmount },
+        adjustedDate,
+        "expense",
+        "expense_rule",
+        {
+          principalPaid: installmentConfig.installmentAmount,
+          interestPaid: 0,
+          remainingBalance:
+            (installmentConfig.installmentCount - paymentNumber) *
+            installmentConfig.installmentAmount,
+          paymentNumber,
+          totalPayments: installmentConfig.installmentCount,
+        },
+        occurrenceId,
+        override
       );
+
+      if (transaction) {
+        projections.push(transaction);
+      }
     }
 
     currentDate = addMonths(currentDate, 1);
@@ -77,4 +79,3 @@ export const generateInstallmentProjections = (
 
   return projections.filter((t): t is NonNullable<typeof t> => t !== null);
 };
-
