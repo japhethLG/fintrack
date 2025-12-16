@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useMemo, useRef } from "react";
+import React, { useState, useMemo, useRef, useCallback } from "react";
 import {
   DndContext,
   DragEndEvent,
@@ -16,7 +16,7 @@ import { Transaction, CompleteTransactionData } from "@/lib/types";
 import { Button, Card, PageHeader, Icon, LoadingSpinner } from "@/components/common";
 import { formatDate, isSameDay, startOfDay } from "@/lib/utils/dateUtils";
 import { getBalanceStatus } from "@/lib/logic/balanceCalculator/utils";
-import { CompleteTransactionModal } from "@/components/pages/transactions";
+import { useModal } from "@/components/modals";
 import { WEEKDAYS } from "./constants";
 import type { CalendarDay } from "./types";
 import DayCell from "./components/DayCell";
@@ -37,11 +37,11 @@ const CalendarView: React.FC = () => {
     setViewDateRange,
     userProfile,
   } = useFinancial();
+  const { openModal } = useModal();
 
   const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [viewMode, setViewMode] = useState<"month" | "week">("month");
-  const [selectedTransaction, setSelectedTransaction] = useState<Transaction | null>(null);
   const calendarCardRef = useRef<HTMLDivElement | null>(null);
   const [draggingTransaction, setDraggingTransaction] = useState<Transaction | null>(null);
   const sensors = useSensors(
@@ -265,17 +265,20 @@ const CalendarView: React.FC = () => {
   };
 
   // Transaction handlers
-  const handleComplete = async (data: CompleteTransactionData) => {
-    if (!selectedTransaction) return;
-    await markTransactionComplete(selectedTransaction.id, data);
-    setSelectedTransaction(null);
-  };
-
-  const handleSkip = async (notes?: string) => {
-    if (!selectedTransaction) return;
-    await markTransactionSkipped(selectedTransaction.id, notes);
-    setSelectedTransaction(null);
-  };
+  const openTransactionModal = useCallback(
+    (transaction: Transaction) => {
+      openModal("CompleteTransactionModal", {
+        transaction,
+        onComplete: async (data: CompleteTransactionData) => {
+          await markTransactionComplete(transaction.id, data);
+        },
+        onSkip: async (notes?: string) => {
+          await markTransactionSkipped(transaction.id, notes);
+        },
+      });
+    },
+    [openModal, markTransactionComplete, markTransactionSkipped]
+  );
 
   const handleDragStart = (event: DragStartEvent) => {
     const txn = event.active.data.current?.transaction as Transaction | undefined;
@@ -491,7 +494,7 @@ const CalendarView: React.FC = () => {
                         key={i}
                         day={day}
                         isSelected={selectedDate ? isSameDay(selectedDate, day.date) : false}
-                        onTransactionClick={setSelectedTransaction}
+                        onTransactionClick={openTransactionModal}
                         onClick={() =>
                           setSelectedDate((prev) =>
                             prev && isSameDay(prev, day.date) ? null : day.date
@@ -516,7 +519,7 @@ const CalendarView: React.FC = () => {
                           prev && isSameDay(prev, day.date) ? null : day.date
                         )
                       }
-                      onTransactionClick={setSelectedTransaction}
+                      onTransactionClick={openTransactionModal}
                     />
                   ))}
                 </div>
@@ -546,7 +549,7 @@ const CalendarView: React.FC = () => {
               selectedDate={selectedDate}
               dayBalance={selectedDayBalance || null}
               transactions={selectedDayTransactions}
-              onTransactionClick={setSelectedTransaction}
+              onTransactionClick={openTransactionModal}
               rangeLabel={
                 viewMode === "month"
                   ? `${periodBalance.startDateLabel} - ${periodBalance.endDateLabel}`
@@ -564,16 +567,6 @@ const CalendarView: React.FC = () => {
             />
           </div>
         </div>
-
-        {/* Transaction Modal */}
-        {selectedTransaction && (
-          <CompleteTransactionModal
-            transaction={selectedTransaction}
-            onComplete={handleComplete}
-            onSkip={handleSkip}
-            onClose={() => setSelectedTransaction(null)}
-          />
-        )}
       </div>
 
       <DragOverlay>

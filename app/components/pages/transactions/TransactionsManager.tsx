@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState, useCallback } from "react";
 import { List as VirtualizedList, type RowComponentProps } from "react-window";
 import { useFinancial } from "@/contexts/FinancialContext";
 import { Transaction } from "@/lib/types";
@@ -14,7 +14,7 @@ import {
   DateRangePicker,
   DateRange,
 } from "@/components/common";
-import CompleteTransactionModal from "./components/CompleteTransactionModal";
+import { useModal } from "@/components/modals";
 import TransactionRow from "./components/TransactionRow";
 import {
   STATUS_OPTIONS,
@@ -53,8 +53,8 @@ const TransactionsManager: React.FC = () => {
     markTransactionComplete,
     markTransactionSkipped,
   } = useFinancial();
+  const { openModal } = useModal();
 
-  const [selectedTransaction, setSelectedTransaction] = useState<Transaction | null>(null);
   const [filterStatus, setFilterStatus] = useState("all");
   const [filterType, setFilterType] = useState("all");
   const [sortBy, setSortBy] = useState<"date" | "amount">("date");
@@ -121,19 +121,20 @@ const TransactionsManager: React.FC = () => {
     };
   }, [dateFilteredTransactions]);
 
-  const handleComplete = async (data: {
-    actualAmount: number;
-    actualDate?: string;
-    notes?: string;
-  }) => {
-    if (!selectedTransaction) return;
-    await markTransactionComplete(selectedTransaction.id, data);
-  };
-
-  const handleSkip = async (notes?: string) => {
-    if (!selectedTransaction) return;
-    await markTransactionSkipped(selectedTransaction.id, notes);
-  };
+  const openTransactionModal = useCallback(
+    (transaction: Transaction) => {
+      openModal("CompleteTransactionModal", {
+        transaction,
+        onComplete: async (data: { actualAmount: number; actualDate?: string; notes?: string }) => {
+          await markTransactionComplete(transaction.id, data);
+        },
+        onSkip: async (notes?: string) => {
+          await markTransactionSkipped(transaction.id, notes);
+        },
+      });
+    },
+    [openModal, markTransactionComplete, markTransactionSkipped]
+  );
 
   // Expand view date range if user selects outside current window
   useEffect(() => {
@@ -270,7 +271,7 @@ const TransactionsManager: React.FC = () => {
             rowComponent={VirtualRow}
             rowProps={{
               transactions: filteredTransactions,
-              onSelect: (t: Transaction) => setSelectedTransaction(t),
+              onSelect: openTransactionModal,
             }}
             style={{ height: 600, width: "100%" }}
           />
@@ -286,16 +287,6 @@ const TransactionsManager: React.FC = () => {
           </div>
         )}
       </Card>
-
-      {/* Transaction Modal */}
-      {selectedTransaction && (
-        <CompleteTransactionModal
-          transaction={selectedTransaction}
-          onComplete={handleComplete}
-          onSkip={handleSkip}
-          onClose={() => setSelectedTransaction(null)}
-        />
-      )}
     </div>
   );
 };

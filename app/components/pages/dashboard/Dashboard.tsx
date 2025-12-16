@@ -1,14 +1,14 @@
 "use client";
 
-import React, { useState, useMemo, useEffect } from "react";
+import React, { useState, useMemo, useEffect, useCallback } from "react";
 import { useRouter } from "next/navigation";
 import { useFinancial } from "@/contexts/FinancialContext";
 import { Transaction } from "@/lib/types";
 import { Button, Icon, LoadingSpinner, DateRangePicker } from "@/components/common";
+import { useModal } from "@/components/modals";
 import UpcomingActivityWidget from "./components/UpcomingActivityWidget";
 import RecurringSummaryWidget from "./components/RecurringSummaryWidget";
 import ProjectedVsActualWidget from "./components/ProjectedVsActualWidget";
-import { CompleteTransactionModal } from "@/components/pages/transactions";
 import { getCategoryBreakdown } from "@/lib/logic/balanceCalculator";
 import { formatDate } from "@/lib/utils/dateUtils";
 import { calculateHealthScore } from "@/lib/logic/healthScore";
@@ -24,6 +24,7 @@ import FinancialHealthScore from "./components/FinancialHealthScore";
 
 const Dashboard: React.FC = () => {
   const router = useRouter();
+  const { openModal } = useModal();
   const {
     userProfile,
     transactions,
@@ -33,8 +34,6 @@ const Dashboard: React.FC = () => {
     markTransactionSkipped,
     setViewDateRange,
   } = useFinancial();
-
-  const [selectedTransaction, setSelectedTransaction] = useState<Transaction | null>(null);
 
   // Date range state - Default to current month
   const [dateRange, setDateRange] = useState<[dayjs.Dayjs | null, dayjs.Dayjs | null]>([
@@ -177,35 +176,20 @@ const Dashboard: React.FC = () => {
     );
   }, [transactions]);
 
-  const handleComplete = async (data: {
-    actualAmount: number;
-    actualDate?: string;
-    notes?: string;
-  }) => {
-    if (!selectedTransaction) {
-      return;
-    }
-    try {
-      await markTransactionComplete(selectedTransaction.id, data);
-      setSelectedTransaction(null);
-    } catch (error) {
-      console.error("❌ Error completing transaction:", error);
-      throw error; // Re-throw so the modal can handle it
-    }
-  };
-
-  const handleSkip = async (notes?: string) => {
-    if (!selectedTransaction) {
-      return;
-    }
-    try {
-      await markTransactionSkipped(selectedTransaction.id, notes);
-      setSelectedTransaction(null);
-    } catch (error) {
-      console.error("❌ Error skipping transaction:", error);
-      throw error; // Re-throw so the modal can handle it
-    }
-  };
+  const openTransactionModal = useCallback(
+    (transaction: Transaction) => {
+      openModal("CompleteTransactionModal", {
+        transaction,
+        onComplete: async (data: { actualAmount: number; actualDate?: string; notes?: string }) => {
+          await markTransactionComplete(transaction.id, data);
+        },
+        onSkip: async (notes?: string) => {
+          await markTransactionSkipped(transaction.id, notes);
+        },
+      });
+    },
+    [openModal, markTransactionComplete, markTransactionSkipped]
+  );
 
   if (isLoading) {
     return (
@@ -269,7 +253,7 @@ const Dashboard: React.FC = () => {
       </div>
 
       {/* Alerts */}
-      <OverdueAlert overdueTransactions={overdueTransactions} onReview={setSelectedTransaction} />
+      <OverdueAlert overdueTransactions={overdueTransactions} onReview={openTransactionModal} />
 
       {/* Main Content Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-8">
@@ -292,7 +276,7 @@ const Dashboard: React.FC = () => {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-8">
         {/* Upcoming Activity Widget */}
         <div className="lg:col-span-2">
-          <UpcomingActivityWidget onTransactionClick={setSelectedTransaction} />
+          <UpcomingActivityWidget onTransactionClick={openTransactionModal} />
         </div>
 
         {/* Side Widgets */}
@@ -301,16 +285,6 @@ const Dashboard: React.FC = () => {
           <ProjectedVsActualWidget dateRange={dateRangeStr} />
         </div>
       </div>
-
-      {/* Transaction Modal */}
-      {selectedTransaction && (
-        <CompleteTransactionModal
-          transaction={selectedTransaction}
-          onComplete={handleComplete}
-          onSkip={handleSkip}
-          onClose={() => setSelectedTransaction(null)}
-        />
-      )}
     </div>
   );
 };
