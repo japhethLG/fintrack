@@ -192,7 +192,12 @@ const UpcomingActivityWidget: React.FC<IProps> = ({ onTransactionClick }) => {
     <Card padding="none" className="h-full flex flex-col">
       {/* Shared Header */}
       <div className="p-4 border-b border-gray-800 flex items-center justify-between">
-        <h3 className="font-bold text-white">Upcoming Activity</h3>
+        <div className="flex items-center gap-2">
+          <h3 className="font-bold text-white">Upcoming Activity</h3>
+          <span className="text-[10px] text-gray-500 bg-gray-800 px-1.5 py-0.5 rounded">
+            Own Range
+          </span>
+        </div>
         <Select
           options={RANGE_OPTIONS}
           value={selectedDays}

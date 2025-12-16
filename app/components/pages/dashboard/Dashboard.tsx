@@ -140,8 +140,8 @@ const Dashboard: React.FC = () => {
     return data;
   }, [dailyBalances, userProfile, dateRange]);
 
-  // Category breakdown - filtered by date range
-  const categoryData = useMemo(() => {
+  // Category breakdown - filtered by date range (with "Other" aggregation)
+  const { expenseCategoryData, incomeCategoryData } = useMemo(() => {
     const { start, end } = dateRangeStr;
     // Filter transactions first
     const filteredTxns = transactions.filter((t) => {
@@ -149,12 +149,33 @@ const Dashboard: React.FC = () => {
       return date >= start && date <= end;
     });
 
-    const breakdown = getCategoryBreakdown(filteredTxns, "expense");
-    return breakdown.slice(0, 6).map((item, index) => ({
-      name: item.category,
-      value: item.total,
-      color: CHART_COLORS[index % CHART_COLORS.length],
-    }));
+    // Helper to process breakdown with "Other" aggregation
+    const processBreakdown = (type: "income" | "expense") => {
+      const breakdown = getCategoryBreakdown(filteredTxns, type);
+      const top5 = breakdown.slice(0, 5);
+      const otherTotal = breakdown.slice(5).reduce((sum, item) => sum + item.total, 0);
+
+      const result = top5.map((item, index) => ({
+        name: item.category,
+        value: item.total,
+        color: CHART_COLORS[index % CHART_COLORS.length],
+      }));
+
+      if (otherTotal > 0) {
+        result.push({
+          name: "Other",
+          value: otherTotal,
+          color: CHART_COLORS[5],
+        });
+      }
+
+      return result;
+    };
+
+    return {
+      expenseCategoryData: processBreakdown("expense"),
+      incomeCategoryData: processBreakdown("income"),
+    };
   }, [transactions, dateRangeStr]);
 
   // Financial health score
@@ -246,8 +267,8 @@ const Dashboard: React.FC = () => {
         </div>
       </div>
 
-      {/* KPI Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+      {/* KPI Cards - 2 column layout */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
         <KPICards currentBalance={currentBalance} stats={periodStats} />
         <FinancialHealthScore healthScore={healthScore} />
       </div>
@@ -269,7 +290,12 @@ const Dashboard: React.FC = () => {
         <IncomeExpenseChart transactions={transactions} dateRange={dateRangeStr} />
 
         {/* Category Breakdown */}
-        <CategoryPieChart data={categoryData} totalExpenses={periodStats.expenses} />
+        <CategoryPieChart
+          expenseData={expenseCategoryData}
+          incomeData={incomeCategoryData}
+          totalExpenses={periodStats.expenses}
+          totalIncome={periodStats.income}
+        />
       </div>
 
       {/* Bottom Grid */}

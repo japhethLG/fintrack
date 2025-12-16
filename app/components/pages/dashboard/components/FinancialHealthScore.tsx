@@ -1,8 +1,8 @@
 "use client";
 
-import React from "react";
+import React, { useState } from "react";
 import { ResponsiveContainer, PieChart, Pie, Cell } from "recharts";
-import { Card, Icon, Tooltip as CommonTooltip } from "@/components/common";
+import { Card, Icon, Tooltip as CommonTooltip, Button } from "@/components/common";
 import { HealthScoreBreakdown } from "@/lib/logic/healthScore";
 import { cn } from "@/lib/utils/cn";
 
@@ -12,6 +12,7 @@ interface IProps {
 
 const FinancialHealthScore: React.FC<IProps> = ({ healthScore }) => {
   const { score, grade, color, components, insights } = healthScore;
+  const [showAllInsights, setShowAllInsights] = useState(false);
 
   // Data for the gauge chart
   const gaugeData = [
@@ -19,8 +20,23 @@ const FinancialHealthScore: React.FC<IProps> = ({ healthScore }) => {
     { name: "Remaining", value: 100 - score, color: "#1f2937" }, // gray-800
   ];
 
+  // Helper to get color based on score
+  const getBarColor = (value: number) => {
+    if (value >= 60) return "#22c55e";
+    if (value >= 30) return "#eab308";
+    return "#ef4444";
+  };
+
+  // All metrics to display
+  const metrics = [
+    { label: "Cash Runway", value: components.runway },
+    { label: "Savings Rate", value: components.savingsRate },
+    { label: "Bill Payments", value: components.billPaymentRate },
+    { label: "Balance Trend", value: components.balanceTrend },
+  ];
+
   return (
-    <Card padding="md" className="relative overflow-hidden">
+    <Card padding="md" className="relative overflow-hidden h-full">
       <div className="flex items-start justify-between">
         <div>
           <p className="text-gray-400 text-sm font-medium mb-1">Financial Health</p>
@@ -63,56 +79,53 @@ const FinancialHealthScore: React.FC<IProps> = ({ healthScore }) => {
       </div>
 
       <div className="mt-4 space-y-2">
-        {/* Component Bars */}
-        <div className="space-y-1">
-          <div className="flex justify-between text-xs text-gray-400">
-            <span>Cash Runway</span>
-            <span>{components.runway}/100</span>
-          </div>
-          <div className="h-1.5 w-full bg-gray-800 rounded-full overflow-hidden">
-            <div
-              className="h-full rounded-full transition-all duration-500"
-              style={{
-                width: `${components.runway}%`,
-                backgroundColor:
-                  components.runway >= 60
-                    ? "#22c55e"
-                    : components.runway >= 30
-                      ? "#eab308"
-                      : "#ef4444",
-              }}
-            />
-          </div>
+        {/* Component Bars - All 4 metrics */}
+        <div className="grid grid-cols-2 gap-x-4 gap-y-2">
+          {metrics.map((metric) => (
+            <div key={metric.label} className="space-y-1">
+              <div className="flex justify-between text-xs text-gray-400">
+                <span className="truncate">{metric.label}</span>
+                <span>{metric.value}/100</span>
+              </div>
+              <div className="h-1.5 w-full bg-gray-800 rounded-full overflow-hidden">
+                <div
+                  className="h-full rounded-full transition-all duration-500"
+                  style={{
+                    width: `${metric.value}%`,
+                    backgroundColor: getBarColor(metric.value),
+                  }}
+                />
+              </div>
+            </div>
+          ))}
         </div>
 
-        <div className="space-y-1">
-          <div className="flex justify-between text-xs text-gray-400">
-            <span>Savings Rate</span>
-            <span>{components.savingsRate}/100</span>
-          </div>
-          <div className="h-1.5 w-full bg-gray-800 rounded-full overflow-hidden">
-            <div
-              className="h-full rounded-full transition-all duration-500"
-              style={{
-                width: `${components.savingsRate}%`,
-                backgroundColor:
-                  components.savingsRate >= 60
-                    ? "#22c55e"
-                    : components.savingsRate >= 30
-                      ? "#eab308"
-                      : "#ef4444",
-              }}
-            />
-          </div>
-        </div>
-
-        {/* Top Insight */}
+        {/* Expandable Insights */}
         {insights.length > 0 && (
           <div className="mt-3 pt-3 border-t border-gray-800">
-            <p className="text-xs text-gray-300 flex items-start gap-2">
-              <Icon name="lightbulb" size={14} className="text-primary shrink-0 mt-0.5" />
-              {insights[0]}
-            </p>
+            <div className="space-y-2">
+              <p className="text-xs text-gray-300 flex items-start gap-2">
+                <Icon name="lightbulb" size={14} className="text-primary shrink-0 mt-0.5" />
+                {insights[0]}
+              </p>
+              {showAllInsights &&
+                insights.slice(1).map((insight, idx) => (
+                  <p key={idx} className="text-xs text-gray-300 flex items-start gap-2 ml-5">
+                    {insight}
+                  </p>
+                ))}
+            </div>
+            {insights.length > 1 && (
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setShowAllInsights(!showAllInsights)}
+                startIcon={<Icon name={showAllInsights ? "expand_less" : "expand_more"} size={14} />}
+                className="h-auto p-0 text-xs text-primary hover:text-primary/80 mt-2"
+              >
+                {showAllInsights ? "Show less" : `View ${insights.length - 1} more`}
+              </Button>
+            )}
           </div>
         )}
       </div>

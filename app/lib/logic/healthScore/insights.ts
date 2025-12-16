@@ -32,8 +32,12 @@ export const generateInsights = (
   }
 
   // Savings rate insights
+  // Note: When savingsRate is 0 but score is 100, it means no transactions (not poor savings)
   if (savingsRate < 0) {
     insights.push("You're spending more than you earn. Review your expenses.");
+  } else if (savingsRate === 0 && components.savingsRate === 100) {
+    // No transactions case - don't penalize, just inform
+    insights.push("No income or expenses recorded for this period.");
   } else if (savingsRate < 10) {
     insights.push("Try to increase your savings rate to at least 10%.");
   } else if (savingsRate >= 20) {

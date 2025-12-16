@@ -97,6 +97,11 @@ export const calculateSavingsRateScore = (
     }
   });
 
+  // Edge case: No transactions = neutral score, not penalized
+  if (totalIncome === 0 && totalExpenses === 0) {
+    return { score: 100, rate: 0 };
+  }
+
   const savings = totalIncome - totalExpenses;
   const rate = totalIncome > 0 ? (savings / totalIncome) * 100 : 0;
 
@@ -173,7 +178,7 @@ export const calculateBalanceTrendScore = (
   });
 
   if (balances.length < 2) {
-    return { score: 50, trend: "stable" };
+    return { score: 65, trend: "stable" }; // Insufficient data = assume stable
   }
 
   // Calculate simple linear regression slope
@@ -207,7 +212,7 @@ export const calculateBalanceTrendScore = (
     score = Math.max(0, 30 + normalizedSlope * 10);
   } else {
     trend = "stable";
-    score = 50;
+    score = 65; // Stable is positive, not neutral
   }
 
   return { score: Math.round(score), trend };

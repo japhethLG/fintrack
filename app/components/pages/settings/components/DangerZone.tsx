@@ -77,7 +77,24 @@ const DangerZone: React.FC = () => {
               try {
                 await resetSelectiveFinancialData(types);
                 closeModal("ConfirmModal");
-                resetSuccess("Selected financial data has been reset successfully.");
+
+                // Show contextual success message
+                const deletedTransactions =
+                  types.includes("transactions") || types.includes("balance_history");
+                const deletedRules =
+                  types.includes("income_sources") || types.includes("expense_rules");
+
+                if (deletedTransactions) {
+                  resetSuccess(
+                    "Selected data reset successfully. Your balance has been reset to ₱0. Update your initial balance in Settings → Balance Management."
+                  );
+                } else if (deletedRules) {
+                  resetSuccess(
+                    "Selected data reset successfully. Your projections have changed. Consider reviewing your balance in Settings → Balance Management."
+                  );
+                } else {
+                  resetSuccess("Selected financial data has been reset successfully.");
+                }
               } catch (err) {
                 setError(err instanceof Error ? err.message : "Failed to reset selected data");
               } finally {

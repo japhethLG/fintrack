@@ -105,7 +105,12 @@ const IncomeExpenseChart: React.FC<IProps> = ({ transactions, dateRange }) => {
     <Card className="lg:col-span-2" padding="md">
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h3 className="text-lg font-bold text-white">Income vs Expenses</h3>
+          <div className="flex items-center gap-2">
+            <h3 className="text-lg font-bold text-white">Income vs Expenses</h3>
+            <span className="text-[10px] text-gray-500 bg-gray-800 px-1.5 py-0.5 rounded">
+              Own Range
+            </span>
+          </div>
           <span className="text-xs text-gray-400 capitalize">{bucketType} view</span>
         </div>
         <Select
