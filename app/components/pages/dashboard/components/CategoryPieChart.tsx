@@ -101,9 +101,9 @@ const CategoryPieChart: React.FC<IProps> = ({
                   borderRadius: "8px",
                   color: "#000",
                 }}
-                formatter={(value: number) => [
+                formatter={(value: number, name: string) => [
                   formatCurrency(value),
-                  isExpenseView ? "Expenses" : "Income",
+                  name,
                 ]}
               />
             )}
