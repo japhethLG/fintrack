@@ -14,6 +14,8 @@ export interface AnalysisContext {
   currentBalance: number;
   billCoverage?: BillCoverageReport;
   varianceReport?: VarianceReport;
+  /** Currency symbol to use for formatting (e.g., "$", "₱", "€") */
+  currencySymbol?: string;
 }
 
 export interface AnalysisResult {
@@ -34,7 +36,7 @@ const getGeminiClient = () => {
 };
 
 // Format helper functions
-const formatIncomeSources = (incomeSources: IncomeSource[]) => {
+const formatIncomeSources = (incomeSources: IncomeSource[], symbol: string) => {
   if (!incomeSources || incomeSources.length === 0) return "No income sources configured.";
   return incomeSources
     .filter((s) => s.isActive)
@@ -43,22 +45,22 @@ const formatIncomeSources = (incomeSources: IncomeSource[]) => {
       if (s.frequency === "semi-monthly" && s.scheduleConfig.specificDays) {
         freq = `semi-monthly (${s.scheduleConfig.specificDays.join(", ")})`;
       }
-      return `- ${s.name}: $${s.amount} ${s.isVariableAmount ? "(variable)" : ""} [${freq}]`;
+      return `- ${s.name}: ${symbol}${s.amount} ${s.isVariableAmount ? "(variable)" : ""} [${freq}]`;
     })
     .join("\n");
 };
 
-const formatExpenseRules = (expenseRules: ExpenseRule[]) => {
+const formatExpenseRules = (expenseRules: ExpenseRule[], symbol: string) => {
   if (!expenseRules || expenseRules.length === 0) return "No expense rules configured.";
   return expenseRules
     .filter((r) => r.isActive)
     .map((r) => {
-      let details = `- ${r.name}: $${r.amount} [${r.frequency}] (${r.category})`;
+      let details = `- ${r.name}: ${symbol}${r.amount} [${r.frequency}] (${r.category})`;
       if (r.loanConfig) {
-        details += `\n  Loan: $${r.loanConfig.currentBalance} remaining of $${r.loanConfig.principalAmount}, ${r.loanConfig.interestRate}% APR`;
+        details += `\n  Loan: ${symbol}${r.loanConfig.currentBalance} remaining of ${symbol}${r.loanConfig.principalAmount}, ${r.loanConfig.interestRate}% APR`;
       }
       if (r.creditConfig) {
-        details += `\n  Credit Card: $${r.creditConfig.currentBalance}/$${r.creditConfig.creditLimit}, ${r.creditConfig.apr}% APR`;
+        details += `\n  Credit Card: ${symbol}${r.creditConfig.currentBalance}/${symbol}${r.creditConfig.creditLimit}, ${r.creditConfig.apr}% APR`;
       }
       if (r.isPriority) details += " [PRIORITY]";
       return details;
@@ -66,7 +68,7 @@ const formatExpenseRules = (expenseRules: ExpenseRule[]) => {
     .join("\n");
 };
 
-const formatTransactions = (transactions: Transaction[]) => {
+const formatTransactions = (transactions: Transaction[], symbol: string) => {
   if (transactions.length === 0) return "No transactions.";
 
   const completed = transactions.filter((t) => t.status === "completed");
@@ -78,35 +80,37 @@ const formatTransactions = (transactions: Transaction[]) => {
     text += "Recent Completed:\n";
     completed.slice(-10).forEach((t) => {
       const amount = t.actualAmount ?? t.projectedAmount;
-      const variance = t.variance ? ` (variance: ${t.variance > 0 ? "+" : ""}$${t.variance})` : "";
-      text += `- ${t.scheduledDate}: ${t.name} ${t.type === "income" ? "+" : "-"}$${amount}${variance}\n`;
+      const variance = t.variance
+        ? ` (variance: ${t.variance > 0 ? "+" : ""}${symbol}${t.variance})`
+        : "";
+      text += `- ${t.scheduledDate}: ${t.name} ${t.type === "income" ? "+" : "-"}${symbol}${amount}${variance}\n`;
     });
   }
 
   if (upcoming.length > 0) {
     text += "\nUpcoming (next 30 days):\n";
     upcoming.slice(0, 15).forEach((t) => {
-      text += `- ${t.scheduledDate}: ${t.name} ${t.type === "income" ? "+" : "-"}$${t.projectedAmount} [${t.status}]\n`;
+      text += `- ${t.scheduledDate}: ${t.name} ${t.type === "income" ? "+" : "-"}${symbol}${t.projectedAmount} [${t.status}]\n`;
     });
   }
 
   return text;
 };
 
-const formatBillCoverage = (billCoverage?: BillCoverageReport) => {
+const formatBillCoverage = (billCoverage: BillCoverageReport | undefined, symbol: string) => {
   if (!billCoverage) return "";
 
   const billsAtRisk = billCoverage.upcomingBills.filter((bill) => !bill.canCover);
 
   let text = `\nBill Coverage Analysis (next 14 days):
-- Current Balance: $${billCoverage.currentBalance}
-- Total Bills: $${billCoverage.totalUpcoming}
-- Projected End Balance: $${billCoverage.projectedBalance}`;
+- Current Balance: ${symbol}${billCoverage.currentBalance}
+- Total Bills: ${symbol}${billCoverage.totalUpcoming}
+- Projected End Balance: ${symbol}${billCoverage.projectedBalance}`;
 
   if (billsAtRisk.length > 0) {
     text += `\n\n⚠️ BILLS AT RISK (${billsAtRisk.length}):\n`;
     billsAtRisk.forEach((bill) => {
-      text += `- ${bill.transaction.name}: $${bill.transaction.projectedAmount} on ${bill.transaction.scheduledDate} (Need $${bill.shortfall || 0})\n`;
+      text += `- ${bill.transaction.name}: ${symbol}${bill.transaction.projectedAmount} on ${bill.transaction.scheduledDate} (Need ${symbol}${bill.shortfall || 0})\n`;
     });
   }
 
@@ -116,24 +120,31 @@ const formatBillCoverage = (billCoverage?: BillCoverageReport) => {
 export const analyzeBudget = async (context: AnalysisContext): Promise<string> => {
   try {
     const ai = getGeminiClient();
-    const { transactions, incomeSources, expenseRules, currentBalance, billCoverage } = context;
+    const {
+      transactions,
+      incomeSources,
+      expenseRules,
+      currentBalance,
+      billCoverage,
+      currencySymbol = "$",
+    } = context;
 
     // Build the prompt
     const prompt = `
 You are an expert financial advisor AI. Analyze the following financial data and provide actionable insights.
 
 ## Current Financial Status
-Balance: $${currentBalance}
+Balance: ${currencySymbol}${currentBalance}
 
 ## Income Sources
-${formatIncomeSources(incomeSources)}
+${formatIncomeSources(incomeSources, currencySymbol)}
 
 ## Expense Rules
-${formatExpenseRules(expenseRules)}
+${formatExpenseRules(expenseRules, currencySymbol)}
 
 ## Transaction History
-${formatTransactions(transactions)}
-${formatBillCoverage(billCoverage)}
+${formatTransactions(transactions, currencySymbol)}
+${formatBillCoverage(billCoverage, currencySymbol)}
 
 ## Your Analysis
 
@@ -203,48 +214,57 @@ export const getSmartInsights = async (context: AnalysisContext): Promise<Analys
 };
 
 // Helper to format transaction data for the AI
-export const formatTransactionsForAI = (transactions: Transaction[]): string => {
+export const formatTransactionsForAI = (
+  transactions: Transaction[],
+  currencySymbol: string = "$"
+): string => {
   const completed = transactions.filter((t) => t.status === "completed");
   const pending = transactions.filter((t) => t.status === "projected");
 
   let text = "## Completed Transactions\n";
   completed.forEach((t) => {
     const amount = t.actualAmount ?? t.projectedAmount;
-    text += `- ${t.name}: ${t.type === "income" ? "+" : "-"}$${amount} (${t.category})\n`;
+    text += `- ${t.name}: ${t.type === "income" ? "+" : "-"}${currencySymbol}${amount} (${t.category})\n`;
   });
 
   text += "\n## Upcoming Transactions\n";
   pending.forEach((t) => {
-    text += `- ${t.name}: ${t.type === "income" ? "+" : "-"}$${t.projectedAmount} on ${t.scheduledDate} (${t.category})\n`;
+    text += `- ${t.name}: ${t.type === "income" ? "+" : "-"}${currencySymbol}${t.projectedAmount} on ${t.scheduledDate} (${t.category})\n`;
   });
 
   return text;
 };
 
 // Helper to format income sources for the AI
-export const formatIncomeSourcesForAI = (sources: IncomeSource[]): string => {
+export const formatIncomeSourcesForAI = (
+  sources: IncomeSource[],
+  currencySymbol: string = "$"
+): string => {
   let text = "## Income Sources\n";
   sources
     .filter((s) => s.isActive)
     .forEach((s) => {
-      text += `- ${s.name}: $${s.amount} (${s.frequency})\n`;
+      text += `- ${s.name}: ${currencySymbol}${s.amount} (${s.frequency})\n`;
       if (s.isVariableAmount) text += "  Note: Amount varies\n";
     });
   return text;
 };
 
 // Helper to format expense rules for the AI
-export const formatExpenseRulesForAI = (rules: ExpenseRule[]): string => {
+export const formatExpenseRulesForAI = (
+  rules: ExpenseRule[],
+  currencySymbol: string = "$"
+): string => {
   let text = "## Expense Rules\n";
   rules
     .filter((r) => r.isActive)
     .forEach((r) => {
-      text += `- ${r.name}: $${r.amount} (${r.frequency})\n`;
+      text += `- ${r.name}: ${currencySymbol}${r.amount} (${r.frequency})\n`;
       if (r.loanConfig) {
-        text += `  Loan: $${r.loanConfig.currentBalance} remaining, ${r.loanConfig.interestRate}% APR\n`;
+        text += `  Loan: ${currencySymbol}${r.loanConfig.currentBalance} remaining, ${r.loanConfig.interestRate}% APR\n`;
       }
       if (r.creditConfig) {
-        text += `  Credit Card: $${r.creditConfig.currentBalance} balance, ${r.creditConfig.apr}% APR\n`;
+        text += `  Credit Card: ${currencySymbol}${r.creditConfig.currentBalance} balance, ${r.creditConfig.apr}% APR\n`;
       }
     });
   return text;

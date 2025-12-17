@@ -78,6 +78,11 @@
   - Balance, APR, statement/due date tracking
   - Payment strategies: Minimum, Fixed, Full Balance
   - Payoff timeline projections
+  - **Payoff Scenario Analysis**: Compare alternative payment strategies
+    - Double payment scenario
+    - 12-month payoff plan
+    - 24-month payoff plan
+    - Interest savings calculations
 - **Priority Bills**: Mark critical expenses (rent, utilities)
 
 ### 📅 Financial Calendar
@@ -107,14 +112,22 @@
   - Savings rate (30%)
   - Bill payment rate (20%)
   - Balance trend (20%)
+  - **Grade System**: A through F ratings with color indicators
+  - **Smart Insights**: Contextual recommendations based on your metrics
+- **Projected vs Actual Widget**: Track variance between planned and actual transactions
 
 ### 💳 Transaction Management
 
 - **Mark Complete**: Record actual amounts with variance tracking
 - **Skip Transactions**: Mark as skipped with optional notes
-- **Automatic Balance Updates**: Real-time balance recalculation
+- **Reschedule Transactions**: Move transactions to different dates
+- **Occurrence Overrides**: Customize individual instances of recurring transactions
+  - Adjust amount for specific occurrences
+  - Reschedule single occurrences without affecting the series
+- **Automatic Balance Updates**: Real-time balance recalculation via Firestore subscriptions
 - **Variance Analysis**: Track projected vs actual spending
 - **Filter & Sort**: By status, type, date, amount
+- **Overdue Transaction Modal**: Quick access to view and manage overdue items
 
 ### 🤖 AI-Powered Forecast
 
@@ -143,7 +156,14 @@
   - Start of week (Sunday/Monday)
   - Theme (Dark/Light)
   - Warning threshold for low balance
-- **Danger Zone**: Clear all data or delete account
+- **Data Management**:
+  - **Selective Reset**: Granular data reset options
+    - Reset income sources only
+    - Reset expense rules only
+    - Reset transactions only
+    - Reset all financial data
+  - **Clear All Data**: Complete data wipe
+  - **Delete Account**: Full account removal
 
 ---
 
@@ -375,20 +395,61 @@ fintrack/
 │   │   ├── settings/page.tsx
 │   │   └── layout.tsx
 │   ├── components/
-│   │   ├── common/                  # Reusable UI components
-│   │   │   ├── Button.tsx
-│   │   │   ├── Card.tsx
-│   │   │   ├── Input.tsx
-│   │   │   ├── Select.tsx
-│   │   │   ├── Icon.tsx
-│   │   │   └── ... (25+ components)
+│   │   ├── common/                  # 25 reusable UI components
+│   │   │   ├── Accordion.tsx        # Collapsible content
+│   │   │   ├── Alert.tsx            # Alert messages
+│   │   │   ├── Badge.tsx            # Status indicators
+│   │   │   ├── Button.tsx           # Action buttons
+│   │   │   ├── Card.tsx             # Content containers
+│   │   │   ├── Checkbox.tsx         # Checkbox inputs
+│   │   │   ├── DatePicker.tsx       # Date selection
+│   │   │   ├── DateRangePicker.tsx  # Date range selection
+│   │   │   ├── Divider.tsx          # Visual separators
+│   │   │   ├── Drawer.tsx           # Slide-out panels
+│   │   │   ├── Dropdown.tsx         # Dropdown menus
+│   │   │   ├── Icon.tsx             # Material icons
+│   │   │   ├── Input.tsx            # Text inputs
+│   │   │   ├── LoadingSpinner.tsx   # Loading states
+│   │   │   ├── MultiSelectDropdown.tsx # Multi-select
+│   │   │   ├── PageHeader.tsx       # Page titles
+│   │   │   ├── Popover.tsx          # Popover content
+│   │   │   ├── RadioGroup.tsx       # Radio selections
+│   │   │   ├── Select.tsx           # Dropdown selects
+│   │   │   ├── Switch.tsx           # Toggle switches
+│   │   │   ├── Table.tsx            # Data tables
+│   │   │   ├── Tabs.tsx             # Tabbed content
+│   │   │   ├── TextArea.tsx         # Multi-line text
+│   │   │   ├── Tooltip.tsx          # Hover tooltips
+│   │   │   └── index.ts             # Barrel exports
 │   │   ├── formElements/            # React Hook Form components
 │   │   │   ├── Form/
 │   │   │   ├── FormInput/
 │   │   │   ├── FormSelect/
-│   │   │   └── ... (10 components)
+│   │   │   └── ... (11 components)
+│   │   ├── modals/                  # Centralized modal system
+│   │   │   ├── BaseModal.tsx        # Base modal component
+│   │   │   ├── index.tsx            # Modal context & hooks
+│   │   │   ├── components/
+│   │   │   │   ├── CompleteTransactionModal/
+│   │   │   │   ├── ConfirmModal.tsx
+│   │   │   │   ├── OverdueTransactionsModal.tsx
+│   │   │   │   └── SelectiveResetModal.tsx
+│   │   │   └── utils.ts             # Modal utilities
 │   │   ├── pages/                   # Page-specific components
-│   │   │   ├── dashboard/
+│   │   │   ├── dashboard/           # 11 dashboard widgets
+│   │   │   │   ├── Dashboard.tsx
+│   │   │   │   └── components/
+│   │   │   │       ├── CashFlowChart.tsx
+│   │   │   │       ├── CategoryPieChart.tsx
+│   │   │   │       ├── FinancialHealthScore.tsx
+│   │   │   │       ├── IncomeExpenseChart.tsx
+│   │   │   │       ├── KPICards.tsx
+│   │   │   │       ├── OverdueAlert.tsx
+│   │   │   │       ├── PeriodComparison.tsx
+│   │   │   │       ├── ProjectedVsActualWidget.tsx
+│   │   │   │       ├── QuickTransaction.tsx
+│   │   │   │       ├── RecurringSummaryWidget.tsx
+│   │   │   │       └── UpcomingActivityWidget.tsx
 │   │   │   ├── calendar/
 │   │   │   ├── expenses/
 │   │   │   ├── income/
@@ -396,23 +457,30 @@ fintrack/
 │   │   │   ├── forecast/
 │   │   │   └── settings/
 │   │   ├── widgets/                 # Reusable widgets
-│   │   │   └── BillCoverageWidget.tsx
+│   │   │   ├── BillCoverageWidget.tsx
+│   │   │   └── BillItem.tsx
 │   │   ├── ProtectedRoute.tsx
 │   │   └── Sidebar.tsx
 │   ├── contexts/
 │   │   ├── AuthContext.tsx          # Authentication state
-│   │   └── FinancialContext.tsx     # Financial data & operations
+│   │   └── FinancialContext/        # Financial data (modular)
+│   │       ├── index.tsx            # Main provider
+│   │       ├── types.ts             # Context types
+│   │       ├── actions/             # CRUD operations
+│   │       ├── hooks/               # Custom hooks
+│   │       └── utils/               # Helper utilities
 │   ├── lib/
 │   │   ├── firebase/
 │   │   │   ├── config.ts            # Firebase configuration
 │   │   │   ├── auth.ts              # Auth functions
 │   │   │   └── firestore.ts         # CRUD operations
-│   │   ├── logic/
-│   │   │   ├── amortization.ts      # Loan calculations
-│   │   │   ├── balanceCalculator.ts # Daily balance logic
-│   │   │   ├── projectionEngine.ts  # Transaction generation
-│   │   │   ├── forecasting.ts       # Prediction algorithms
-│   │   │   └── healthScore.ts       # Financial health scoring
+│   │   ├── logic/                   # 6 calculation engines
+│   │   │   ├── amortization/        # Loan amortization
+│   │   │   ├── balanceCalculator/   # Daily balance logic
+│   │   │   ├── creditCardCalculator/# Credit card projections
+│   │   │   ├── forecasting/         # Prediction algorithms
+│   │   │   ├── healthScore/         # Financial health scoring
+│   │   │   └── projectionEngine/    # Transaction generation
 │   │   ├── services/
 │   │   │   └── geminiService.ts     # AI integration
 │   │   ├── utils/
@@ -430,6 +498,8 @@ fintrack/
 │   └── icon.tsx
 ├── public/
 │   └── favicon.svg
+├── .agent/                          # AI coding assistant rules
+│   └── rules/                       # Project coding patterns
 ├── .env.local                       # Environment variables
 ├── next.config.js
 ├── tailwind.config.ts
@@ -561,17 +631,64 @@ FinTrack uses a custom design system built on Tailwind CSS:
 
 ### Common Components
 
-All UI built from reusable components in `components/common/`:
+All UI built from 25 reusable components in `components/common/`:
+
+**Layout & Containers:**
+
+- `Card` - Content containers with padding options
+- `Accordion` - Collapsible content sections
+- `Drawer` - Slide-out side panels
+- `Tabs` - Tabbed content navigation
+- `Divider` - Visual separators
+
+**Form Controls:**
 
 - `Button` - 5 variants (primary, secondary, ghost, danger, icon)
-- `Card` - Container with padding options
 - `Input` - Text/number inputs with labels
-- `Select` - Dropdown with options
+- `TextArea` - Multi-line text inputs
+- `Select` - Enhanced dropdown selects
+- `Checkbox` - Checkbox with label support
+- `Switch` - Toggle switches
+- `RadioGroup` - Radio button groups
+- `DatePicker` - Single date selection
+- `DateRangePicker` - Date range selection
+- `Dropdown` - Action dropdown menus
+- `MultiSelectDropdown` - Multi-select chips
+
+**Feedback & Display:**
+
+- `Alert` - Alert messages (info, success, warning, error)
 - `Badge` - Status indicators
-- `Icon` - Material Symbols icons
+- `Tooltip` - Hover tooltips
+- `Popover` - Click-triggered popovers
 - `LoadingSpinner` - Loading states
+- `Table` - Data tables with sorting
+
+**Navigation:**
+
 - `PageHeader` - Page titles with actions
-- And 20+ more...
+- `Icon` - Material Symbols icons
+
+### Modal System
+
+Centralized modal management via `components/modals/`:
+
+- **BaseModal** - Foundation modal with portal rendering
+- **ConfirmModal** - Confirmation dialogs (delete, reset)
+- **CompleteTransactionModal** - Mark transactions complete
+- **OverdueTransactionsModal** - View/manage overdue items
+- **SelectiveResetModal** - Granular data reset options
+
+```typescript
+// Usage with useModal hook
+const { openModal, closeModal } = useModal();
+
+openModal("confirm", {
+  title: "Delete Item",
+  message: "Are you sure?",
+  onConfirm: handleDelete,
+});
+```
 
 ---
 

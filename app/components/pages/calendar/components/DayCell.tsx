@@ -5,6 +5,7 @@ import { useDroppable } from "@dnd-kit/core";
 import { Transaction } from "@/lib/types";
 import { cn } from "@/lib/utils/cn";
 import { formatDate } from "@/lib/utils/dateUtils";
+import { useCurrency } from "@/lib/hooks/useCurrency";
 import DraggableDayChip from "./DraggableDayChip";
 import { STATUS_COLORS } from "../constants";
 import type { CalendarDay } from "../types";
@@ -17,6 +18,7 @@ interface IProps {
 }
 
 const DayCell: React.FC<IProps> = ({ day, isSelected, onClick, onTransactionClick }) => {
+  const { currencySymbol } = useCurrency();
   const { date, isCurrentMonth, isToday, isPast, dayBalance } = day;
   const transactions = dayBalance?.transactions || [];
   const hasTransactions = transactions.length > 0;
@@ -68,7 +70,7 @@ const DayCell: React.FC<IProps> = ({ day, isSelected, onClick, onTransactionClic
         {/* Balance indicator */}
         {dayBalance && isCurrentMonth && (
           <span className={cn("text-xs font-medium", STATUS_COLORS[dayBalance.status])}>
-            $
+            {currencySymbol}
             {Math.abs(dayBalance.closingBalance).toLocaleString(undefined, {
               maximumFractionDigits: 0,
             })}

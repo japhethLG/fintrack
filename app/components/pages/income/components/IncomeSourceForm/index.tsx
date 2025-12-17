@@ -414,7 +414,8 @@ const IncomeSourceForm: React.FC<IProps> = ({
                 <div>
                   <p className="text-xs text-gray-400">Amount</p>
                   <p className="text-success font-bold text-xl">
-                    ${parseFloat(amount || "0").toLocaleString()}
+                    {currencySymbol}
+                    {parseFloat(amount || "0").toLocaleString()}
                     {isVariableAmount && (
                       <span className="text-xs text-gray-400 ml-1">(estimate)</span>
                     )}

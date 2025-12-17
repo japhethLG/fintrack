@@ -9,6 +9,7 @@ import {
   calculateVarianceReport,
   getCategoryBreakdown,
 } from "@/lib/logic/balanceCalculator";
+import { useCurrency } from "@/lib/hooks/useCurrency";
 import { LoadingSpinner, Icon } from "@/components/common";
 import MetricsGrid from "./components/MetricsGrid";
 import MonthlyOverview from "./components/MonthlyOverview";
@@ -17,6 +18,7 @@ import AIAnalysisPanel from "./components/AIAnalysisPanel";
 const Forecast: React.FC = () => {
   const { userProfile, transactions, incomeSources, expenseRules, billCoverage, isLoading } =
     useFinancial();
+  const { currencySymbol } = useCurrency();
 
   const [analysis, setAnalysis] = useState<string | null>(null);
   const [analyzing, setAnalyzing] = useState(false);
@@ -181,6 +183,7 @@ const Forecast: React.FC = () => {
         expenseRules,
         currentBalance: userProfile.currentBalance,
         billCoverage: billCoverage || undefined,
+        currencySymbol,
       };
 
       const result = await analyzeBudget(context);
