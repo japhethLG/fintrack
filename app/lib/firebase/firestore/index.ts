@@ -66,6 +66,7 @@ export {
   updateTransaction,
   completeTransaction,
   skipTransaction,
+  revertToProjected,
   deleteTransaction,
   deleteTransactionsBySource,
   subscribeToTransactions,
@@ -75,22 +76,12 @@ export {
 // ============================================================================
 // BALANCE HISTORY OPERATIONS
 // ============================================================================
-export {
-  saveBalanceSnapshot,
-  getBalanceSnapshot,
-  getBalanceHistory,
-} from "./balanceHistory";
+export { saveBalanceSnapshot, getBalanceSnapshot, getBalanceHistory } from "./balanceHistory";
 
 // ============================================================================
 // ALERT OPERATIONS
 // ============================================================================
-export {
-  createAlert,
-  getAlerts,
-  markAlertAsRead,
-  dismissAlert,
-  subscribeToAlerts,
-} from "./alerts";
+export { createAlert, getAlerts, markAlertAsRead, dismissAlert, subscribeToAlerts } from "./alerts";
 
 // ============================================================================
 // MIGRATION UTILITIES
@@ -102,4 +93,3 @@ export {
   migrateToInitialBalance,
   migratePendingToOverrides,
 } from "./migrations";
-

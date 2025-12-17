@@ -15,7 +15,12 @@ const RANGE_OPTIONS = [
 ];
 
 const UpcomingBillsWidget: React.FC = () => {
-  const { transactions, markTransactionComplete, markTransactionSkipped } = useFinancial();
+  const {
+    transactions,
+    markTransactionComplete,
+    markTransactionSkipped,
+    revertTransactionToProjected,
+  } = useFinancial();
   const { formatCurrency } = useCurrency();
   const { openModal } = useModal();
   const [selectedDays, setSelectedDays] = useState("30");
@@ -112,6 +117,9 @@ const UpcomingBillsWidget: React.FC = () => {
                           },
                           onSkip: async (notes?: string) => {
                             await markTransactionSkipped(t.id, notes);
+                          },
+                          onRevert: async () => {
+                            await revertTransactionToProjected(t.id);
                           },
                         });
                       }}

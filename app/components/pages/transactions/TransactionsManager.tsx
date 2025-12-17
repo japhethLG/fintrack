@@ -52,6 +52,7 @@ const TransactionsManager: React.FC = () => {
     setViewDateRange,
     markTransactionComplete,
     markTransactionSkipped,
+    revertTransactionToProjected,
   } = useFinancial();
   const { openModal } = useModal();
 
@@ -131,9 +132,12 @@ const TransactionsManager: React.FC = () => {
         onSkip: async (notes?: string) => {
           await markTransactionSkipped(transaction.id, notes);
         },
+        onRevert: async () => {
+          await revertTransactionToProjected(transaction.id);
+        },
       });
     },
-    [openModal, markTransactionComplete, markTransactionSkipped]
+    [openModal, markTransactionComplete, markTransactionSkipped, revertTransactionToProjected]
   );
 
   // Expand view date range if user selects outside current window

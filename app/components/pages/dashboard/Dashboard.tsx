@@ -32,6 +32,7 @@ const Dashboard: React.FC = () => {
     isLoading,
     markTransactionComplete,
     markTransactionSkipped,
+    revertTransactionToProjected,
     setViewDateRange,
   } = useFinancial();
 
@@ -207,9 +208,12 @@ const Dashboard: React.FC = () => {
         onSkip: async (notes?: string) => {
           await markTransactionSkipped(transaction.id, notes);
         },
+        onRevert: async () => {
+          await revertTransactionToProjected(transaction.id);
+        },
       });
     },
-    [openModal, markTransactionComplete, markTransactionSkipped]
+    [openModal, markTransactionComplete, markTransactionSkipped, revertTransactionToProjected]
   );
 
   if (isLoading) {

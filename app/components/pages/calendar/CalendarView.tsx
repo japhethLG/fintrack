@@ -33,6 +33,7 @@ const CalendarView: React.FC = () => {
     isLoading,
     markTransactionComplete,
     markTransactionSkipped,
+    revertTransactionToProjected,
     rescheduleTransaction,
     setViewDateRange,
     userProfile,
@@ -275,9 +276,12 @@ const CalendarView: React.FC = () => {
         onSkip: async (notes?: string) => {
           await markTransactionSkipped(transaction.id, notes);
         },
+        onRevert: async () => {
+          await revertTransactionToProjected(transaction.id);
+        },
       });
     },
-    [openModal, markTransactionComplete, markTransactionSkipped]
+    [openModal, markTransactionComplete, markTransactionSkipped, revertTransactionToProjected]
   );
 
   const handleDragStart = (event: DragStartEvent) => {

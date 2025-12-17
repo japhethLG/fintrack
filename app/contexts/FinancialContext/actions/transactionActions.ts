@@ -9,11 +9,14 @@ import {
   addTransaction,
   completeTransaction,
   skipTransaction,
+  revertToProjected,
   deleteTransaction,
   updateExpenseRule,
   adjustUserBalance,
   updateTransaction,
   getTransaction,
+  getIncomeSource,
+  getExpenseRule,
   setIncomeSourceOverride,
   removeIncomeSourceOverride,
   setExpenseRuleOverride,
@@ -97,20 +100,24 @@ export async function markTransactionCompleteAction(
       notes: data.notes,
       occurrenceId:
         parsedOccurrenceId ||
-        generateOccurrenceId(source.id, source.frequency, parseDate(scheduledDate), source.startDate, source.scheduleConfig),
+        generateOccurrenceId(
+          source.id,
+          source.frequency,
+          parseDate(scheduledDate),
+          source.startDate,
+          source.scheduleConfig
+        ),
     });
 
     // Update user balance
     const delta = isIncome ? data.actualAmount : -data.actualAmount;
     await adjustUserBalance(userId, delta);
 
-      // Remove any override now that occurrence is realized
-      const overrideRemover = isIncome
-        ? removeIncomeSourceOverride
-        : removeExpenseRuleOverride;
-      if (parsedOccurrenceId) {
-        await overrideRemover(source.id, parsedOccurrenceId);
-      }
+    // Remove any override now that occurrence is realized
+    const overrideRemover = isIncome ? removeIncomeSourceOverride : removeExpenseRuleOverride;
+    if (parsedOccurrenceId) {
+      await overrideRemover(source.id, parsedOccurrenceId);
+    }
 
     // Update source tracking if applicable (loan/installment)
     if (!isIncome) {
@@ -172,7 +179,13 @@ export async function markTransactionSkippedAction(
       notes,
       occurrenceId:
         parsedOccurrenceId ||
-        generateOccurrenceId(source.id, source.frequency, parseDate(scheduledDate), source.startDate, source.scheduleConfig),
+        generateOccurrenceId(
+          source.id,
+          source.frequency,
+          parseDate(scheduledDate),
+          source.startDate,
+          source.scheduleConfig
+        ),
     });
 
     // Remove any override now that occurrence is realized
@@ -275,3 +288,97 @@ export async function removeTransactionAction(id: string): Promise<void> {
   }
 }
 
+/**
+ * Revert a stored transaction back to projected status.
+ * Deletes the stored transaction and optionally creates an override to preserve the scheduled date.
+ */
+export async function revertTransactionToProjectedAction(id: string): Promise<void> {
+  // Cannot revert projected transactions (they're already projected!)
+  if (id.startsWith("proj_")) {
+    throw new Error("Transaction is already projected");
+  }
+
+  // Call Firestore function which handles balance reversal and deletion
+  const revertData = await revertToProjected(id);
+
+  if (!revertData) {
+    return; // Transaction was reverted but no date preservation needed
+  }
+
+  // Check if we need to create an override to preserve the scheduled date
+  // We need to compare the stored transaction's date with what the source pattern would generate
+  const { scheduledDate, sourceId, sourceType, occurrenceId } = revertData;
+
+  if (!occurrenceId) {
+    return; // Can't create override without occurrence ID
+  }
+
+  // Get the source to check if the date differs from the pattern
+  const source =
+    sourceType === "income_source"
+      ? await getIncomeSource(sourceId)
+      : await getExpenseRule(sourceId);
+
+  if (!source) {
+    return; // Source was deleted, can't create override
+  }
+
+  // Calculate what the original pattern date would be for this occurrence
+  // The occurrenceId encodes the logical period (e.g., "sourceId_2025-01" for monthly)
+  // We compare the stored scheduledDate with what would be generated
+  // If they differ, we create an override to preserve the user's custom date
+
+  // Generate the expected date for this occurrence
+  const expectedDate = getExpectedDateFromOccurrenceId(occurrenceId, source);
+
+  if (expectedDate && scheduledDate !== expectedDate) {
+    // User had moved this transaction - preserve the custom date
+    const override: OccurrenceOverride = { scheduledDate };
+
+    if (sourceType === "income_source") {
+      await setIncomeSourceOverride(sourceId, occurrenceId, override);
+    } else {
+      await setExpenseRuleOverride(sourceId, occurrenceId, override);
+    }
+  }
+}
+
+/**
+ * Helper to extract expected date from occurrence ID
+ * Returns null if we can't determine (fallback to no override)
+ */
+function getExpectedDateFromOccurrenceId(
+  occurrenceId: string,
+  source: { startDate: string; frequency: string; scheduleConfig?: { specificDays?: number[] } }
+): string | null {
+  // Occurrence ID formats:
+  // - one-time: "sourceId_once"
+  // - daily: "sourceId_YYYY-MM-DD"
+  // - weekly: "sourceId_WN" (week number)
+  // - bi-weekly: "sourceId_BWN" (occurrence number)
+  // - semi-monthly: "sourceId_YYYY-MM-index"
+  // - monthly: "sourceId_YYYY-MM"
+  // - quarterly: "sourceId_YYYY-QN"
+  // - yearly: "sourceId_YYYY"
+
+  // For monthly, we can reconstruct the expected date
+  const monthlyMatch = occurrenceId.match(/_([0-9]{4})-([0-9]{2})$/);
+  if (monthlyMatch) {
+    const [, year, month] = monthlyMatch;
+    const startDay = parseInt(source.startDate.split("-")[2], 10);
+    const lastDayOfMonth = new Date(parseInt(year, 10), parseInt(month, 10), 0).getDate();
+    const day = Math.min(startDay, lastDayOfMonth);
+    return `${year}-${month}-${day.toString().padStart(2, "0")}`;
+  }
+
+  // For daily, the date is in the occurrence ID
+  const dailyMatch = occurrenceId.match(/_([0-9]{4}-[0-9]{2}-[0-9]{2})$/);
+  if (dailyMatch) {
+    return dailyMatch[1];
+  }
+
+  // For other frequencies, we can't easily determine - safer to not create override
+  // This means weekly/bi-weekly/semi-monthly rescheduled dates won't be preserved
+  // This is acceptable as an initial implementation
+  return null;
+}

@@ -1,7 +1,7 @@
 import * as yup from "yup";
 
 export interface CompleteTransactionFormValues {
-  mode: "complete" | "skip";
+  mode: "complete" | "skip" | "revert";
   actualAmount: string;
   actualDate: string;
   notes: string;
@@ -19,7 +19,7 @@ export const getDefaultValues = (
 });
 
 export const completeTransactionSchema = yup.object({
-  mode: yup.string().oneOf(["complete", "skip"]).required(),
+  mode: yup.string().oneOf(["complete", "skip", "revert"]).required(),
   actualAmount: yup.string().when("mode", {
     is: "complete",
     then: (schema) => schema.required("Amount is required"),

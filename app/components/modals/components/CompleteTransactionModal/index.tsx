@@ -19,6 +19,7 @@ export interface IModalData {
   transaction: Transaction;
   onComplete: (data: CompleteTransactionData) => Promise<void>;
   onSkip: (notes?: string) => Promise<void>;
+  onRevert?: () => Promise<void>;
   onCloseModal?: () => void;
 }
 
@@ -28,7 +29,7 @@ export interface IProps {
 }
 
 const CompleteTransactionModal: React.FC<IProps> = ({ closeModal, modalData }) => {
-  const { transaction, onComplete, onSkip } = modalData;
+  const { transaction, onComplete, onSkip, onRevert } = modalData;
   const { formatCurrency, formatCurrencyWithSign, currencySymbol } = useCurrency();
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -74,6 +75,8 @@ const CompleteTransactionModal: React.FC<IProps> = ({ closeModal, modalData }) =
         });
       } else if (values.mode === "skip") {
         await onSkip(values.notes?.trim() || undefined);
+      } else if (values.mode === "revert" && onRevert) {
+        await onRevert();
       }
       closeModal();
     } catch (err) {
@@ -82,6 +85,13 @@ const CompleteTransactionModal: React.FC<IProps> = ({ closeModal, modalData }) =
       setIsSubmitting(false);
     }
   };
+
+  // Determine if revert is available: non-manual, stored transaction, with onRevert callback
+  const canRevert =
+    onRevert &&
+    transaction.sourceType !== "manual" &&
+    !transaction.id.startsWith("proj_") &&
+    (transaction.status === "completed" || transaction.status === "skipped");
 
   return (
     <div>
@@ -119,9 +129,7 @@ const CompleteTransactionModal: React.FC<IProps> = ({ closeModal, modalData }) =
         <div className="grid grid-cols-2 gap-4">
           <div>
             <p className="text-xs text-gray-400">Scheduled Date</p>
-            <p className="text-white font-medium">
-              {formatDisplayDate(transaction.scheduledDate)}
-            </p>
+            <p className="text-white font-medium">{formatDisplayDate(transaction.scheduledDate)}</p>
           </div>
           <div>
             <p className="text-xs text-gray-400">Expected Amount</p>
@@ -190,6 +198,17 @@ const CompleteTransactionModal: React.FC<IProps> = ({ closeModal, modalData }) =
             <Icon name="skip_next" size="sm" className="mr-2" />
             Skip
           </Button>
+          {canRevert && (
+            <Button
+              type="button"
+              variant={mode === "revert" ? "danger" : "ghost"}
+              className="flex-1"
+              onClick={() => setValue("mode", "revert")}
+            >
+              <Icon name="undo" size="sm" className="mr-2" />
+              Revert
+            </Button>
+          )}
         </div>
 
         {/* Complete Mode */}
@@ -234,6 +253,19 @@ const CompleteTransactionModal: React.FC<IProps> = ({ closeModal, modalData }) =
           </div>
         )}
 
+        {/* Revert Mode */}
+        {mode === "revert" && (
+          <div className="bg-danger/10 border border-danger/30 rounded-lg p-4 mb-4">
+            <p className="text-danger text-sm">
+              This will delete this transaction and regenerate it as a projection from the source
+              rule. If you had moved this transaction to a different date, that date will be
+              preserved.
+              {transaction.status === "completed" &&
+                " Your balance will be adjusted to reverse this transaction's impact."}
+            </p>
+          </div>
+        )}
+
         {/* Notes */}
         <div className="mt-4">
           <FormInput inputName="notes" label="Notes (Optional)" placeholder="Add a note..." />
@@ -259,7 +291,7 @@ const CompleteTransactionModal: React.FC<IProps> = ({ closeModal, modalData }) =
           </Button>
           <Button
             type="submit"
-            variant={mode === "skip" ? "secondary" : "primary"}
+            variant={mode === "skip" ? "secondary" : mode === "revert" ? "danger" : "primary"}
             className="flex-1"
             disabled={isSubmitting}
           >
@@ -267,7 +299,9 @@ const CompleteTransactionModal: React.FC<IProps> = ({ closeModal, modalData }) =
               ? "Processing..."
               : mode === "complete"
                 ? "Mark Complete"
-                : "Skip Transaction"}
+                : mode === "revert"
+                  ? "Revert to Projected"
+                  : "Skip Transaction"}
           </Button>
         </div>
       </Form>

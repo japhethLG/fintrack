@@ -28,6 +28,7 @@ import {
   markTransactionSkippedAction,
   rescheduleTransactionAction,
   removeTransactionAction,
+  revertTransactionToProjectedAction,
 } from "../actions/transactionActions";
 import { updateProfileAction, setCurrentBalanceAction } from "../actions/userActions";
 import { markAlertReadAction, dismissAlertAction } from "../actions/alertActions";
@@ -200,12 +201,21 @@ export function useFinancialActions({
     await removeTransactionAction(id);
   }, []);
 
+  const revertTransactionToProjected = useCallback(async (id: string) => {
+    await revertTransactionToProjectedAction(id);
+  }, []);
+
   // ============================================================================
   // OVERRIDE ACTIONS
   // ============================================================================
 
   const setOccurrenceOverride = useCallback(
-    async (sourceId: string, occurrenceId: string, override: OccurrenceOverride, isIncome: boolean) => {
+    async (
+      sourceId: string,
+      occurrenceId: string,
+      override: OccurrenceOverride,
+      isIncome: boolean
+    ) => {
       await setOccurrenceOverrideAction(sourceId, occurrenceId, override, isIncome);
     },
     []
@@ -258,7 +268,15 @@ export function useFinancialActions({
     } finally {
       setIsLoading(false);
     }
-  }, [user, setIsLoading, setUserProfile, setIncomeSources, setExpenseRules, setStoredTransactions, setAlerts]);
+  }, [
+    user,
+    setIsLoading,
+    setUserProfile,
+    setIncomeSources,
+    setExpenseRules,
+    setStoredTransactions,
+    setAlerts,
+  ]);
 
   return {
     // User actions
@@ -280,6 +298,7 @@ export function useFinancialActions({
     markTransactionSkipped,
     rescheduleTransaction,
     removeTransaction,
+    revertTransactionToProjected,
     setOccurrenceOverride,
     removeOccurrenceOverride,
     // Alert actions
@@ -289,4 +308,3 @@ export function useFinancialActions({
     refreshData,
   };
 }
-

@@ -50,6 +50,7 @@ export interface FinancialContextValue {
   markTransactionSkipped: (id: string, notes?: string) => Promise<void>;
   rescheduleTransaction: (id: string, newDate: string) => Promise<void>;
   removeTransaction: (id: string) => Promise<void>;
+  revertTransactionToProjected: (id: string) => Promise<void>;
   setOccurrenceOverride: (
     sourceId: string,
     occurrenceId: string,
@@ -79,4 +80,3 @@ export interface FinancialContextValue {
   // Actions
   refreshData: () => Promise<void>;
 }
-

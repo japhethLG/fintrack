@@ -25,7 +25,12 @@ import { db } from "../config";
 import { Transaction } from "@/lib/types";
 import { removeUndefined } from "./utils";
 import { adjustUserBalance } from "./users";
-import { getExpenseRule, updateLoanBalance, updateInstallmentProgress } from "./expenseRules";
+import {
+  getExpenseRule,
+  updateExpenseRule,
+  updateLoanBalance,
+  updateInstallmentProgress,
+} from "./expenseRules";
 
 export const addTransaction = async (
   userId: string,
@@ -203,6 +208,75 @@ export const skipTransaction = async (id: string, notes?: string): Promise<void>
     status: "skipped",
     notes,
   });
+};
+
+/**
+ * Revert a stored transaction back to projected status.
+ * This deletes the stored transaction, allowing it to regenerate as a projection.
+ *
+ * @param id - Transaction ID (must be a stored transaction, not proj_*)
+ * @returns Object with scheduledDate if it should be preserved as an override
+ */
+export const revertToProjected = async (
+  id: string
+): Promise<{
+  scheduledDate: string;
+  sourceId: string;
+  sourceType: "income_source" | "expense_rule";
+  occurrenceId?: string;
+} | null> => {
+  const transaction = await getTransaction(id);
+  if (!transaction) throw new Error("Transaction not found");
+
+  // Cannot revert manual transactions - they have no source to project from
+  if (transaction.sourceType === "manual") {
+    throw new Error("Manual transactions cannot be reverted to projected");
+  }
+
+  // Must have a source to revert to
+  if (!transaction.sourceId) {
+    throw new Error("Transaction has no source to revert to");
+  }
+
+  // Reverse balance if was completed
+  if (transaction.status === "completed") {
+    const amount = transaction.actualAmount ?? transaction.projectedAmount;
+    const reversalDelta = transaction.type === "income" ? -amount : amount;
+    await adjustUserBalance(transaction.userId, reversalDelta);
+
+    // Decrement loan/installment counters if applicable
+    if (transaction.sourceType === "expense_rule") {
+      const rule = await getExpenseRule(transaction.sourceId);
+      if (rule?.loanConfig && rule.loanConfig.paymentsMade > 0) {
+        await updateExpenseRule(transaction.sourceId, {
+          loanConfig: {
+            ...rule.loanConfig,
+            paymentsMade: rule.loanConfig.paymentsMade - 1,
+          },
+        });
+      } else if (rule?.installmentConfig && rule.installmentConfig.installmentsPaid > 0) {
+        await updateExpenseRule(transaction.sourceId, {
+          installmentConfig: {
+            ...rule.installmentConfig,
+            installmentsPaid: rule.installmentConfig.installmentsPaid - 1,
+          },
+        });
+      }
+    }
+  }
+
+  // Capture data before deletion for potential override creation
+  const revertData = {
+    scheduledDate: transaction.scheduledDate,
+    sourceId: transaction.sourceId,
+    sourceType: transaction.sourceType as "income_source" | "expense_rule",
+    occurrenceId: transaction.occurrenceId,
+  };
+
+  // Delete the stored transaction - it will re-appear as a projection
+  await deleteTransaction(id);
+
+  return revertData;
 };
 
 export const deleteTransaction = async (id: string): Promise<void> => {
