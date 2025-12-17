@@ -63,7 +63,11 @@ export const incomeSourceSchema = yup.object({
   weekendAdjustment: yup.string().oneOf(["before", "after", "none"]),
   specificDays: yup.array().of(yup.number()),
   dayOfWeek: yup.number().min(0).max(6),
-  dayOfMonth: yup.number().min(1).max(31),
+  dayOfMonth: yup
+    .number()
+    .transform((value) => (isNaN(value) ? undefined : Math.min(31, Math.max(1, value))))
+    .min(1)
+    .max(31),
   category: yup.string().required("Category is required"),
   notes: yup.string().optional(),
   color: yup.string().optional(),

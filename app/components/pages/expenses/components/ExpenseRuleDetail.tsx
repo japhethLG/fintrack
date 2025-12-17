@@ -271,7 +271,10 @@ const ExpenseRuleDetail: React.FC<IProps> = ({ rule, onEdit, onDelete, onToggleA
                   <div
                     className="h-full bg-primary rounded-full transition-all"
                     style={{
-                      width: `${Math.max(5, 100 - (creditPayoffSummary.monthsToPayoff / (creditPayoffSummary.monthsToPayoff + 12)) * 100)}%`,
+                      // Progress = principal paid so far / total to pay
+                      width: `${creditPayoffSummary.principalPaidSoFar > 0
+                        ? Math.min(100, (creditPayoffSummary.principalPaidSoFar / rule.creditConfig.currentBalance) * 100)
+                        : 0}%`,
                     }}
                   />
                 </div>

@@ -2,8 +2,8 @@
  * Comprehensive credit card payoff summary
  */
 
-import { CreditConfig, CreditCardPayoffSummary } from "./types";
-import { calculateCreditCardPayoff } from "./payoffCalculator";
+import { CreditConfig, CreditCardPayoffSummary, MonthlyBreakdown } from "./types";
+import { calculateCreditCardPayoff, calculateDecliningMinimumPayoff } from "./payoffCalculator";
 import { getEffectivePayment } from "./paymentCalculator";
 import { calculatePayoffScenarios } from "./scenarioCalculator";
 
@@ -22,12 +22,18 @@ export const calculatePayoffSummary = (
   const effectivePayment = getEffectivePayment(config);
   const currentMonthlyInterest = config.currentBalance * (config.apr / 100 / 12);
 
-  // Calculate payoff with current strategy
-  const schedule = calculateCreditCardPayoff(
-    config.currentBalance,
-    config.apr,
-    effectivePayment
-  );
+  // Use declining minimum calculation for minimum strategy,
+  // fixed payment calculation for fixed/full_balance strategies
+  let schedule: MonthlyBreakdown[];
+  if (config.paymentStrategy === "minimum") {
+    schedule = calculateDecliningMinimumPayoff(config);
+  } else {
+    schedule = calculateCreditCardPayoff(
+      config.currentBalance,
+      config.apr,
+      effectivePayment
+    );
+  }
 
   const lastPayment = schedule[schedule.length - 1];
   const willPayOff = lastPayment && lastPayment.remainingBalance < 0.01;
@@ -56,4 +62,3 @@ export const calculatePayoffSummary = (
     yearsToPayoff: willPayOff ? schedule.length / 12 : Infinity,
   };
 };
-

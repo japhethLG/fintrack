@@ -142,7 +142,11 @@ export const expenseRuleSchema = yup.object({
   weekendAdjustment: yup.string().oneOf(["before", "after", "none"]),
   specificDays: yup.array().of(yup.number()),
   dayOfWeek: yup.number().min(0).max(6),
-  dayOfMonth: yup.number().min(1).max(31),
+  dayOfMonth: yup
+    .number()
+    .transform((value) => (isNaN(value) ? undefined : Math.min(31, Math.max(1, value))))
+    .min(1)
+    .max(31),
 
   // Loan config
   loanPrincipal: yup.string().when("expenseType", {
@@ -176,10 +180,25 @@ export const expenseRuleSchema = yup.object({
     then: (schema) => schema.required("APR is required"),
     otherwise: (schema) => schema.optional(),
   }),
-  creditMinPaymentPercent: yup.string().optional(),
+  creditMinPaymentPercent: yup
+    .string()
+    .optional()
+    .test('max-percent', 'Percentage cannot exceed 100%', (value) =>
+      !value || parseFloat(value) <= 100
+    ),
   creditMinPaymentFloor: yup.string().optional(),
-  creditStatementDate: yup.string().optional(),
-  creditDueDate: yup.string().optional(),
+  creditStatementDate: yup
+    .string()
+    .optional()
+    .test('valid-day', 'Day must be between 1 and 31', (value) =>
+      !value || (parseInt(value) >= 1 && parseInt(value) <= 31)
+    ),
+  creditDueDate: yup
+    .string()
+    .optional()
+    .test('valid-day', 'Day must be between 1 and 31', (value) =>
+      !value || (parseInt(value) >= 1 && parseInt(value) <= 31)
+    ),
   creditPaymentStrategy: yup.string().optional(),
   creditMinPaymentMethod: yup.string().optional(),
   creditFixedPayment: yup.string().optional(),
@@ -192,7 +211,14 @@ export const expenseRuleSchema = yup.object({
   }),
   installmentCount: yup.string().when("expenseType", {
     is: "installment",
-    then: (schema) => schema.required("Number of installments is required"),
+    then: (schema) =>
+      schema
+        .required("Number of installments is required")
+        .test(
+          "max-installments",
+          "Number of installments cannot exceed 120",
+          (value) => !value || parseInt(value) <= 120
+        ),
     otherwise: (schema) => schema.optional(),
   }),
   installmentHasInterest: yup.boolean(),
