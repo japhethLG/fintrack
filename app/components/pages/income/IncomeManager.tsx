@@ -1,6 +1,7 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
+import { useSearchParams } from "next/navigation";
 import { useFinancial } from "@/contexts/FinancialContext";
 import { IncomeSource, IncomeSourceFormData } from "@/lib/types";
 import {
@@ -33,6 +34,15 @@ const IncomeManager: React.FC = () => {
   const [showForm, setShowForm] = useState(false);
   const [editingSource, setEditingSource] = useState<IncomeSource | null>(null);
   const [filterTypes, setFilterTypes] = useState<string[]>(["all"]);
+
+  // Handle query param for auto-selecting source (from transaction modal)
+  const searchParams = useSearchParams();
+  useEffect(() => {
+    const sourceId = searchParams.get("source");
+    if (sourceId && incomeSources.some((s) => s.id === sourceId)) {
+      setSelectedSourceId(sourceId);
+    }
+  }, [searchParams, incomeSources]);
 
   const selectedSource = selectedSourceId
     ? incomeSources.find((s) => s.id === selectedSourceId)

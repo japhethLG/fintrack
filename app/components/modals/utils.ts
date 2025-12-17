@@ -6,7 +6,7 @@ import type { ReactNode } from "react";
 import type { IModalData as ConfirmModalData } from "./components/ConfirmModal";
 import type { IModalData as SelectiveResetModalData } from "./components/SelectiveResetModal";
 import type { IModalData as OverdueTransactionsModalData } from "./components/OverdueTransactionsModal";
-import type { IModalData as CompleteTransactionModalData } from "./components/CompleteTransactionModal";
+import type { IModalData as TransactionModalData } from "./components/TransactionModal";
 
 // ============================================================================
 // TYPES
@@ -20,7 +20,7 @@ export interface IModalData {
   ConfirmModal: ConfirmModalData;
   SelectiveResetModal: SelectiveResetModalData;
   OverdueTransactionsModal: OverdueTransactionsModalData;
-  CompleteTransactionModal: CompleteTransactionModalData;
+  TransactionModal: TransactionModalData;
 }
 
 export interface IModal<TModal extends TModalName> {
@@ -55,7 +55,7 @@ export const componentMap: {
   ConfirmModal: () => import("./components/ConfirmModal"),
   SelectiveResetModal: () => import("./components/SelectiveResetModal"),
   OverdueTransactionsModal: () => import("./components/OverdueTransactionsModal"),
-  CompleteTransactionModal: () => import("./components/CompleteTransactionModal"),
+  TransactionModal: () => import("./components/TransactionModal"),
 };
 
 // ============================================================================
@@ -90,8 +90,8 @@ export const MODALS: TModalState = {
     title: "Overdue Transactions",
     width: "2xl",
   },
-  CompleteTransactionModal: {
-    title: "Complete Transaction",
+  TransactionModal: {
+    title: "Transaction",
     width: "lg",
   },
 };

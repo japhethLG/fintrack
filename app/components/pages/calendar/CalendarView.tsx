@@ -265,7 +265,7 @@ const CalendarView: React.FC = () => {
   // Transaction handlers
   const openTransactionModal = useCallback(
     (transaction: Transaction) => {
-      openModal("CompleteTransactionModal", { transaction });
+      openModal("TransactionModal", { transaction });
     },
     [openModal]
   );

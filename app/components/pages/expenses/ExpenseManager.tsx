@@ -1,6 +1,7 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
+import { useSearchParams } from "next/navigation";
 import { useFinancial } from "@/contexts/FinancialContext";
 import { ExpenseRule, ExpenseRuleFormData } from "@/lib/types";
 import {
@@ -33,6 +34,15 @@ const ExpenseManager: React.FC = () => {
   const [showForm, setShowForm] = useState(false);
   const [editingRule, setEditingRule] = useState<ExpenseRule | null>(null);
   const [filterTypes, setFilterTypes] = useState<string[]>(["all"]);
+
+  // Handle query param for auto-selecting rule (from transaction modal)
+  const searchParams = useSearchParams();
+  useEffect(() => {
+    const sourceId = searchParams.get("source");
+    if (sourceId && expenseRules.some((r) => r.id === sourceId)) {
+      setSelectedRuleId(sourceId);
+    }
+  }, [searchParams, expenseRules]);
 
   const selectedRule = selectedRuleId ? expenseRules.find((r) => r.id === selectedRuleId) : null;
 

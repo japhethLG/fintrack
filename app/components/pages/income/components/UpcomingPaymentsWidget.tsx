@@ -105,7 +105,7 @@ const UpcomingPaymentsWidget: React.FC = () => {
                       key={t.id}
                       className="flex items-center justify-between p-4 bg-gray-800/50 rounded-xl border border-gray-800/50 hover:bg-gray-800 transition-colors cursor-pointer"
                       onClick={() => {
-                        openModal("CompleteTransactionModal", { transaction: t });
+                        openModal("TransactionModal", { transaction: t });
                       }}
                     >
                       <div className="flex items-center gap-4">
