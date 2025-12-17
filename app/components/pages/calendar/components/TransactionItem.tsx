@@ -4,6 +4,7 @@ import React from "react";
 import { Transaction } from "@/lib/types";
 import { Icon, Badge } from "@/components/common";
 import { cn } from "@/lib/utils/cn";
+import { TRANSACTION_STATUS_BADGE_VARIANT } from "@/lib/constants";
 
 interface IProps {
   transaction: Transaction;
@@ -69,13 +70,7 @@ const TransactionItem: React.FC<IProps> = ({ transaction, onClick }) => {
         <div className="flex items-center justify-between gap-2">
           <p className="text-xs text-gray-400 truncate">{transaction.category}</p>
           <Badge
-            variant={
-              transaction.status === "completed"
-                ? "success"
-                : transaction.status === "skipped"
-                  ? "default"
-                  : "default"
-            }
+            variant={TRANSACTION_STATUS_BADGE_VARIANT[transaction.status]}
             className="text-xs flex-shrink-0"
           >
             {transaction.status}

@@ -6,6 +6,7 @@ import { Icon, Badge } from "@/components/common";
 import { cn } from "@/lib/utils/cn";
 import { useCurrency } from "@/lib/hooks/useCurrency";
 import { formatDate } from "@/lib/utils/dateUtils";
+import { TRANSACTION_STATUS_BADGE_VARIANT } from "@/lib/constants";
 
 interface IProps {
   transaction: Transaction;
@@ -17,12 +18,16 @@ const QuickTransaction: React.FC<IProps> = ({ transaction, onClick }) => {
   const isIncome = transaction.type === "income";
   const today = formatDate(new Date()); // YYYY-MM-DD
   const isPast = transaction.scheduledDate < today; // String comparison (today is NOT past)
+  const isOverdue = isPast && transaction.status !== "completed";
+
+  // Badge variant: overdue takes precedence, then use centralized status colors
+  const badgeVariant = isOverdue ? "danger" : TRANSACTION_STATUS_BADGE_VARIANT[transaction.status];
 
   return (
     <div
       className={cn(
         "flex items-center justify-between p-3 rounded-lg cursor-pointer transition-colors",
-        isPast && transaction.status !== "completed"
+        isOverdue
           ? "bg-danger/10 hover:bg-danger/20 border border-danger/20"
           : isIncome
             ? "bg-success/10 hover:bg-success/20"
@@ -54,11 +59,8 @@ const QuickTransaction: React.FC<IProps> = ({ transaction, onClick }) => {
           {isIncome ? "+" : "-"}
           {formatCurrency(transaction.projectedAmount)}
         </p>
-        <Badge
-          variant={transaction.status === "completed" ? "success" : isPast ? "danger" : "warning"}
-          className="text-xs"
-        >
-          {isPast && transaction.status !== "completed" ? "Overdue" : transaction.status}
+        <Badge variant={badgeVariant} className="text-xs">
+          {isOverdue ? "Overdue" : transaction.status}
         </Badge>
       </div>
     </div>

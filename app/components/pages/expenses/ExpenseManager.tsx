@@ -278,7 +278,7 @@ const ExpenseManager: React.FC = () => {
                       key={rule.id}
                       rule={rule}
                       isSelected={selectedRuleId === rule.id}
-                      onClick={() => setSelectedRuleId(rule.id)}
+                      onClick={() => setSelectedRuleId(selectedRuleId === rule.id ? null : rule.id)}
                     />
                   ))}
                 </div>
@@ -296,7 +296,7 @@ const ExpenseManager: React.FC = () => {
                 onToggleActive={handleToggleActive}
               />
             ) : (
-              <UpcomingBillsWidget onSelectRule={setSelectedRuleId} />
+              <UpcomingBillsWidget />
             )}
           </div>
         </div>

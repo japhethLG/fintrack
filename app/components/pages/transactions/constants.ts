@@ -1,6 +1,7 @@
 import dayjs from "dayjs";
 import { DateRange } from "@/components/common/DateRangePicker";
 import { TransactionStatus } from "@/lib/types";
+import { TRANSACTION_STATUS_BADGE_VARIANT } from "@/lib/constants";
 
 export const STATUS_OPTIONS = [
   { value: "all", label: "All Status" },
@@ -25,14 +26,8 @@ export const ORDER_OPTIONS = [
   { value: "desc", label: "Descending" },
 ];
 
-export const STATUS_VARIANTS: Record<
-  TransactionStatus,
-  "success" | "warning" | "danger" | "default"
-> = {
-  completed: "success",
-  projected: "default",
-  skipped: "danger",
-};
+// Re-export centralized status variants for backward compatibility
+export const STATUS_VARIANTS = TRANSACTION_STATUS_BADGE_VARIANT;
 
 export const STATUS_ICONS: Record<TransactionStatus, string> = {
   completed: "check_circle",

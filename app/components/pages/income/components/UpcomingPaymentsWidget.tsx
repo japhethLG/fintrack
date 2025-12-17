@@ -2,15 +2,11 @@
 
 import React, { useState, useMemo } from "react";
 import { useFinancial } from "@/contexts/FinancialContext";
-import { Transaction } from "@/lib/types";
+import { Transaction, CompleteTransactionData } from "@/lib/types";
 import { Card, Icon, Select, Badge } from "@/components/common";
 import { formatDate, addDays } from "@/lib/utils/dateUtils";
-import { cn } from "@/lib/utils/cn";
 import { useCurrency } from "@/lib/hooks/useCurrency";
-
-interface IProps {
-  onSelectSource: (sourceId: string) => void;
-}
+import { useModal } from "@/components/modals";
 
 const RANGE_OPTIONS = [
   { value: "14", label: "Next 14 days" },
@@ -18,9 +14,10 @@ const RANGE_OPTIONS = [
   { value: "90", label: "Next 90 days" },
 ];
 
-const UpcomingPaymentsWidget: React.FC<IProps> = ({ onSelectSource }) => {
-  const { transactions } = useFinancial();
+const UpcomingPaymentsWidget: React.FC = () => {
+  const { transactions, markTransactionComplete, markTransactionSkipped } = useFinancial();
   const { formatCurrency, formatCurrencyWithSign } = useCurrency();
+  const { openModal } = useModal();
   const [selectedDays, setSelectedDays] = useState("30");
 
   const upcomingIncome = useMemo(() => {
@@ -108,9 +105,15 @@ const UpcomingPaymentsWidget: React.FC<IProps> = ({ onSelectSource }) => {
                       key={t.id}
                       className="flex items-center justify-between p-4 bg-gray-800/50 rounded-xl border border-gray-800/50 hover:bg-gray-800 transition-colors cursor-pointer"
                       onClick={() => {
-                        if (t.sourceId && t.sourceType === "income_source") {
-                          onSelectSource(t.sourceId);
-                        }
+                        openModal("CompleteTransactionModal", {
+                          transaction: t,
+                          onComplete: async (data: CompleteTransactionData) => {
+                            await markTransactionComplete(t.id, data);
+                          },
+                          onSkip: async (notes?: string) => {
+                            await markTransactionSkipped(t.id, notes);
+                          },
+                        });
                       }}
                     >
                       <div className="flex items-center gap-4">

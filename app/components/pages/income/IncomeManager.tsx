@@ -221,7 +221,9 @@ const IncomeManager: React.FC = () => {
                       key={source.id}
                       source={source}
                       isSelected={selectedSourceId === source.id}
-                      onClick={() => setSelectedSourceId(source.id)}
+                      onClick={() =>
+                        setSelectedSourceId(selectedSourceId === source.id ? null : source.id)
+                      }
                     />
                   ))}
                 </div>
@@ -239,7 +241,7 @@ const IncomeManager: React.FC = () => {
                 onToggleActive={handleToggleActive}
               />
             ) : (
-              <UpcomingPaymentsWidget onSelectSource={setSelectedSourceId} />
+              <UpcomingPaymentsWidget />
             )}
           </div>
         </div>

@@ -6,6 +6,7 @@ import { cn } from "@/lib/utils/cn";
 import { Icon, Badge } from "@/components/common";
 import { useCurrency } from "@/lib/hooks/useCurrency";
 import { formatDate } from "@/lib/utils/dateUtils";
+import { TRANSACTION_STATUS_BADGE_VARIANT } from "@/lib/constants";
 import { STATUS_COLORS } from "../constants";
 import type { CalendarDay } from "../types";
 import { Transaction } from "@/lib/types";
@@ -27,18 +28,6 @@ const WeekDayCell: React.FC<IProps> = ({ day, isSelected, onClick, onTransaction
     id: dateKey,
     data: { date: dateKey },
   });
-
-  // Get status variant for badge
-  const getStatusVariant = (status: string) => {
-    switch (status) {
-      case "completed":
-        return "success";
-      case "skipped":
-        return "default";
-      default:
-        return "default";
-    }
-  };
 
   return (
     <div
@@ -136,7 +125,7 @@ const WeekDayCell: React.FC<IProps> = ({ day, isSelected, onClick, onTransaction
                   </span>
                   <div className="flex flex-col items-start justify-center gap-2 mt-1">
                     <span className="text-xs text-gray-500">{t.category}</span>
-                    <Badge variant={getStatusVariant(t.status)} className="text-xs">
+                    <Badge variant={TRANSACTION_STATUS_BADGE_VARIANT[t.status]} className="text-xs">
                       {t.status}
                     </Badge>
                   </div>
