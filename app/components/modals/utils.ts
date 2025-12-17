@@ -7,6 +7,7 @@ import type { IModalData as ConfirmModalData } from "./components/ConfirmModal";
 import type { IModalData as SelectiveResetModalData } from "./components/SelectiveResetModal";
 import type { IModalData as OverdueTransactionsModalData } from "./components/OverdueTransactionsModal";
 import type { IModalData as TransactionModalData } from "./components/TransactionModal";
+import type { IModalData as ApiKeyModalData } from "./components/ApiKeyModal";
 
 // ============================================================================
 // TYPES
@@ -21,6 +22,7 @@ export interface IModalData {
   SelectiveResetModal: SelectiveResetModalData;
   OverdueTransactionsModal: OverdueTransactionsModalData;
   TransactionModal: TransactionModalData;
+  ApiKeyModal: ApiKeyModalData;
 }
 
 export interface IModal<TModal extends TModalName> {
@@ -56,6 +58,7 @@ export const componentMap: {
   SelectiveResetModal: () => import("./components/SelectiveResetModal"),
   OverdueTransactionsModal: () => import("./components/OverdueTransactionsModal"),
   TransactionModal: () => import("./components/TransactionModal"),
+  ApiKeyModal: () => import("./components/ApiKeyModal"),
 };
 
 // ============================================================================
@@ -93,5 +96,9 @@ export const MODALS: TModalState = {
   TransactionModal: {
     title: "Transaction",
     width: "lg",
+  },
+  ApiKeyModal: {
+    title: "Configure API Key",
+    width: "md",
   },
 };

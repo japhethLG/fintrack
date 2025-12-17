@@ -32,9 +32,15 @@ interface IProps {
   metrics: Metrics;
   budgetedMetrics: MonthlyMetrics;
   actualMetrics: MonthlyMetrics;
+  periodLabel?: string;
 }
 
-const MetricsGrid: React.FC<IProps> = ({ metrics, budgetedMetrics, actualMetrics }) => {
+const MetricsGrid: React.FC<IProps> = ({
+  metrics,
+  budgetedMetrics,
+  actualMetrics,
+  periodLabel,
+}) => {
   const { formatCurrency } = useCurrency();
 
   // Calculate variance percentages
@@ -90,6 +96,7 @@ const MetricsGrid: React.FC<IProps> = ({ metrics, budgetedMetrics, actualMetrics
           icon="credit_card"
           title="Total Debt"
           value={formatCurrency(metrics.totalDebt)}
+          subtitle={`Active in ${periodLabel || "selected period"}`}
           status={metrics.totalDebt > 0 ? "warning" : "success"}
         />
       </div>
@@ -98,7 +105,9 @@ const MetricsGrid: React.FC<IProps> = ({ metrics, budgetedMetrics, actualMetrics
       <Card padding="md">
         <div className="flex items-center gap-2 mb-4">
           <Icon name="compare_arrows" className="text-primary" />
-          <h3 className="text-sm font-semibold text-white">Budgeted vs Actual (This Month)</h3>
+          <h3 className="text-sm font-semibold text-white">
+            Budgeted vs Actual ({periodLabel || "This Month"})
+          </h3>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">

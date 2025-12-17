@@ -1,43 +1,125 @@
 "use client";
 
-import React, { useState, useMemo } from "react";
+import React, { useState, useMemo, useEffect } from "react";
+import dayjs from "dayjs";
 import { useFinancial } from "@/contexts/FinancialContext";
 import { analyzeBudget, AnalysisContext } from "@/lib/services/geminiService";
+import { needsApiKeyConfiguration, isProduction } from "@/lib/services/apiKeyService";
+import { useModal } from "@/components/modals";
 import {
   getRunway,
   getNextCrunch,
   calculateVarianceReport,
   getCategoryBreakdown,
 } from "@/lib/logic/balanceCalculator";
+import { getMonthlyMultiplier, prorateToDateRange } from "@/lib/utils/frequencyUtils";
 import { useCurrency } from "@/lib/hooks/useCurrency";
-import { LoadingSpinner, Icon } from "@/components/common";
+import { LoadingSpinner, Icon, DateRangePicker, Button, Tooltip } from "@/components/common";
 import MetricsGrid from "./components/MetricsGrid";
 import MonthlyOverview from "./components/MonthlyOverview";
 import AIAnalysisPanel from "./components/AIAnalysisPanel";
 
+// Forecast-specific date range presets
+const FORECAST_PRESETS = [
+  {
+    value: "this-month",
+    label: "This Month",
+    range: [dayjs().startOf("month"), dayjs().endOf("month")] as [dayjs.Dayjs, dayjs.Dayjs],
+  },
+  {
+    value: "next-30",
+    label: "Next 30 Days",
+    range: [dayjs(), dayjs().add(30, "day")] as [dayjs.Dayjs, dayjs.Dayjs],
+  },
+  {
+    value: "next-60",
+    label: "Next 60 Days",
+    range: [dayjs(), dayjs().add(60, "day")] as [dayjs.Dayjs, dayjs.Dayjs],
+  },
+  {
+    value: "next-90",
+    label: "Next 90 Days",
+    range: [dayjs(), dayjs().add(90, "day")] as [dayjs.Dayjs, dayjs.Dayjs],
+  },
+  {
+    value: "this-quarter",
+    label: "This Quarter",
+    range: [dayjs().startOf("quarter"), dayjs().endOf("quarter")] as [dayjs.Dayjs, dayjs.Dayjs],
+  },
+];
+
 const Forecast: React.FC = () => {
-  const { userProfile, transactions, incomeSources, expenseRules, billCoverage, isLoading } =
-    useFinancial();
+  const {
+    userProfile,
+    transactions,
+    incomeSources,
+    expenseRules,
+    billCoverage,
+    isLoading,
+    setViewDateRange,
+  } = useFinancial();
   const { currencySymbol } = useCurrency();
+  const { openModal } = useModal();
 
   const [analysis, setAnalysis] = useState<string | null>(null);
   const [analyzing, setAnalyzing] = useState(false);
+  const [apiKeyMissing, setApiKeyMissing] = useState(false);
 
-  // Get current month date range
-  const dateRange = useMemo(() => {
-    const today = new Date();
-    const startOfMonth = new Date(today.getFullYear(), today.getMonth(), 1)
-      .toISOString()
-      .split("T")[0];
-    const endOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0)
-      .toISOString()
-      .split("T")[0];
-    return { start: startOfMonth, end: endOfMonth };
+  // Check API key status on mount and after modal closes
+  useEffect(() => {
+    setApiKeyMissing(needsApiKeyConfiguration());
   }, []);
+
+  const handleOpenApiKeyModal = () => {
+    openModal("ApiKeyModal", {
+      onSave: () => {
+        setApiKeyMissing(needsApiKeyConfiguration());
+      },
+    });
+  };
+
+  // Date range state - Default to current month
+  const [dateRange, setDateRange] = useState<[dayjs.Dayjs | null, dayjs.Dayjs | null]>([
+    dayjs().startOf("month"),
+    dayjs().endOf("month"),
+  ]);
+
+  // Derived date strings for logic functions
+  const dateRangeStr = useMemo(
+    () => ({
+      start: dateRange[0]?.format("YYYY-MM-DD") || dayjs().startOf("month").format("YYYY-MM-DD"),
+      end: dateRange[1]?.format("YYYY-MM-DD") || dayjs().endOf("month").format("YYYY-MM-DD"),
+    }),
+    [dateRange]
+  );
+
+  // Update view date range when user selects dates (expands if needed for projections)
+  useEffect(() => {
+    if (dateRange[0] && dateRange[1]) {
+      setViewDateRange(dateRange[0].format("YYYY-MM-DD"), dateRange[1].format("YYYY-MM-DD"));
+    }
+  }, [dateRange, setViewDateRange]);
+
+  // Get period label for display
+  const periodLabel = useMemo(() => {
+    if (!dateRange[0] || !dateRange[1]) return "Selected Period";
+    const start = dateRange[0];
+    const end = dateRange[1];
+    const daysDiff = end.diff(start, "day") + 1;
+
+    if (
+      daysDiff <= 31 &&
+      start.isSame(start.startOf("month"), "day") &&
+      end.isSame(end.endOf("month"), "day")
+    ) {
+      return start.format("MMMM YYYY");
+    }
+    return `${start.format("MMM D")} - ${end.format("MMM D, YYYY")}`;
+  }, [dateRange]);
 
   // Calculate ACTUAL metrics from transactions (same logic as dashboard)
   const actualMetrics = useMemo(() => {
-    const { start, end } = dateRange;
+    const { start, end } = dateRangeStr;
 
     let income = 0;
     let expenses = 0;
@@ -67,69 +149,70 @@ const Forecast: React.FC = () => {
       monthlySurplus: surplus,
       savingsRate,
     };
-  }, [transactions, dateRange]);
+  }, [transactions, dateRangeStr]);
 
   // Calculate BUDGETED metrics from income sources and expense rules
+  // Prorated to match the selected date range
+  // Only includes sources/rules that are active within the selected period
   const budgetedMetrics = useMemo(() => {
-    const activeIncome = incomeSources.filter((s) => s.isActive);
-    const activeExpenses = expenseRules.filter((r) => r.isActive);
+    const { start, end } = dateRangeStr;
 
+    // Helper to check if a source/rule overlaps with the selected date range
+    const isWithinDateRange = (sourceStart: string, sourceEnd?: string): boolean => {
+      // Source starts after the selected range ends
+      if (sourceStart > end) return false;
+      // Source ends before the selected range starts
+      if (sourceEnd && sourceEnd < start) return false;
+      return true;
+    };
+
+    // Filter to active AND within date range
+    const activeIncome = incomeSources.filter(
+      (s) => s.isActive && isWithinDateRange(s.startDate, s.endDate)
+    );
+    const activeExpenses = expenseRules.filter(
+      (r) => r.isActive && isWithinDateRange(r.startDate, r.endDate)
+    );
+
+    // Calculate monthly equivalent first
     let monthlyIncome = 0;
     activeIncome.forEach((s) => {
-      let monthly = s.amount;
-      switch (s.frequency) {
-        case "weekly":
-          monthly *= 4.33; // More accurate weeks per month
-          break;
-        case "bi-weekly":
-          monthly *= 2.17; // More accurate bi-weekly per month
-          break;
-        case "semi-monthly":
-          monthly *= s.scheduleConfig.specificDays?.length || 2;
-          break;
-        case "quarterly":
-          monthly /= 3;
-          break;
-        case "yearly":
-          monthly /= 12;
-          break;
-      }
-      monthlyIncome += monthly;
+      if (s.frequency === "one-time") return; // Skip one-time for recurring projections
+      const multiplier = getMonthlyMultiplier(s.frequency);
+      monthlyIncome += s.amount * multiplier;
     });
 
     let monthlyExpenses = 0;
     activeExpenses.forEach((r) => {
-      let monthly = r.amount;
-      switch (r.frequency) {
-        case "weekly":
-          monthly *= 4.33;
-          break;
-        case "bi-weekly":
-          monthly *= 2.17;
-          break;
-        case "semi-monthly":
-          monthly *= r.scheduleConfig.specificDays?.length || 2;
-          break;
-        case "quarterly":
-          monthly /= 3;
-          break;
-        case "yearly":
-          monthly /= 12;
-          break;
+      if (r.frequency === "one-time") return; // Skip one-time for recurring projections
+
+      // Handle credit card payment strategies
+      let amount = r.amount;
+      if (r.creditConfig) {
+        if (r.creditConfig.paymentStrategy === "fixed" && r.creditConfig.fixedPaymentAmount) {
+          amount = r.creditConfig.fixedPaymentAmount;
+        } else if (r.creditConfig.paymentStrategy === "full_balance") {
+          amount = r.creditConfig.currentBalance;
+        }
       }
-      monthlyExpenses += monthly;
+
+      const multiplier = getMonthlyMultiplier(r.frequency);
+      monthlyExpenses += amount * multiplier;
     });
 
-    const savingsRate =
-      monthlyIncome > 0 ? ((monthlyIncome - monthlyExpenses) / monthlyIncome) * 100 : 0;
+    // Prorate to selected date range
+    const proratedIncome = prorateToDateRange(monthlyIncome, start, end);
+    const proratedExpenses = prorateToDateRange(monthlyExpenses, start, end);
+    const surplus = proratedIncome - proratedExpenses;
+    const savingsRate = proratedIncome > 0 ? (surplus / proratedIncome) * 100 : 0;
 
     return {
-      monthlyIncome,
-      monthlyExpenses,
-      monthlySurplus: monthlyIncome - monthlyExpenses,
+      monthlyIncome: proratedIncome,
+      monthlyExpenses: proratedExpenses,
+      monthlySurplus: surplus,
       savingsRate,
     };
-  }, [incomeSources, expenseRules]);
+  }, [incomeSources, expenseRules, dateRangeStr]);
 
   // Calculate financial metrics for MetricsGrid
   const metrics = useMemo(() => {
@@ -139,17 +222,26 @@ const Forecast: React.FC = () => {
     const runway = getRunway(balance, transactions);
     const nextCrunch = getNextCrunch(balance, transactions);
 
-    const variance = calculateVarianceReport(transactions, dateRange.start, dateRange.end);
+    const variance = calculateVarianceReport(transactions, dateRangeStr.start, dateRangeStr.end);
 
     // Category breakdown from actual transactions
     const filteredTxns = transactions.filter((t) => {
       const date = t.actualDate || t.scheduledDate;
-      return date >= dateRange.start && date <= dateRange.end;
+      return date >= dateRangeStr.start && date <= dateRangeStr.end;
     });
     const categoryBreakdown = getCategoryBreakdown(filteredTxns, "expense");
 
-    // Debt total
-    const activeExpenses = expenseRules.filter((r) => r.isActive);
+    // Debt total - only for loans/cards active within the selected period
+    // Helper to check date overlap (same logic as budgetedMetrics)
+    const isWithinPeriod = (ruleStart: string, ruleEnd?: string): boolean => {
+      if (ruleStart > dateRangeStr.end) return false;
+      if (ruleEnd && ruleEnd < dateRangeStr.start) return false;
+      return true;
+    };
+
+    const activeExpenses = expenseRules.filter(
+      (r) => r.isActive && isWithinPeriod(r.startDate, r.endDate)
+    );
     let totalDebt = 0;
     activeExpenses.forEach((r) => {
       if (r.loanConfig) totalDebt += r.loanConfig.currentBalance;
@@ -170,7 +262,7 @@ const Forecast: React.FC = () => {
       totalDebt,
       billsAtRisk: billCoverage?.upcomingBills.filter((b) => !b.canCover).length || 0,
     };
-  }, [userProfile, transactions, expenseRules, billCoverage, dateRange, actualMetrics]);
+  }, [userProfile, transactions, expenseRules, billCoverage, dateRangeStr, actualMetrics]);
 
   const handleAnalyze = async () => {
     if (!userProfile) return;
@@ -184,6 +276,15 @@ const Forecast: React.FC = () => {
         currentBalance: userProfile.currentBalance,
         billCoverage: billCoverage || undefined,
         currencySymbol,
+        // Include pre-computed summary for the AI
+        periodSummary: {
+          dateRange: dateRangeStr,
+          actualIncome: actualMetrics.monthlyIncome,
+          actualExpenses: actualMetrics.monthlyExpenses,
+          budgetedIncome: budgetedMetrics.monthlyIncome,
+          budgetedExpenses: budgetedMetrics.monthlyExpenses,
+          savingsRate: actualMetrics.savingsRate,
+        },
       };
 
       const result = await analyzeBudget(context);
@@ -207,15 +308,51 @@ const Forecast: React.FC = () => {
   return (
     <div className="p-6 lg:p-10 max-w-5xl mx-auto animate-fade-in">
       {/* Header */}
-      <div className="text-center mb-10">
-        <div className="w-16 h-16 bg-gradient-to-br from-blue-500 to-purple-600 rounded-2xl mx-auto flex items-center justify-center mb-4 shadow-lg shadow-purple-500/20">
-          <Icon name="smart_toy" size={48} className="text-white" />
+      <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4 mb-8">
+        <div className="text-center lg:text-left">
+          <div className="flex items-center gap-4 mb-2">
+            <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-purple-600 rounded-xl flex items-center justify-center shadow-lg shadow-purple-500/20">
+              <Icon name="smart_toy" size={32} className="text-white" />
+            </div>
+            <div>
+              <h1 className="text-2xl font-bold text-white">AI Financial Forecaster</h1>
+              <p className="text-gray-400 text-sm">Insights for {periodLabel}</p>
+            </div>
+          </div>
         </div>
-        <h1 className="text-3xl font-bold text-white mb-2">AI Financial Forecaster</h1>
-        <p className="text-gray-400 max-w-lg mx-auto">
-          Get intelligent insights about your financial health, spending patterns, and personalized
-          recommendations.
-        </p>
+
+        <div className="flex items-center gap-3">
+          {/* API Key Config Button */}
+          <Tooltip
+            content={apiKeyMissing ? "API key required" : "Configure API key"}
+            position="bottom"
+          >
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={handleOpenApiKeyModal}
+              className={apiKeyMissing && isProduction() ? "text-warning" : ""}
+            >
+              <Icon
+                name="key"
+                size={20}
+                className={apiKeyMissing && isProduction() ? "text-warning" : ""}
+              />
+            </Button>
+          </Tooltip>
+
+          {/* Date Range Picker */}
+          <DateRangePicker
+            value={dateRange as [dayjs.Dayjs | null, dayjs.Dayjs | null]}
+            onChange={(dates) => setDateRange(dates as [dayjs.Dayjs | null, dayjs.Dayjs | null])}
+            presets={FORECAST_PRESETS.map((p) => ({
+              value: p.value,
+              label: p.label,
+              range: p.range as [dayjs.Dayjs, dayjs.Dayjs],
+            }))}
+            className="w-full lg:w-[300px]"
+          />
+        </div>
       </div>
 
       {/* Quick Metrics */}
@@ -224,6 +361,7 @@ const Forecast: React.FC = () => {
           metrics={metrics}
           budgetedMetrics={budgetedMetrics}
           actualMetrics={actualMetrics}
+          periodLabel={periodLabel}
         />
       )}
 
@@ -240,6 +378,7 @@ const Forecast: React.FC = () => {
           budgetedSavingsRate={budgetedMetrics.savingsRate}
           billsAtRisk={metrics.billsAtRisk}
           categoryBreakdown={metrics.categoryBreakdown}
+          periodLabel={periodLabel}
         />
       )}
 

@@ -6,6 +6,7 @@ import {
   VarianceReport,
 } from "@/lib/types";
 import { GoogleGenAI } from "@google/genai";
+import { getEffectiveApiKey, isApiKeyConfigured, isProduction } from "./apiKeyService";
 
 export interface AnalysisContext {
   transactions: Transaction[];
@@ -16,6 +17,15 @@ export interface AnalysisContext {
   varianceReport?: VarianceReport;
   /** Currency symbol to use for formatting (e.g., "$", "₱", "€") */
   currencySymbol?: string;
+  /** Pre-computed summary for the selected period */
+  periodSummary?: {
+    dateRange: { start: string; end: string };
+    actualIncome: number;
+    actualExpenses: number;
+    budgetedIncome: number;
+    budgetedExpenses: number;
+    savingsRate: number;
+  };
 }
 
 export interface AnalysisResult {
@@ -28,9 +38,12 @@ export interface AnalysisResult {
 
 // Initialize Gemini AI client
 const getGeminiClient = () => {
-  const apiKey = process.env.NEXT_PUBLIC_GEMINI_API_KEY;
+  const apiKey = getEffectiveApiKey();
   if (!apiKey) {
-    throw new Error("NEXT_PUBLIC_GEMINI_API_KEY is not configured");
+    if (isProduction()) {
+      throw new Error("API key required. Please configure your Gemini API key.");
+    }
+    throw new Error("NEXT_PUBLIC_GEMINI_API_KEY is not configured and no user key provided.");
   }
   return new GoogleGenAI({ apiKey });
 };
@@ -127,7 +140,20 @@ export const analyzeBudget = async (context: AnalysisContext): Promise<string> =
       currentBalance,
       billCoverage,
       currencySymbol = "$",
+      periodSummary,
     } = context;
+
+    // Format period summary if available
+    const periodSummaryText = periodSummary
+      ? `
+## Period Summary (${periodSummary.dateRange.start} to ${periodSummary.dateRange.end})
+- Actual Income: ${currencySymbol}${periodSummary.actualIncome.toFixed(2)}
+- Actual Expenses: ${currencySymbol}${periodSummary.actualExpenses.toFixed(2)}
+- Budgeted Income: ${currencySymbol}${periodSummary.budgetedIncome.toFixed(2)}
+- Budgeted Expenses: ${currencySymbol}${periodSummary.budgetedExpenses.toFixed(2)}
+- Savings Rate: ${periodSummary.savingsRate.toFixed(1)}%
+`
+      : "";
 
     // Build the prompt
     const prompt = `
@@ -145,6 +171,7 @@ ${formatExpenseRules(expenseRules, currencySymbol)}
 ## Transaction History
 ${formatTransactions(transactions, currencySymbol)}
 ${formatBillCoverage(billCoverage, currencySymbol)}
+${periodSummaryText}
 
 ## Your Analysis
 

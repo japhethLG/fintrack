@@ -72,24 +72,4 @@ export const FREQUENCY_LABELS: Record<string, string> = {
   yearly: "Yearly",
 };
 
-export const getMonthlyMultiplier = (frequency: IncomeFrequency): number => {
-  switch (frequency) {
-    case "daily":
-      return 30;
-    case "weekly":
-      return 52 / 12;
-    case "bi-weekly":
-      return 26 / 12;
-    case "semi-monthly":
-      return 2;
-    case "monthly":
-      return 1;
-    case "quarterly":
-      return 1 / 3;
-    case "yearly":
-      return 1 / 12;
-    case "one-time":
-    default:
-      return 0;
-  }
-};
+export { getMonthlyMultiplier } from "@/lib/utils/frequencyUtils";

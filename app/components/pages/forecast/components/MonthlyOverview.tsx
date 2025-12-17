@@ -22,6 +22,7 @@ interface IProps {
   budgetedSavingsRate: number;
   billsAtRisk: number;
   categoryBreakdown: CategoryBreakdown[];
+  periodLabel?: string;
 }
 
 const MonthlyOverview: React.FC<IProps> = ({
@@ -35,6 +36,7 @@ const MonthlyOverview: React.FC<IProps> = ({
   budgetedSavingsRate,
   billsAtRisk,
   categoryBreakdown,
+  periodLabel,
 }) => {
   const [viewMode, setViewMode] = useState<"actual" | "budgeted" | "comparison">("comparison");
   const { formatCurrency, formatCurrencyWithSign } = useCurrency();
