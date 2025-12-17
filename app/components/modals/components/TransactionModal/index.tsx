@@ -7,7 +7,7 @@ import { useForm, Resolver } from "react-hook-form";
 import { yupResolver } from "@hookform/resolvers/yup";
 import { Transaction } from "@/lib/types";
 import { Button, Icon, Alert, Badge } from "@/components/common";
-import { Form, FormInput } from "@/components/formElements";
+import { Form, FormInput, FormDatePicker } from "@/components/formElements";
 import { cn } from "@/lib/utils/cn";
 import { useCurrency } from "@/lib/hooks/useCurrency";
 import { useFinancial } from "@/contexts/FinancialContext";
@@ -277,7 +277,7 @@ const TransactionModal: React.FC<IProps> = ({ closeModal, modalData }) => {
                 </div>
               )}
 
-              <FormInput inputName="actualDate" type="date" label="Actual Date" />
+              <FormDatePicker inputName="actualDate" label="Actual Date" format="YYYY-MM-DD" />
             </div>
           )}
 

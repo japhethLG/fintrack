@@ -2,7 +2,7 @@
 
 import React from "react";
 import { useFormContext } from "react-hook-form";
-import { FormInput, FormSelect, FormCheckbox } from "@/components/formElements";
+import { FormInput, FormSelect, FormCheckbox, FormDatePicker } from "@/components/formElements";
 import { EXPENSE_CATEGORY_LABELS } from "@/lib/constants";
 import { useCurrency } from "@/lib/hooks/useCurrency";
 import type { ExpenseRuleFormValues } from "../formHelpers";
@@ -24,7 +24,9 @@ const StandardDetailsForm: React.FC = () => {
         <FormInput
           inputName="name"
           label="Expense Name"
-          placeholder={isOneTime ? "e.g., Doctor visit, Car repair" : "e.g., Netflix, Rent, Electric Bill"}
+          placeholder={
+            isOneTime ? "e.g., Doctor visit, Car repair" : "e.g., Netflix, Rent, Electric Bill"
+          }
           isRequired
         />
       </div>
@@ -44,15 +46,9 @@ const StandardDetailsForm: React.FC = () => {
         <FormSelect inputName="category" label="Category" options={categoryOptions} isRequired />
       </div>
 
-      {/* For one-time expenses, include the date field here */}
       {isOneTime && (
         <div>
-          <FormInput
-            inputName="startDate"
-            type="date"
-            label="Date"
-            isRequired
-          />
+          <FormDatePicker inputName="startDate" label="Date" isRequired />
         </div>
       )}
 

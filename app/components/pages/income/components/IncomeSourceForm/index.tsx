@@ -4,7 +4,13 @@ import React, { useState, useMemo, useCallback } from "react";
 import { useForm, Resolver } from "react-hook-form";
 import { yupResolver } from "@hookform/resolvers/yup";
 import { Button, Card, Icon, Input } from "@/components/common";
-import { Form, FormInput, FormSelect, FormCheckbox } from "@/components/formElements";
+import {
+  Form,
+  FormInput,
+  FormSelect,
+  FormCheckbox,
+  FormDatePicker,
+} from "@/components/formElements";
 import { IncomeSourceFormData } from "@/lib/types";
 import { INCOME_CATEGORIES } from "@/lib/constants";
 import { useCurrency } from "@/lib/hooks/useCurrency";
@@ -284,7 +290,7 @@ const IncomeSourceForm: React.FC<IProps> = ({
               </div>
 
               <div>
-                <FormInput inputName="startDate" type="date" label="Start Date" isRequired />
+                <FormDatePicker inputName="startDate" label="Start Date" isRequired />
               </div>
 
               {(frequency === "weekly" || frequency === "bi-weekly") && (
@@ -363,7 +369,7 @@ const IncomeSourceForm: React.FC<IProps> = ({
                 <FormCheckbox inputName="hasEndDate" label="Set End Date" />
                 {hasEndDate && (
                   <div className="mt-3">
-                    <FormInput inputName="endDate" type="date" label="End Date" min={startDate} />
+                    <FormDatePicker inputName="endDate" label="End Date" />
                   </div>
                 )}
               </div>

@@ -2,7 +2,7 @@
 
 import React, { useState } from "react";
 import { useFormContext, useWatch } from "react-hook-form";
-import { FormInput, FormSelect, FormCheckbox } from "@/components/formElements";
+import { FormInput, FormSelect, FormCheckbox, FormDatePicker } from "@/components/formElements";
 import { Button, Icon } from "@/components/common";
 import { FREQUENCY_OPTIONS, DAYS_OF_WEEK, WEEKEND_ADJUSTMENT_OPTIONS } from "../constants";
 import SchedulePreview from "../components/SchedulePreview";
@@ -75,9 +75,8 @@ const ScheduleStep: React.FC<IProps> = ({ totalSteps }) => {
         )}
 
         <div>
-          <FormInput
+          <FormDatePicker
             inputName="startDate"
-            type="date"
             label={
               expenseType === "one-time"
                 ? "Date"
@@ -161,7 +160,7 @@ const ScheduleStep: React.FC<IProps> = ({ totalSteps }) => {
               <FormCheckbox inputName="hasEndDate" label="Set End Date" />
               {hasEndDate && (
                 <div className="mt-3">
-                  <FormInput inputName="endDate" type="date" label="End Date" min={startDate} />
+                  <FormDatePicker inputName="endDate" label="End Date" />
                 </div>
               )}
             </div>

@@ -2,7 +2,7 @@
 
 import React, { useMemo } from "react";
 import { useFormContext, useWatch } from "react-hook-form";
-import { FormInput, FormSelect } from "@/components/formElements";
+import { FormInput, FormSelect, FormDatePicker } from "@/components/formElements";
 import { EXPENSE_CATEGORY_LABELS } from "@/lib/constants";
 import { useCurrency } from "@/lib/hooks/useCurrency";
 import { calculateAmortizationSchedule } from "@/lib/logic/amortization";
@@ -119,12 +119,7 @@ const LoanDetailsForm: React.FC = () => {
       </div>
 
       <div>
-        <FormInput
-          inputName="loanStartDate"
-          type="date"
-          label="Loan Start Date"
-          tooltip="When the loan was issued or when payments began"
-        />
+        <FormDatePicker inputName="loanStartDate" label="Loan Start Date" />
       </div>
 
       <div>
