@@ -2,7 +2,7 @@
 
 import React, { useState, useMemo } from "react";
 import { useFinancial } from "@/contexts/FinancialContext";
-import { Transaction, CompleteTransactionData } from "@/lib/types";
+import { Transaction } from "@/lib/types";
 import { Card, Icon, Select, Badge } from "@/components/common";
 import { formatDate, addDays } from "@/lib/utils/dateUtils";
 import { useCurrency } from "@/lib/hooks/useCurrency";
@@ -15,12 +15,7 @@ const RANGE_OPTIONS = [
 ];
 
 const UpcomingPaymentsWidget: React.FC = () => {
-  const {
-    transactions,
-    markTransactionComplete,
-    markTransactionSkipped,
-    revertTransactionToProjected,
-  } = useFinancial();
+  const { transactions } = useFinancial();
   const { formatCurrency, formatCurrencyWithSign } = useCurrency();
   const { openModal } = useModal();
   const [selectedDays, setSelectedDays] = useState("30");
@@ -110,18 +105,7 @@ const UpcomingPaymentsWidget: React.FC = () => {
                       key={t.id}
                       className="flex items-center justify-between p-4 bg-gray-800/50 rounded-xl border border-gray-800/50 hover:bg-gray-800 transition-colors cursor-pointer"
                       onClick={() => {
-                        openModal("CompleteTransactionModal", {
-                          transaction: t,
-                          onComplete: async (data: CompleteTransactionData) => {
-                            await markTransactionComplete(t.id, data);
-                          },
-                          onSkip: async (notes?: string) => {
-                            await markTransactionSkipped(t.id, notes);
-                          },
-                          onRevert: async () => {
-                            await revertTransactionToProjected(t.id);
-                          },
-                        });
+                        openModal("CompleteTransactionModal", { transaction: t });
                       }}
                     >
                       <div className="flex items-center gap-4">

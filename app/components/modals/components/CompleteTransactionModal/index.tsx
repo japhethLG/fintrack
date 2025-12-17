@@ -4,11 +4,12 @@ import React, { useState } from "react";
 import dayjs from "dayjs";
 import { useForm, Resolver } from "react-hook-form";
 import { yupResolver } from "@hookform/resolvers/yup";
-import { Transaction, CompleteTransactionData } from "@/lib/types";
+import { Transaction } from "@/lib/types";
 import { Button, Icon, Alert, Badge } from "@/components/common";
 import { Form, FormInput } from "@/components/formElements";
 import { cn } from "@/lib/utils/cn";
 import { useCurrency } from "@/lib/hooks/useCurrency";
+import { useFinancial } from "@/contexts/FinancialContext";
 import {
   completeTransactionSchema,
   getDefaultValues,
@@ -17,9 +18,6 @@ import {
 
 export interface IModalData {
   transaction: Transaction;
-  onComplete: (data: CompleteTransactionData) => Promise<void>;
-  onSkip: (notes?: string) => Promise<void>;
-  onRevert?: () => Promise<void>;
   onCloseModal?: () => void;
 }
 
@@ -29,7 +27,9 @@ export interface IProps {
 }
 
 const CompleteTransactionModal: React.FC<IProps> = ({ closeModal, modalData }) => {
-  const { transaction, onComplete, onSkip, onRevert } = modalData;
+  const { transaction } = modalData;
+  const { markTransactionComplete, markTransactionSkipped, revertTransactionToProjected } =
+    useFinancial();
   const { formatCurrency, formatCurrencyWithSign, currencySymbol } = useCurrency();
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -68,15 +68,15 @@ const CompleteTransactionModal: React.FC<IProps> = ({ closeModal, modalData }) =
 
     try {
       if (values.mode === "complete") {
-        await onComplete({
+        await markTransactionComplete(transaction.id, {
           actualAmount: parseFloat(values.actualAmount),
           actualDate: values.actualDate,
           notes: values.notes?.trim() || undefined,
         });
       } else if (values.mode === "skip") {
-        await onSkip(values.notes?.trim() || undefined);
-      } else if (values.mode === "revert" && onRevert) {
-        await onRevert();
+        await markTransactionSkipped(transaction.id, values.notes?.trim() || undefined);
+      } else if (values.mode === "revert") {
+        await revertTransactionToProjected(transaction.id);
       }
       closeModal();
     } catch (err) {
@@ -86,9 +86,8 @@ const CompleteTransactionModal: React.FC<IProps> = ({ closeModal, modalData }) =
     }
   };
 
-  // Determine if revert is available: non-manual, stored transaction, with onRevert callback
+  // Determine if revert is available: non-manual, stored transaction
   const canRevert =
-    onRevert &&
     transaction.sourceType !== "manual" &&
     !transaction.id.startsWith("proj_") &&
     (transaction.status === "completed" || transaction.status === "skipped");

@@ -25,16 +25,7 @@ import FinancialHealthScore from "./components/FinancialHealthScore";
 const Dashboard: React.FC = () => {
   const router = useRouter();
   const { openModal } = useModal();
-  const {
-    userProfile,
-    transactions,
-    dailyBalances,
-    isLoading,
-    markTransactionComplete,
-    markTransactionSkipped,
-    revertTransactionToProjected,
-    setViewDateRange,
-  } = useFinancial();
+  const { userProfile, transactions, dailyBalances, isLoading, setViewDateRange } = useFinancial();
 
   // Date range state - Default to current month
   const [dateRange, setDateRange] = useState<[dayjs.Dayjs | null, dayjs.Dayjs | null]>([
@@ -200,20 +191,9 @@ const Dashboard: React.FC = () => {
 
   const openTransactionModal = useCallback(
     (transaction: Transaction) => {
-      openModal("CompleteTransactionModal", {
-        transaction,
-        onComplete: async (data: { actualAmount: number; actualDate?: string; notes?: string }) => {
-          await markTransactionComplete(transaction.id, data);
-        },
-        onSkip: async (notes?: string) => {
-          await markTransactionSkipped(transaction.id, notes);
-        },
-        onRevert: async () => {
-          await revertTransactionToProjected(transaction.id);
-        },
-      });
+      openModal("CompleteTransactionModal", { transaction });
     },
-    [openModal, markTransactionComplete, markTransactionSkipped, revertTransactionToProjected]
+    [openModal]
   );
 
   if (isLoading) {

@@ -12,7 +12,7 @@ import {
   useSensors,
 } from "@dnd-kit/core";
 import { useFinancial } from "@/contexts/FinancialContext";
-import { Transaction, CompleteTransactionData } from "@/lib/types";
+import { Transaction } from "@/lib/types";
 import { Button, Card, PageHeader, Icon, LoadingSpinner } from "@/components/common";
 import { formatDate, isSameDay, startOfDay } from "@/lib/utils/dateUtils";
 import { getBalanceStatus } from "@/lib/logic/balanceCalculator/utils";
@@ -31,9 +31,6 @@ const CalendarView: React.FC = () => {
     transactions,
     dailyBalances,
     isLoading,
-    markTransactionComplete,
-    markTransactionSkipped,
-    revertTransactionToProjected,
     rescheduleTransaction,
     setViewDateRange,
     userProfile,
@@ -268,20 +265,9 @@ const CalendarView: React.FC = () => {
   // Transaction handlers
   const openTransactionModal = useCallback(
     (transaction: Transaction) => {
-      openModal("CompleteTransactionModal", {
-        transaction,
-        onComplete: async (data: CompleteTransactionData) => {
-          await markTransactionComplete(transaction.id, data);
-        },
-        onSkip: async (notes?: string) => {
-          await markTransactionSkipped(transaction.id, notes);
-        },
-        onRevert: async () => {
-          await revertTransactionToProjected(transaction.id);
-        },
-      });
+      openModal("CompleteTransactionModal", { transaction });
     },
-    [openModal, markTransactionComplete, markTransactionSkipped, revertTransactionToProjected]
+    [openModal]
   );
 
   const handleDragStart = (event: DragStartEvent) => {

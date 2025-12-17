@@ -45,15 +45,7 @@ const TransactionsManager: React.FC = () => {
     );
   };
 
-  const {
-    transactions,
-    isLoading,
-    viewDateRange,
-    setViewDateRange,
-    markTransactionComplete,
-    markTransactionSkipped,
-    revertTransactionToProjected,
-  } = useFinancial();
+  const { transactions, isLoading, viewDateRange, setViewDateRange } = useFinancial();
   const { openModal } = useModal();
 
   const [filterStatus, setFilterStatus] = useState("all");
@@ -124,20 +116,9 @@ const TransactionsManager: React.FC = () => {
 
   const openTransactionModal = useCallback(
     (transaction: Transaction) => {
-      openModal("CompleteTransactionModal", {
-        transaction,
-        onComplete: async (data: { actualAmount: number; actualDate?: string; notes?: string }) => {
-          await markTransactionComplete(transaction.id, data);
-        },
-        onSkip: async (notes?: string) => {
-          await markTransactionSkipped(transaction.id, notes);
-        },
-        onRevert: async () => {
-          await revertTransactionToProjected(transaction.id);
-        },
-      });
+      openModal("CompleteTransactionModal", { transaction });
     },
-    [openModal, markTransactionComplete, markTransactionSkipped, revertTransactionToProjected]
+    [openModal]
   );
 
   // Expand view date range if user selects outside current window

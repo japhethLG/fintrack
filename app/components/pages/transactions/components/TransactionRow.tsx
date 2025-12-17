@@ -75,7 +75,7 @@ const TransactionRow: React.FC<IProps> = ({ transaction, onAction }) => {
 
           {/* Amount */}
           <div className="text-right min-w-[100px]">
-            <p className={cn("font-bold", isIncome ? "text-success" : "text-white")}>
+            <p className={cn("font-bold", isIncome ? "text-success" : "text-danger")}>
               {isIncome ? "+" : "-"}
               {formatCurrency(amount, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
             </p>
