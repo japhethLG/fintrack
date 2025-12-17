@@ -1,0 +1,418 @@
+---
+trigger: model_decision
+description: Governs component structure, code organization, and UI composition patterns for page components and sub-components. Apply when building page managers, list-detail layouts, modals, or any feature UI.
+---
+
+# Page & Component Patterns
+
+## Core Principle
+
+Follow consistent patterns for component structure, state management, and UI composition. Every component follows predictable patterns for maximum maintainability.
+
+## Page Component Structure
+
+### Main Manager Component Pattern
+
+Each page has a "Manager" component as the main entry point:
+
+```tsx
+"use client";
+
+import React, { useState, useMemo } from "react";
+import { useFinancial } from "@/contexts/FinancialContext";
+import { [Type] } from "@/lib/types";
+import { Button, Card, PageHeader, Icon, LoadingSpinner } from "@/components/common";
+import SubComponent from "./components/SubComponent";
+import { CONSTANTS } from "./constants";
+
+const [Feature]Manager: React.FC = () => {
+  // 1. Context hooks
+  const { data, isLoading, actions } = useFinancial();
+
+  // 2. Local state
+  const [selectedItem, setSelectedItem] = useState<Type | null>(null);
+  const [showForm, setShowForm] = useState(false);
+  const [filterValue, setFilterValue] = useState("all");
+
+  // 3. Computed values (useMemo)
+  const filteredData = useMemo(() => {
+    // Filtering logic
+  }, [data, filterValue]);
+
+  const stats = useMemo(() => {
+    // Statistics calculation
+  }, [data]);
+
+  // 4. Event handlers
+  const handleCreate = async (formData: FormData) => {
+    await actions.create(formData);
+    setShowForm(false);
+  };
+
+  const handleDelete = async () => {
+    if (!selectedItem) return;
+    await actions.delete(selectedItem.id);
+    setSelectedItem(null);
+  };
+
+  // 5. Loading state
+  if (isLoading) {
+    return (
+      <div className="p-6 lg:p-10 flex items-center justify-center min-h-[400px]">
+        <LoadingSpinner size="lg" text="Loading [feature]..." />
+      </div>
+    );
+  }
+
+  // 6. Main render
+  return (
+    <div className="p-6 lg:p-10 max-w-7xl mx-auto animate-fade-in">
+      {/* Page Header */}
+      <PageHeader
+        title="[Feature] Management"
+        description="Description text."
+        actions={
+          <Button variant="primary" icon={<Icon name="add" />} iconPosition="left">
+            Add [Item]
+          </Button>
+        }
+      />
+
+      {/* Summary Cards */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+        {/* Stats cards */}
+      </div>
+
+      {/* Main Content */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        {/* List/Grid */}
+        {/* Detail/Form */}
+      </div>
+
+      {/* Modals */}
+      {selectedItem && (
+        <Modal item={selectedItem} onClose={() => setSelectedItem(null)} />
+      )}
+    </div>
+  );
+};
+
+export default [Feature]Manager;
+```
+
+## Component Order Convention
+
+Within every component file, organize code in this order:
+
+```tsx
+"use client";
+
+// 1. External imports
+import React, { useState, useMemo } from "react";
+import { useForm } from "react-hook-form";
+
+// 2. Internal imports - contexts
+import { useFinancial } from "@/contexts/FinancialContext";
+
+// 3. Internal imports - types
+import { Transaction } from "@/lib/types";
+
+// 4. Internal imports - common components
+import { Button, Card, Icon } from "@/components/common";
+
+// 5. Internal imports - form elements
+import { Form, FormInput } from "@/components/formElements";
+
+// 6. Internal imports - local components
+import SubComponent from "./components/SubComponent";
+
+// 7. Internal imports - constants/helpers
+import { CONSTANTS } from "./constants";
+import { helperFunction } from "./formHelpers";
+
+// ============================================================================
+// INTERFACES
+// ============================================================================
+
+interface IProps {
+  required: string;
+  optional?: string;
+}
+
+// ============================================================================
+// COMPONENT
+// ============================================================================
+
+const ComponentName: React.FC<IProps> = ({ required, optional }) => {
+  // Component implementation
+};
+
+export default ComponentName;
+```
+
+## Sub-Component Patterns
+
+### Simple Sub-Component (Single File)
+
+For components without complex logic:
+
+```tsx
+// components/TransactionRow.tsx
+"use client";
+
+import React from "react";
+import { Transaction } from "@/lib/types";
+import { Button, Badge, Icon } from "@/components/common";
+import { STATUS_VARIANTS } from "../constants";
+
+interface IProps {
+  transaction: Transaction;
+  onAction: () => void;
+}
+
+const TransactionRow: React.FC<IProps> = ({ transaction, onAction }) => {
+  return (
+    <div className="flex items-center justify-between p-4 border-b border-gray-800">
+      {/* Row content */}
+    </div>
+  );
+};
+
+export default TransactionRow;
+```
+
+### Complex Sub-Component (Folder)
+
+For components with forms, helpers, or sub-components:
+
+```
+ComplexComponent/
+├── index.tsx           # Main component
+├── formHelpers.ts      # Form validation & defaults
+├── constants.ts        # Component-specific constants
+├── components/         # Sub-sub-components
+│   ├── PartA.tsx
+│   └── PartB.tsx
+└── steps/              # (if multi-step)
+    ├── Step1.tsx
+    └── Step2.tsx
+```
+
+## List-Detail Layout Pattern
+
+Standard two-panel layout for CRUD interfaces:
+
+```tsx
+<div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+  {/* Left: List Panel */}
+  <div className="lg:col-span-1">
+    <Card padding="none">
+      {/* Filter header */}
+      <div className="p-4 border-b border-gray-800">
+        <h3 className="font-bold text-white mb-3">Items</h3>
+        {/* Filter buttons */}
+      </div>
+
+      {/* List */}
+      {items.length === 0 ? (
+        <EmptyState />
+      ) : (
+        <div className="max-h-[600px] overflow-y-auto">
+          {items.map((item) => (
+            <ItemCard
+              key={item.id}
+              item={item}
+              isSelected={selectedId === item.id}
+              onClick={() => setSelectedId(item.id)}
+            />
+          ))}
+        </div>
+      )}
+    </Card>
+  </div>
+
+  {/* Right: Detail Panel */}
+  <div className="lg:col-span-2">
+    {selectedItem ? (
+      <ItemDetail item={selectedItem} onEdit={handleEdit} onDelete={handleDelete} />
+    ) : (
+      <EmptyDetailState />
+    )}
+  </div>
+</div>
+```
+
+## Modal Pattern
+
+```tsx
+const Modal: React.FC<ModalProps> = ({ item, onClose, onAction }) => {
+  return (
+    <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4">
+      <Card padding="lg" className="w-full max-w-lg animate-fade-in">
+        {/* Header */}
+        <div className="flex items-start justify-between mb-6">
+          <div className="flex items-center gap-3">
+            <div className="w-12 h-12 rounded-xl flex items-center justify-center bg-primary/20">
+              <Icon name="icon_name" size={24} />
+            </div>
+            <div>
+              <h2 className="text-xl font-bold text-white">{item.name}</h2>
+              <p className="text-gray-400 text-sm">{item.subtitle}</p>
+            </div>
+          </div>
+          <Button
+            variant="ghost"
+            size="sm"
+            icon={<Icon name="close" size="sm" />}
+            onClick={onClose}
+          />
+        </div>
+
+        {/* Content */}
+        <div className="space-y-4">{/* Modal content */}</div>
+
+        {/* Actions */}
+        <div className="flex gap-3 mt-6 pt-6 border-t border-gray-800">
+          <Button type="button" variant="ghost" className="flex-1" onClick={onClose}>
+            Cancel
+          </Button>
+          <Button type="submit" variant="primary" className="flex-1">
+            Confirm
+          </Button>
+        </div>
+      </Card>
+    </div>
+  );
+};
+```
+
+## Empty State Pattern
+
+```tsx
+{
+  items.length === 0 ? (
+    <div className="p-8 text-center">
+      <Icon name="inbox" size={48} className="text-gray-600 mx-auto mb-4" />
+      <p className="text-gray-400 mb-4">No items yet</p>
+      <Button variant="primary" size="sm" onClick={handleAdd}>
+        Add Your First Item
+      </Button>
+    </div>
+  ) : (
+    <ItemList items={items} />
+  );
+}
+```
+
+## Card Component Patterns
+
+### Clickable Item Card
+
+```tsx
+<Card
+  padding="md"
+  className={cn(
+    "cursor-pointer transition-all duration-200",
+    isSelected ? "ring-2 ring-primary bg-primary/10" : "hover:bg-gray-800/50"
+  )}
+  onClick={onClick}
+>
+  {/* Card content */}
+</Card>
+```
+
+### Summary Stats Cards
+
+```tsx
+<div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+  <Card padding="sm">
+    <p className="text-xs text-gray-400">Total</p>
+    <p className="text-2xl font-bold text-white">{stats.total}</p>
+  </Card>
+  <Card padding="sm">
+    <p className="text-xs text-gray-400">Completed</p>
+    <p className="text-2xl font-bold text-success">{stats.completed}</p>
+  </Card>
+  {/* More stat cards */}
+</div>
+```
+
+## Filter/Sort Pattern
+
+```tsx
+<Card padding="md" className="mb-6">
+  <div className="flex flex-wrap items-center gap-4">
+    <div className="flex-1 min-w-[150px]">
+      <Select
+        label="Status"
+        options={STATUS_OPTIONS}
+        value={filterStatus}
+        onChange={setFilterStatus}
+      />
+    </div>
+    <div className="flex-1 min-w-[150px]">
+      <Select label="Type" options={TYPE_OPTIONS} value={filterType} onChange={setFilterType} />
+    </div>
+    <div className="flex items-end">
+      <Button
+        variant="ghost"
+        size="sm"
+        icon={<Icon name={sortOrder === "asc" ? "arrow_upward" : "arrow_downward"} size="sm" />}
+        onClick={() => setSortOrder((prev) => (prev === "asc" ? "desc" : "asc"))}
+      >
+        {sortOrder === "asc" ? "Oldest First" : "Newest First"}
+      </Button>
+    </div>
+  </div>
+</Card>
+```
+
+## Props Interface Naming
+
+Always name component props interfaces as `IProps`:
+
+```tsx
+interface IProps {
+  item: ItemType;
+  onSelect: (id: string) => void;
+  isSelected?: boolean;
+}
+
+const Component: React.FC<IProps> = ({ item, onSelect, isSelected = false }) => {
+  // ...
+};
+```
+
+## Barrel Export Pattern
+
+Every page component folder should have an `index.ts`:
+
+```tsx
+// components/pages/expenses/index.ts
+export { default as ExpenseManager } from "./ExpenseManager";
+export { default as ExpenseRuleCard } from "./components/ExpenseRuleCard";
+export { default as ExpenseRuleDetail } from "./components/ExpenseRuleDetail";
+export { default as ExpenseRuleForm } from "./components/ExpenseRuleForm";
+```
+
+## CSS/Styling Patterns
+
+### Page Container
+
+```tsx
+<div className="p-6 lg:p-10 max-w-7xl mx-auto animate-fade-in">
+```
+
+### Loading Container
+
+```tsx
+<div className="p-6 lg:p-10 flex items-center justify-center min-h-[400px]">
+  <LoadingSpinner size="lg" text="Loading..." />
+</div>
+```
+
+### Scrollable Lists
+
+```tsx
+<div className="max-h-[600px] overflow-y-auto">{/* List items */}</div>
+```
