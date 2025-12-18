@@ -7,6 +7,7 @@ import Image from "next/image";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button, Icon, Tooltip } from "@/components/common";
 import { cn } from "@/lib/utils/cn";
+import { getAssetPath } from "@/lib/utils/assetPath";
 
 const SIDEBAR_COLLAPSED_KEY = "sidebar-collapsed";
 
@@ -65,7 +66,13 @@ const Sidebar: React.FC = () => {
       >
         <Link href="/" className="flex items-center gap-3 group">
           <div className="w-10 h-10 rounded-xl overflow-hidden shrink-0 shadow-lg shadow-primary/20 group-hover:shadow-primary/40 transition-shadow">
-            <Image src="/logo.png" alt="FinTrack" width={40} height={40} className="object-cover" />
+            <Image
+              src={getAssetPath("/logo.png")}
+              alt="FinTrack"
+              width={40}
+              height={40}
+              className="object-cover"
+            />
           </div>
           <span
             className={cn(

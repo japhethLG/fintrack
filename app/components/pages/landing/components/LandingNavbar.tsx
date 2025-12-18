@@ -5,6 +5,7 @@ import Link from "next/link";
 import Image from "next/image";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button, Icon } from "@/components/common";
+import { getAssetPath } from "@/lib/utils/assetPath";
 
 export const LandingNavbar: React.FC = () => {
   const { user, userProfile, loading } = useAuth();
@@ -17,7 +18,7 @@ export const LandingNavbar: React.FC = () => {
           {/* Logo */}
           <Link href="/" className="flex items-center gap-3 group">
             <div className="relative w-10 h-10 rounded-xl overflow-hidden shadow-lg shadow-primary/20 group-hover:shadow-primary/40 transition-shadow">
-              <Image src="/logo.png" alt="FinTrack" fill className="object-cover" />
+              <Image src={getAssetPath("/logo.png")} alt="FinTrack" fill className="object-cover" />
             </div>
             <span className="text-xl font-bold text-white">FinTrack</span>
           </Link>

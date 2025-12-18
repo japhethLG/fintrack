@@ -4,6 +4,7 @@ import React from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { Icon } from "@/components/common";
+import { getAssetPath } from "@/lib/utils/assetPath";
 
 export const LandingFooter: React.FC = () => {
   const currentYear = new Date().getFullYear();
@@ -16,7 +17,12 @@ export const LandingFooter: React.FC = () => {
           <div className="flex flex-col items-center md:items-start gap-4">
             <Link href="/" className="flex items-center gap-3">
               <div className="relative w-10 h-10 rounded-xl overflow-hidden">
-                <Image src="/logo.png" alt="FinTrack" fill className="object-cover" />
+                <Image
+                  src={getAssetPath("/logo.png")}
+                  alt="FinTrack"
+                  fill
+                  className="object-cover"
+                />
               </div>
               <span className="text-xl font-bold text-white">FinTrack</span>
             </Link>

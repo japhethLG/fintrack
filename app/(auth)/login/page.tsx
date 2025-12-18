@@ -4,6 +4,7 @@ import { useState, FormEvent, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button, Input, Alert, Divider, LoadingSpinner, Card, Icon } from "@/components/common";
+import { getAssetPath } from "@/lib/utils/assetPath";
 
 const getAuthErrorMessage = (error: unknown): string => {
   const errorMessage = error instanceof Error ? error.message : String(error);
@@ -88,7 +89,11 @@ export default function LoginPage() {
     <Card variant="elevated" padding="lg">
       <div className="text-center mb-8">
         <div className="w-16 h-16 rounded-2xl mx-auto overflow-hidden mb-4 shadow-lg shadow-primary/20">
-          <img src="/logo.png" alt="FinTrack" className="w-full h-full object-cover" />
+          <img
+            src={getAssetPath("/logo.png")}
+            alt="FinTrack"
+            className="w-full h-full object-cover"
+          />
         </div>
         <h1 className="text-3xl font-bold text-white mb-2">Welcome to FinTrack</h1>
         <p className="text-gray-400">Sign in to manage your finances</p>
