@@ -7,8 +7,31 @@ import { useAuth } from "@/contexts/AuthContext";
 import { Button, Icon } from "@/components/common";
 import { getAssetPath } from "@/lib/utils/assetPath";
 
+const navLinks = [
+  { href: "#features", label: "Features" },
+  { href: "#how-it-works", label: "How It Works" },
+  { href: "#faq", label: "FAQ" },
+];
+
 export const LandingNavbar: React.FC = () => {
   const { user, userProfile, loading } = useAuth();
+
+  const handleSmoothScroll = (e: React.MouseEvent<HTMLAnchorElement>, href: string) => {
+    e.preventDefault();
+    const targetId = href.replace("#", "");
+    const element = document.getElementById(targetId);
+
+    if (element) {
+      const navHeight = 80; // Height of fixed navbar
+      const elementPosition = element.getBoundingClientRect().top + window.scrollY;
+      const offsetPosition = elementPosition - navHeight;
+
+      window.scrollTo({
+        top: offsetPosition,
+        behavior: "smooth",
+      });
+    }
+  };
 
   return (
     <nav className="fixed top-0 left-0 right-0 z-50">
@@ -25,18 +48,17 @@ export const LandingNavbar: React.FC = () => {
 
           {/* Navigation Links */}
           <div className="hidden md:flex items-center gap-8">
-            <a
-              href="#features"
-              className="text-gray-400 hover:text-white transition-colors text-sm font-medium"
-            >
-              Features
-            </a>
-            <a
-              href="#how-it-works"
-              className="text-gray-400 hover:text-white transition-colors text-sm font-medium"
-            >
-              How It Works
-            </a>
+            {navLinks.map((link) => (
+              <a
+                key={link.href}
+                href={link.href}
+                onClick={(e) => handleSmoothScroll(e, link.href)}
+                className="text-gray-400 hover:text-white transition-colors text-sm font-medium relative group cursor-pointer"
+              >
+                {link.label}
+                <span className="absolute -bottom-1 left-0 w-0 h-0.5 bg-primary transition-all duration-300 group-hover:w-full" />
+              </a>
+            ))}
           </div>
 
           {/* Auth Section */}
