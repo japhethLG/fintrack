@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import { useRouter, usePathname } from "next/navigation";
+import Link from "next/link";
 import Image from "next/image";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button, Icon, Tooltip } from "@/components/common";
@@ -62,17 +63,19 @@ const Sidebar: React.FC = () => {
           isCollapsed ? "justify-center px-0" : "justify-center lg:justify-start lg:px-6"
         )}
       >
-        <div className="w-10 h-10 bg-primary rounded-xl flex items-center justify-center shrink-0">
-          <Icon name="account_balance" className="text-white" />
-        </div>
-        <span
-          className={cn(
-            "text-white font-bold text-xl transition-opacity duration-300",
-            isCollapsed ? "hidden" : "hidden lg:block"
-          )}
-        >
-          FinTrack
-        </span>
+        <Link href="/" className="flex items-center gap-3 group">
+          <div className="w-10 h-10 rounded-xl overflow-hidden shrink-0 shadow-lg shadow-primary/20 group-hover:shadow-primary/40 transition-shadow">
+            <Image src="/logo.png" alt="FinTrack" width={40} height={40} className="object-cover" />
+          </div>
+          <span
+            className={cn(
+              "text-white font-bold text-xl transition-opacity duration-300 group-hover:text-primary",
+              isCollapsed ? "hidden" : "hidden lg:block"
+            )}
+          >
+            FinTrack
+          </span>
+        </Link>
         <button
           onClick={() => setIsCollapsed(!isCollapsed)}
           className="absolute right-0 top-1/2 -translate-y-1/2 translate-x-1/2 w-6 h-6 rounded-full flex items-center justify-center text-gray-400 hover:text-white hover:bg-gray-800 transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-primary/20 z-10 bg-[#151c2c] border border-gray-800 shadow-lg hidden lg:flex"
@@ -176,9 +179,7 @@ const Sidebar: React.FC = () => {
           fullWidth
           className={cn(
             "rounded-xl text-gray-400 hover:bg-gray-800 hover:text-danger transition-colors",
-            isCollapsed
-              ? "flex items-center justify-center p-2"
-              : "flex items-center gap-3 p-2"
+            isCollapsed ? "flex items-center justify-center p-2" : "flex items-center gap-3 p-2"
           )}
           icon={<Icon name="logout" size="sm" />}
           iconPosition="left"
