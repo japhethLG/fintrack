@@ -8,6 +8,86 @@ import {
 import { GoogleGenAI } from "@google/genai";
 import { getEffectiveApiKey, isApiKeyConfigured, isProduction } from "./apiKeyService";
 
+// ============================================================================
+// MODEL TYPES
+// ============================================================================
+
+export interface GeminiModel {
+  name: string;
+  displayName: string;
+  description: string;
+  supportedGenerationMethods: string[];
+}
+
+interface ModelsApiResponse {
+  models: Array<{
+    name: string;
+    displayName: string;
+    description: string;
+    supportedGenerationMethods: string[];
+  }>;
+}
+
+// Default model to use
+export const DEFAULT_MODEL = "gemini-2.5-flash";
+
+// ============================================================================
+// FETCH AVAILABLE MODELS
+// ============================================================================
+
+/**
+ * Fetches available Gemini models from the Google Generative Language API.
+ * Filters to only include models that support generateContent.
+ */
+export const fetchAvailableModels = async (): Promise<GeminiModel[]> => {
+  const apiKey = getEffectiveApiKey();
+  if (!apiKey) {
+    throw new Error("API key required to fetch models");
+  }
+
+  try {
+    const response = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`
+    );
+
+    if (!response.ok) {
+      throw new Error(`Failed to fetch models: ${response.statusText}`);
+    }
+
+    const data: ModelsApiResponse = await response.json();
+
+    // Filter to only Gemini 2.5+ models that support generateContent
+    // Exclude preview, experimental, and older models
+    return data.models
+      .filter((model) => {
+        const name = model.name.toLowerCase();
+        // Must support generateContent
+        if (!model.supportedGenerationMethods?.includes("generateContent")) return false;
+        // Only include gemini-2.5 or newer
+        if (!name.includes("gemini-2.5")) return false;
+        // Exclude preview and experimental models
+        if (name.includes("preview") || name.includes("exp")) return false;
+        // Exclude nano models (check both name and displayName)
+        if (name.includes("nano") || model.displayName.toLowerCase().includes("nano")) return false;
+        return true;
+      })
+      .map((model) => ({
+        name: model.name.replace("models/", ""), // Strip "models/" prefix
+        displayName: model.displayName,
+        description: model.description,
+        supportedGenerationMethods: model.supportedGenerationMethods,
+      }))
+      .sort((a, b) => a.displayName.localeCompare(b.displayName));
+  } catch (error) {
+    console.error("Error fetching models:", error);
+    throw error;
+  }
+};
+
+// ============================================================================
+// ANALYSIS TYPES
+// ============================================================================
+
 export interface AnalysisContext {
   transactions: Transaction[];
   incomeSources: IncomeSource[];
@@ -130,7 +210,10 @@ const formatBillCoverage = (billCoverage: BillCoverageReport | undefined, symbol
   return text;
 };
 
-export const analyzeBudget = async (context: AnalysisContext): Promise<string> => {
+export const analyzeBudget = async (
+  context: AnalysisContext,
+  model: string = DEFAULT_MODEL
+): Promise<string> => {
   try {
     const ai = getGeminiClient();
     const {
@@ -201,9 +284,9 @@ Suggest 1-2 opportunities for savings or financial optimization based on their d
 Be direct, specific, and helpful. Use the actual numbers from their data. Avoid generic advice.
 `;
 
-    // Generate content using Gemini
+    // Generate content using Gemini with selected model
     const response = await ai.models.generateContent({
-      model: "gemini-2.0-flash",
+      model,
       contents: prompt,
     });
 

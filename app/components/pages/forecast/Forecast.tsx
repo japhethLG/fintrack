@@ -3,8 +3,18 @@
 import React, { useState, useMemo, useEffect } from "react";
 import dayjs from "dayjs";
 import { useFinancial } from "@/contexts/FinancialContext";
-import { analyzeBudget, AnalysisContext } from "@/lib/services/geminiService";
-import { needsApiKeyConfiguration, isProduction } from "@/lib/services/apiKeyService";
+import {
+  analyzeBudget,
+  AnalysisContext,
+  fetchAvailableModels,
+  GeminiModel,
+  DEFAULT_MODEL,
+} from "@/lib/services/geminiService";
+import {
+  needsApiKeyConfiguration,
+  isProduction,
+  getEffectiveApiKey,
+} from "@/lib/services/apiKeyService";
 import { useModal } from "@/components/modals";
 import {
   getRunway,
@@ -14,7 +24,14 @@ import {
 } from "@/lib/logic/balanceCalculator";
 import { getMonthlyMultiplier, prorateToDateRange } from "@/lib/utils/frequencyUtils";
 import { useCurrency } from "@/lib/hooks/useCurrency";
-import { LoadingSpinner, Icon, DateRangePicker, Button, Tooltip } from "@/components/common";
+import {
+  LoadingSpinner,
+  Icon,
+  DateRangePicker,
+  Button,
+  Tooltip,
+  Select,
+} from "@/components/common";
 import MetricsGrid from "./components/MetricsGrid";
 import MonthlyOverview from "./components/MonthlyOverview";
 import AIAnalysisPanel from "./components/AIAnalysisPanel";
@@ -65,10 +82,44 @@ const Forecast: React.FC = () => {
   const [analyzing, setAnalyzing] = useState(false);
   const [apiKeyMissing, setApiKeyMissing] = useState(false);
 
+  // Model picker state
+  const [selectedModel, setSelectedModel] = useState<string>(DEFAULT_MODEL);
+  const [availableModels, setAvailableModels] = useState<GeminiModel[]>([]);
+  const [loadingModels, setLoadingModels] = useState(false);
+
   // Check API key status on mount and after modal closes
   useEffect(() => {
     setApiKeyMissing(needsApiKeyConfiguration());
   }, []);
+
+  // Fetch available models when API key is available
+  useEffect(() => {
+    const loadModels = async () => {
+      const apiKey = getEffectiveApiKey();
+      if (!apiKey) {
+        setAvailableModels([]);
+        return;
+      }
+
+      setLoadingModels(true);
+      try {
+        const models = await fetchAvailableModels();
+        setAvailableModels(models);
+        // If current selection isn't in the list, reset to default
+        if (models.length > 0 && !models.find((m) => m.name === selectedModel)) {
+          const defaultExists = models.find((m) => m.name === DEFAULT_MODEL);
+          setSelectedModel(defaultExists ? DEFAULT_MODEL : models[0].name);
+        }
+      } catch (error) {
+        console.error("Failed to load models:", error);
+        setAvailableModels([]);
+      } finally {
+        setLoadingModels(false);
+      }
+    };
+
+    loadModels();
+  }, [apiKeyMissing]); // Re-fetch when API key status changes
 
   const handleOpenApiKeyModal = () => {
     openModal("ApiKeyModal", {
@@ -287,7 +338,7 @@ const Forecast: React.FC = () => {
         },
       };
 
-      const result = await analyzeBudget(context);
+      const result = await analyzeBudget(context, selectedModel);
       setAnalysis(result);
     } catch (error) {
       console.error("Failed to analyze budget:", error);
@@ -339,6 +390,34 @@ const Forecast: React.FC = () => {
                 className={apiKeyMissing && isProduction() ? "text-warning" : ""}
               />
             </Button>
+          </Tooltip>
+
+          {/* Model Picker */}
+          <Tooltip
+            content={
+              availableModels.find((m) => m.name === selectedModel)?.description ||
+              "Select AI model"
+            }
+            position="bottom"
+          >
+            <div className="w-full lg:w-[200px]">
+              <Select
+                value={selectedModel}
+                onChange={setSelectedModel}
+                options={
+                  loadingModels
+                    ? [{ value: selectedModel, label: "Loading models..." }]
+                    : availableModels.length > 0
+                      ? availableModels.map((m) => ({
+                          value: m.name,
+                          label: m.displayName,
+                        }))
+                      : [{ value: DEFAULT_MODEL, label: "Gemini 2.5 Flash" }]
+                }
+                placeholder="Select model"
+                disabled={loadingModels || apiKeyMissing}
+              />
+            </div>
           </Tooltip>
 
           {/* Date Range Picker */}
