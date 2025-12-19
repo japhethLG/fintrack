@@ -198,7 +198,7 @@ const Dashboard: React.FC = () => {
 
   if (isLoading) {
     return (
-      <div className="p-6 lg:p-10 flex items-center justify-center min-h-[400px]">
+      <div className="p-4 lg:p-10 flex items-center justify-center min-h-[400px]">
         <LoadingSpinner size="lg" text="Loading dashboard..." />
       </div>
     );
@@ -207,7 +207,7 @@ const Dashboard: React.FC = () => {
   const currentBalance = userProfile?.currentBalance || 0;
 
   return (
-    <div className="p-6 lg:p-10 max-w-7xl mx-auto animate-fade-in">
+    <div className="p-4 lg:p-10 max-w-7xl mx-auto animate-fade-in">
       <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4 mb-8">
         <div>
           <h1 className="text-2xl font-bold text-white mb-1">Dashboard</h1>
@@ -252,7 +252,7 @@ const Dashboard: React.FC = () => {
       </div>
 
       {/* KPI Cards - 2 column layout */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 lg:gap-6 mb-6 lg:mb-8">
         <KPICards currentBalance={currentBalance} stats={periodStats} />
         <FinancialHealthScore healthScore={healthScore} />
       </div>
@@ -261,7 +261,7 @@ const Dashboard: React.FC = () => {
       <OverdueAlert overdueTransactions={overdueTransactions} onReview={openTransactionModal} />
 
       {/* Main Content Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-8">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 lg:gap-8 mb-6 lg:mb-8">
         {/* Cash Flow Chart */}
         <CashFlowChart data={chartData} />
 
@@ -269,7 +269,7 @@ const Dashboard: React.FC = () => {
         <PeriodComparison transactions={transactions} dateRange={dateRangeStr} />
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-8">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 lg:gap-8 mb-6 lg:mb-8">
         {/* Income vs Expense Chart */}
         <IncomeExpenseChart transactions={transactions} dateRange={dateRangeStr} />
 
@@ -283,7 +283,7 @@ const Dashboard: React.FC = () => {
       </div>
 
       {/* Bottom Grid */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8 mb-8">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 lg:gap-8 mb-6 lg:mb-8">
         {/* Upcoming Activity Widget */}
         <div className="lg:col-span-2">
           <UpcomingActivityWidget onTransactionClick={openTransactionModal} />

@@ -144,14 +144,14 @@ const TransactionsManager: React.FC = () => {
 
   if (isLoading) {
     return (
-      <div className="p-6 lg:p-10 flex items-center justify-center min-h-[400px]">
+      <div className="p-4 lg:p-10 flex items-center justify-center min-h-[400px]">
         <LoadingSpinner size="lg" text="Loading transactions..." />
       </div>
     );
   }
 
   return (
-    <div className="p-6 lg:p-10 max-w-7xl mx-auto animate-fade-in">
+    <div className="p-4 lg:p-10 max-w-7xl mx-auto animate-fade-in">
       <PageHeader
         title="Transactions"
         description="View and manage all your financial transactions."
@@ -163,28 +163,28 @@ const TransactionsManager: React.FC = () => {
       />
 
       {/* Summary Cards */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-2 lg:gap-4 mb-4 lg:mb-6">
         <Card padding="sm">
           <p className="text-xs text-gray-400">Total</p>
-          <p className="text-2xl font-bold text-white">{stats.total}</p>
+          <p className="text-xl lg:text-2xl font-bold text-white">{stats.total}</p>
         </Card>
         <Card padding="sm">
           <p className="text-xs text-gray-400">Completed</p>
-          <p className="text-2xl font-bold text-success">{stats.completed}</p>
+          <p className="text-xl lg:text-2xl font-bold text-success">{stats.completed}</p>
         </Card>
         <Card padding="sm">
           <p className="text-xs text-gray-400">Pending</p>
-          <p className="text-2xl font-bold text-warning">{stats.pending}</p>
+          <p className="text-xl lg:text-2xl font-bold text-warning">{stats.pending}</p>
         </Card>
         <Card padding="sm">
           <p className="text-xs text-gray-400">Overdue</p>
-          <p className="text-2xl font-bold text-danger">{stats.overdue}</p>
+          <p className="text-xl lg:text-2xl font-bold text-danger">{stats.overdue}</p>
         </Card>
       </div>
 
       {/* Filters */}
-      <Card padding="md" className="mb-6">
-        <div className="flex flex-wrap items-center gap-4">
+      <Card padding="md" className="mb-4 lg:mb-6">
+        <div className="flex flex-wrap items-end gap-2 lg:gap-4">
           <div className="flex-1 min-w-[150px]">
             <Select
               label="Status"
@@ -217,7 +217,7 @@ const TransactionsManager: React.FC = () => {
               onChange={(v) => setSortOrder(v as "asc" | "desc")}
             />
           </div>
-          <div className="flex-1 min-w-[220px]">
+          <div className="flex-1 min-w-[120px] lg:min-w-[220px]">
             <DateRangePicker
               label="Date Range"
               value={dateRange ?? [null, null]}

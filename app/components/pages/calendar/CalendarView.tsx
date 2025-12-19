@@ -17,7 +17,7 @@ import { Button, Card, PageHeader, Icon, LoadingSpinner } from "@/components/com
 import { formatDate, isSameDay, startOfDay } from "@/lib/utils/dateUtils";
 import { getBalanceStatus } from "@/lib/logic/balanceCalculator/utils";
 import { useModal } from "@/components/modals";
-import { WEEKDAYS } from "./constants";
+import { WEEKDAYS, WEEKDAYS_SHORT } from "./constants";
 import type { CalendarDay } from "./types";
 import DayCell from "./components/DayCell";
 import WeekDayCell from "./components/WeekDayCell";
@@ -379,7 +379,7 @@ const CalendarView: React.FC = () => {
 
   if (isLoading) {
     return (
-      <div className="p-6 lg:p-10 flex items-center justify-center min-h-[400px]">
+      <div className="p-4 lg:p-10 flex items-center justify-center min-h-[400px]">
         <LoadingSpinner size="lg" text="Loading calendar..." />
       </div>
     );
@@ -387,16 +387,16 @@ const CalendarView: React.FC = () => {
 
   return (
     <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
-      <div className="p-6 lg:p-10 max-w-7xl mx-auto animate-fade-in">
+      <div className="p-4 lg:p-10 max-w-7xl mx-auto animate-fade-in">
         <PageHeader
           title="Financial Calendar"
           description="Visualize your cash flow and upcoming transactions."
           actions={
-            <div className="flex items-center gap-4">
+            <div className="flex flex-wrap items-center gap-2 lg:gap-4">
               <Button variant="secondary" size="sm" onClick={goToToday}>
                 Today
               </Button>
-              <div className="flex items-center gap-2 bg-gray-800 p-1 rounded-lg">
+              <div className="flex items-center gap-1 bg-gray-800 p-1 rounded-lg">
                 <Button
                   variant={viewMode === "month" ? "primary" : "ghost"}
                   size="sm"
@@ -440,9 +440,9 @@ const CalendarView: React.FC = () => {
           endDateLabel={periodBalance.endDateLabel}
         />
 
-        <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+        <div className="grid grid-cols-1 lg:grid-cols-4 gap-4 lg:gap-6">
           {/* Calendar Grid */}
-          <div className="lg:col-span-3">
+          <div className="lg:col-span-3 order-1">
             <Card padding="none" ref={calendarCardRef}>
               {/* Header */}
               <div className="p-4 border-b border-gray-800 flex items-center justify-between">
@@ -470,9 +470,13 @@ const CalendarView: React.FC = () => {
                 <>
                   {/* Weekday headers */}
                   <div className="grid grid-cols-7 border-b border-gray-800">
-                    {WEEKDAYS.map((day) => (
-                      <div key={day} className="p-2 text-center text-sm font-medium text-gray-400">
-                        {day}
+                    {WEEKDAYS.map((day, index) => (
+                      <div
+                        key={day}
+                        className="p-1 lg:p-2 text-center text-xs lg:text-sm font-medium text-gray-400"
+                      >
+                        <span className="hidden sm:inline">{day}</span>
+                        <span className="sm:hidden">{WEEKDAYS_SHORT[index]}</span>
                       </div>
                     ))}
                   </div>
@@ -516,7 +520,7 @@ const CalendarView: React.FC = () => {
               )}
 
               {/* Legend */}
-              <div className="p-4 border-t border-gray-800 flex gap-6 text-sm">
+              <div className="p-3 lg:p-4 border-t border-gray-800 flex flex-wrap gap-3 lg:gap-6 text-xs lg:text-sm">
                 <div className="flex items-center gap-2">
                   <div className="w-3 h-3 rounded-full bg-success" />
                   <span className="text-gray-300">Income</span>
@@ -534,7 +538,7 @@ const CalendarView: React.FC = () => {
           </div>
 
           {/* Day Detail Sidebar */}
-          <div className="lg:col-span-1">
+          <div className="lg:col-span-1 order-2">
             <DayDetailSidebar
               selectedDate={selectedDate}
               dayBalance={selectedDayBalance || null}

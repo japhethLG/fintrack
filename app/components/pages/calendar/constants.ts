@@ -1,6 +1,7 @@
 import { BalanceStatus } from "@/lib/types";
 
 export const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+export const WEEKDAYS_SHORT = ["S", "M", "T", "W", "T", "F", "S"];
 
 export const STATUS_COLORS: Record<BalanceStatus, string> = {
   safe: "text-success",

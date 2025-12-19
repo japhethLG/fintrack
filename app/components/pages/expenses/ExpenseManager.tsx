@@ -128,14 +128,14 @@ const ExpenseManager: React.FC = () => {
 
   if (isLoading) {
     return (
-      <div className="p-6 lg:p-10 flex items-center justify-center min-h-[400px]">
+      <div className="p-4 lg:p-10 flex items-center justify-center min-h-[400px]">
         <LoadingSpinner size="lg" text="Loading expenses..." />
       </div>
     );
   }
 
   return (
-    <div className="p-6 lg:p-10 max-w-7xl mx-auto animate-fade-in">
+    <div className="p-4 lg:p-10 max-w-7xl mx-auto animate-fade-in">
       <PageHeader
         title="Expense Management"
         description="Track bills, loans, credit cards, and recurring expenses."
@@ -158,32 +158,32 @@ const ExpenseManager: React.FC = () => {
 
       {/* Summary Cards */}
       {!showForm && (
-        <div className="grid grid-cols-1 md:grid-cols-5 gap-6 mb-8">
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-3 lg:gap-6 mb-6 lg:mb-8">
           <Card padding="md">
-            <p className="text-gray-400 text-sm mb-1">Active Expenses</p>
-            <p className="text-3xl font-bold text-white">{activeRules.length}</p>
+            <p className="text-gray-400 text-xs lg:text-sm mb-1">Active Expenses</p>
+            <p className="text-xl lg:text-3xl font-bold text-white">{activeRules.length}</p>
           </Card>
           <Card padding="md">
-            <p className="text-gray-400 text-sm mb-1">Monthly Recurring</p>
-            <p className="text-3xl font-bold text-danger">
+            <p className="text-gray-400 text-xs lg:text-sm mb-1">Monthly Recurring</p>
+            <p className="text-lg lg:text-3xl font-bold text-danger">
               {formatCurrency(recurringMonthly, { maximumFractionDigits: 0 })}
             </p>
           </Card>
           <Card padding="md">
-            <p className="text-gray-400 text-sm mb-1">One-time Expenses</p>
-            <p className="text-3xl font-bold text-warning">
+            <p className="text-gray-400 text-xs lg:text-sm mb-1">One-time</p>
+            <p className="text-lg lg:text-3xl font-bold text-warning">
               {formatCurrency(oneTimeTotal, { maximumFractionDigits: 0 })}
             </p>
           </Card>
           <Card padding="md">
-            <p className="text-gray-400 text-sm mb-1">Total Debt</p>
-            <p className="text-3xl font-bold text-danger">
+            <p className="text-gray-400 text-xs lg:text-sm mb-1">Total Debt</p>
+            <p className="text-lg lg:text-3xl font-bold text-danger">
               {formatCurrency(totalDebt, { maximumFractionDigits: 0 })}
             </p>
           </Card>
           <Card padding="md">
-            <p className="text-gray-400 text-sm mb-1">Priority Bills</p>
-            <p className="text-3xl font-bold text-warning">
+            <p className="text-gray-400 text-xs lg:text-sm mb-1">Priority Bills</p>
+            <p className="text-xl lg:text-3xl font-bold text-warning">
               {activeRules.filter((r) => r.isPriority).length}
             </p>
           </Card>
@@ -250,7 +250,7 @@ const ExpenseManager: React.FC = () => {
           />
         </Card>
       ) : (
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 lg:gap-8">
           {/* Left: List */}
           <div className="lg:col-span-1">
             <Card padding="none">

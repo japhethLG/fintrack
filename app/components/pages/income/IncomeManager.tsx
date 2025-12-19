@@ -99,14 +99,14 @@ const IncomeManager: React.FC = () => {
 
   if (isLoading) {
     return (
-      <div className="p-6 lg:p-10 flex items-center justify-center min-h-[400px]">
+      <div className="p-4 lg:p-10 flex items-center justify-center min-h-[400px]">
         <LoadingSpinner size="lg" text="Loading income sources..." />
       </div>
     );
   }
 
   return (
-    <div className="p-6 lg:p-10 max-w-7xl mx-auto animate-fade-in">
+    <div className="p-4 lg:p-10 max-w-7xl mx-auto animate-fade-in">
       <PageHeader
         title="Income Management"
         description="Track your salary, freelance income, investments, and other revenue streams."
@@ -129,26 +129,26 @@ const IncomeManager: React.FC = () => {
 
       {/* Summary Cards */}
       {!showForm && (
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 lg:gap-6 mb-6 lg:mb-8">
           <Card padding="md">
-            <p className="text-gray-400 text-sm mb-1">Active Sources</p>
-            <p className="text-3xl font-bold text-white">{activeSources.length}</p>
+            <p className="text-gray-400 text-xs lg:text-sm mb-1">Active Sources</p>
+            <p className="text-2xl lg:text-3xl font-bold text-white">{activeSources.length}</p>
           </Card>
           <Card padding="md">
-            <p className="text-gray-400 text-sm mb-1">Monthly Recurring</p>
-            <p className="text-3xl font-bold text-success">
+            <p className="text-gray-400 text-xs lg:text-sm mb-1">Monthly Recurring</p>
+            <p className="text-xl lg:text-3xl font-bold text-success">
               {formatCurrency(recurringMonthly, { maximumFractionDigits: 0 })}
             </p>
           </Card>
           <Card padding="md">
-            <p className="text-gray-400 text-sm mb-1">Annual Projection</p>
-            <p className="text-3xl font-bold text-success">
+            <p className="text-gray-400 text-xs lg:text-sm mb-1">Annual Projection</p>
+            <p className="text-xl lg:text-3xl font-bold text-success">
               {formatCurrency(recurringMonthly * 12, { maximumFractionDigits: 0 })}
             </p>
           </Card>
           <Card padding="md">
-            <p className="text-gray-400 text-sm mb-1">One-time Income</p>
-            <p className="text-3xl font-bold text-primary">
+            <p className="text-gray-400 text-xs lg:text-sm mb-1">One-time Income</p>
+            <p className="text-xl lg:text-3xl font-bold text-primary">
               {formatCurrency(oneTimeTotal, { maximumFractionDigits: 0 })}
             </p>
           </Card>
@@ -189,7 +189,7 @@ const IncomeManager: React.FC = () => {
           />
         </Card>
       ) : (
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 lg:gap-8">
           {/* Left: List */}
           <div className="lg:col-span-1">
             <Card padding="none">

@@ -350,17 +350,17 @@ const Forecast: React.FC = () => {
 
   if (isLoading) {
     return (
-      <div className="p-6 lg:p-10 flex items-center justify-center min-h-[400px]">
+      <div className="p-4 lg:p-10 flex items-center justify-center min-h-[400px]">
         <LoadingSpinner size="lg" text="Loading forecast data..." />
       </div>
     );
   }
 
   return (
-    <div className="p-6 lg:p-10 max-w-5xl mx-auto animate-fade-in">
+    <div className="p-4 lg:p-10 max-w-5xl mx-auto animate-fade-in">
       {/* Header */}
-      <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4 mb-8">
-        <div className="text-center lg:text-left">
+      <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4 mb-6 lg:mb-8">
+        <div className="text-left">
           <div className="flex items-center gap-4 mb-2">
             <div className="w-12 h-12 bg-gradient-to-br from-blue-500 to-purple-600 rounded-xl flex items-center justify-center shadow-lg shadow-purple-500/20">
               <Icon name="smart_toy" size={32} className="text-white" />
@@ -372,7 +372,7 @@ const Forecast: React.FC = () => {
           </div>
         </div>
 
-        <div className="flex items-center gap-3">
+        <div className="flex flex-wrap items-center gap-2 lg:gap-3 w-full lg:w-auto">
           {/* API Key Config Button */}
           <Tooltip
             content={apiKeyMissing ? "API key required" : "Configure API key"}

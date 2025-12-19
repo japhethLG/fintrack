@@ -54,7 +54,7 @@ const Sidebar: React.FC = () => {
   return (
     <aside
       className={cn(
-        "bg-[#151c2c] border-r border-gray-800 flex flex-col transition-all duration-300 shrink-0",
+        "bg-[#151c2c] border-r border-gray-800 flex-col transition-all duration-300 shrink-0 hidden lg:flex",
         isCollapsed ? "w-20" : "w-20 lg:w-64"
       )}
     >
