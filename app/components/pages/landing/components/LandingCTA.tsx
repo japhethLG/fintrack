@@ -9,7 +9,7 @@ export const LandingCTA: React.FC = () => {
   const { user } = useAuth();
 
   return (
-    <section className="relative py-24 overflow-hidden">
+    <section className="relative py-24 overflow-hidden snap-start">
       {/* Background with gradient */}
       <div className="absolute inset-0 bg-gradient-to-br from-primary/20 via-dark-800 to-dark-900" />
       <div className="absolute inset-0">

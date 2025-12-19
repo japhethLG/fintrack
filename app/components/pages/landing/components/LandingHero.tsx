@@ -19,7 +19,7 @@ export const LandingHero: React.FC = () => {
   const { user } = useAuth();
 
   return (
-    <section className="relative min-h-screen flex items-center justify-center overflow-hidden pt-20">
+    <section className="relative min-h-screen flex items-center justify-center overflow-hidden pt-20 snap-start">
       {/* Animated Background */}
       <div className="absolute inset-0 bg-dark-900">
         {/* Gradient orbs */}

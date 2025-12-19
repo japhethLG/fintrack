@@ -5,7 +5,7 @@ import { useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
 import { useAuth } from "@/contexts/AuthContext";
-import { Button, Icon, Tooltip } from "@/components/common";
+import { Button, Icon, Tooltip, Avatar } from "@/components/common";
 import { cn } from "@/lib/utils/cn";
 import { getAssetPath } from "@/lib/utils/assetPath";
 
@@ -159,13 +159,11 @@ const Sidebar: React.FC = () => {
             tabIndex={0}
             onKeyDown={(e) => e.key === "Enter" && router.push("/settings")}
           >
-            <Image
-              src={user?.photoURL || "https://picsum.photos/40/40"}
-              alt="User"
-              width={40}
-              height={40}
-              className="w-10 h-10 rounded-full border-2 border-gray-700 shrink-0"
-              unoptimized
+            <Avatar
+              name={userProfile?.displayName || user?.displayName}
+              email={user?.email}
+              size="md"
+              className="border-2 border-gray-700"
             />
             <div
               className={cn(

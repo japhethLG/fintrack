@@ -11,7 +11,7 @@ import { LandingFooter } from "./components/LandingFooter";
 
 export const LandingPage: React.FC = () => {
   return (
-    <div className="min-h-screen bg-dark-900">
+    <div className="h-screen overflow-y-auto bg-dark-900 snap-y snap-proximity scroll-smooth">
       <LandingNavbar />
       <main>
         <LandingHero />

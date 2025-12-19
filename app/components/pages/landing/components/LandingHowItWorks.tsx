@@ -36,7 +36,7 @@ export const LandingHowItWorks: React.FC = () => {
   const { user } = useAuth();
 
   return (
-    <section id="how-it-works" className="relative py-32 overflow-hidden">
+    <section id="how-it-works" className="relative py-32 overflow-hidden scroll-mt-20 snap-start">
       {/* Background */}
       <div className="absolute inset-0 bg-dark-800">
         <div className="absolute bottom-0 left-0 w-[600px] h-[300px] bg-primary/5 rounded-full blur-3xl" />

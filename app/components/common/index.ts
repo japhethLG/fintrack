@@ -12,6 +12,7 @@ export { PageHeader, type PageHeaderProps } from "./PageHeader";
 export { Icon, type IconProps } from "./Icon";
 export { LoadingSpinner, type LoadingSpinnerProps } from "./LoadingSpinner";
 export { Table, type TableProps, type TableColumn } from "./Table";
+export { Avatar, type AvatarProps } from "./Avatar";
 
 // ============================================================================
 // RADIX-BASED FORM COMPONENTS

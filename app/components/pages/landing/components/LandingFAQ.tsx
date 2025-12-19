@@ -44,7 +44,7 @@ export const LandingFAQ: React.FC = () => {
   };
 
   return (
-    <section id="faq" className="relative py-32 overflow-hidden">
+    <section id="faq" className="relative py-32 overflow-hidden scroll-mt-20 snap-start">
       {/* Background */}
       <div className="absolute inset-0 bg-dark-900" />
 
