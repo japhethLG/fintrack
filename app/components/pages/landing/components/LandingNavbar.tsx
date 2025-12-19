@@ -76,7 +76,7 @@ export const LandingNavbar: React.FC = () => {
                       <Avatar name={userProfile?.displayName} email={user.email} size="sm" />
                     }
                     variant="ghost"
-                    className="hidden sm:flex items-center gap-2 px-3 py-1.5 rounded-full bg-dark-800 border border-white/10 hover:border-white/20 hover:bg-dark-700"
+                    className="flex items-center gap-2 px-2 sm:px-3 py-1.5 rounded-full bg-dark-800 border border-white/10 hover:border-white/20 hover:bg-dark-700"
                   >
                     <span className="text-sm text-gray-300 font-medium max-w-[120px] truncate">
                       {userProfile?.displayName || user.email?.split("@")[0]}
@@ -91,6 +91,15 @@ export const LandingNavbar: React.FC = () => {
                   {/* Dropdown Menu */}
                   {isDropdownOpen && (
                     <div className="absolute right-0 mt-2 w-48 py-2 bg-dark-800 border border-white/10 rounded-xl shadow-xl shadow-black/50 animate-in fade-in slide-in-from-top-2 duration-200">
+                      {/* Dashboard - only visible in dropdown on mobile */}
+                      <Link
+                        href="/dashboard"
+                        onClick={() => setIsDropdownOpen(false)}
+                        className="sm:hidden flex items-center gap-3 px-4 py-2.5 text-sm text-gray-300 hover:text-white hover:bg-dark-700 transition-colors"
+                      >
+                        <Icon name="dashboard" size={18} className="text-gray-400" />
+                        Dashboard
+                      </Link>
                       <Link
                         href="/settings"
                         onClick={() => setIsDropdownOpen(false)}
@@ -110,7 +119,8 @@ export const LandingNavbar: React.FC = () => {
                   )}
                 </div>
 
-                <Link href="/dashboard">
+                {/* Dashboard button - hidden on mobile, visible on desktop */}
+                <Link href="/dashboard" className="hidden sm:block">
                   <Button variant="primary" size="sm">
                     <Icon name="dashboard" size={18} className="mr-1.5" />
                     Dashboard
