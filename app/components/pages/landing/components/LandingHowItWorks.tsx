@@ -3,7 +3,7 @@
 import React from "react";
 import Link from "next/link";
 import { useAuth } from "@/contexts/AuthContext";
-import { Button, Icon } from "@/components/common";
+import { Button, Icon, AnimatedElement } from "@/components/common";
 
 const steps = [
   {
@@ -36,7 +36,7 @@ export const LandingHowItWorks: React.FC = () => {
   const { user } = useAuth();
 
   return (
-    <section id="how-it-works" className="relative py-32 overflow-hidden scroll-mt-20 snap-start">
+    <section id="how-it-works" className="relative py-32 overflow-hidden scroll-mt-20">
       {/* Background */}
       <div className="absolute inset-0 bg-dark-800">
         <div className="absolute bottom-0 left-0 w-[600px] h-[300px] bg-primary/5 rounded-full blur-3xl" />
@@ -45,7 +45,7 @@ export const LandingHowItWorks: React.FC = () => {
 
       <div className="relative z-10 max-w-7xl mx-auto px-6">
         {/* Section Header */}
-        <div className="text-center mb-20">
+        <AnimatedElement animation="fade-up" className="text-center mb-20">
           <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-dark-700 border border-white/10 mb-6">
             <Icon name="route" size={18} className="text-primary" />
             <span className="text-sm text-gray-400 font-medium">Simple Process</span>
@@ -59,12 +59,17 @@ export const LandingHowItWorks: React.FC = () => {
           <p className="text-xl text-gray-400 max-w-2xl mx-auto">
             Start managing your finances like a pro in just minutes.
           </p>
-        </div>
+        </AnimatedElement>
 
         {/* Steps */}
         <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-8 mb-16">
           {steps.map((step, index) => (
-            <div key={index} className="relative group">
+            <AnimatedElement
+              key={index}
+              animation={index % 2 === 0 ? "fade-up" : "fade-down"}
+              delay={index * 150}
+              className="relative group"
+            >
               {/* Connector line */}
               {index < steps.length - 1 && (
                 <div className="hidden lg:block absolute top-12 left-[60%] w-full h-[2px] bg-gradient-to-r from-primary/30 to-transparent" />
@@ -85,12 +90,12 @@ export const LandingHowItWorks: React.FC = () => {
                 <h3 className="text-lg font-semibold text-white mb-2">{step.title}</h3>
                 <p className="text-sm text-gray-400 leading-relaxed">{step.description}</p>
               </div>
-            </div>
+            </AnimatedElement>
           ))}
         </div>
 
         {/* CTA */}
-        <div className="text-center">
+        <AnimatedElement animation="zoom-in" delay={600} className="text-center">
           <Link href={user ? "/dashboard" : "/signup"}>
             <Button
               variant="primary"
@@ -102,7 +107,7 @@ export const LandingHowItWorks: React.FC = () => {
             </Button>
           </Link>
           <p className="mt-4 text-sm text-gray-500">No credit card required • Free forever</p>
-        </div>
+        </AnimatedElement>
       </div>
     </section>
   );

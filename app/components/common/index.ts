@@ -13,6 +13,12 @@ export { Icon, type IconProps } from "./Icon";
 export { LoadingSpinner, type LoadingSpinnerProps } from "./LoadingSpinner";
 export { Table, type TableProps, type TableColumn } from "./Table";
 export { Avatar, type AvatarProps } from "./Avatar";
+export {
+  AnimatedElement,
+  type AnimationType,
+  type AnimationDuration,
+  type AnimationEase,
+} from "./AnimatedElement";
 
 // ============================================================================
 // RADIX-BASED FORM COMPONENTS

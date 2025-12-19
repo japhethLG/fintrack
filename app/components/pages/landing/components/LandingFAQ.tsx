@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
-import { Icon } from "@/components/common";
+import { Icon, AnimatedElement } from "@/components/common";
 
 const faqs = [
   {
@@ -49,13 +49,13 @@ export const LandingFAQ: React.FC = () => {
   };
 
   return (
-    <section id="faq" className="relative py-32 overflow-hidden scroll-mt-20 snap-start">
+    <section id="faq" className="relative py-32 overflow-hidden scroll-mt-20">
       {/* Background */}
       <div className="absolute inset-0 bg-dark-900" />
 
       <div className="relative z-10 max-w-4xl mx-auto px-6">
         {/* Section Header */}
-        <div className="text-center mb-16">
+        <AnimatedElement animation="fade-up" className="text-center mb-16">
           <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-dark-800 border border-white/10 mb-6">
             <Icon name="help" size={18} className="text-primary" />
             <span className="text-sm text-gray-400 font-medium">FAQ</span>
@@ -67,7 +67,7 @@ export const LandingFAQ: React.FC = () => {
             </span>
           </h2>
           <p className="text-xl text-gray-400">Everything you need to know about FinTrack.</p>
-        </div>
+        </AnimatedElement>
 
         {/* FAQ Items */}
         <div className="space-y-4">

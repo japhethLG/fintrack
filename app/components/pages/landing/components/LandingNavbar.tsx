@@ -9,6 +9,7 @@ import { getAssetPath } from "@/lib/utils/assetPath";
 
 const navLinks = [
   { href: "#features", label: "Features" },
+  { href: "#product-tour", label: "Tour" },
   { href: "#how-it-works", label: "How It Works" },
   { href: "#faq", label: "FAQ" },
 ];

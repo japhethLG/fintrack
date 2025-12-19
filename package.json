@@ -44,6 +44,7 @@
     "recharts": "^3.4.1",
     "tailwind-merge": "^3.4.0",
     "tailwindcss-animate": "^1.0.7",
+    "tailwindcss-animated": "^2.0.0",
     "yup": "^1.7.1"
   },
   "devDependencies": {

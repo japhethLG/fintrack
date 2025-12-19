@@ -1,7 +1,7 @@
 "use client";
 
 import React from "react";
-import { Icon } from "@/components/common";
+import { Icon, AnimatedElement } from "@/components/common";
 
 const features = [
   {
@@ -50,7 +50,7 @@ const features = [
 
 export const LandingFeatures: React.FC = () => {
   return (
-    <section id="features" className="relative py-32 overflow-hidden scroll-mt-20 snap-start">
+    <section id="features" className="relative py-32 overflow-hidden scroll-mt-20">
       {/* Background */}
       <div className="absolute inset-0 bg-dark-900">
         <div className="absolute top-0 left-1/2 -translate-x-1/2 w-[800px] h-[400px] bg-primary/5 rounded-full blur-3xl" />
@@ -58,7 +58,7 @@ export const LandingFeatures: React.FC = () => {
 
       <div className="relative z-10 max-w-7xl mx-auto px-6">
         {/* Section Header */}
-        <div className="text-center mb-20">
+        <AnimatedElement animation="fade-up" className="text-center mb-20">
           <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-dark-800 border border-white/10 mb-6">
             <Icon name="star" size={18} className="text-warning" />
             <span className="text-sm text-gray-400 font-medium">Powerful Features</span>
@@ -72,13 +72,15 @@ export const LandingFeatures: React.FC = () => {
           <p className="text-xl text-gray-400 max-w-2xl mx-auto">
             Comprehensive tools for tracking, analyzing, and optimizing your personal finances.
           </p>
-        </div>
+        </AnimatedElement>
 
         {/* Features Grid */}
         <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-6">
           {features.map((feature, index) => (
-            <div
+            <AnimatedElement
               key={index}
+              animation="fade-up"
+              delay={index * 100}
               className="group relative p-6 rounded-2xl bg-dark-800/50 border border-white/5 hover:border-white/10 transition-all duration-300 hover:-translate-y-1"
             >
               {/* Gradient glow on hover */}
@@ -102,7 +104,7 @@ export const LandingFeatures: React.FC = () => {
                 </h3>
                 <p className="text-gray-400 leading-relaxed">{feature.description}</p>
               </div>
-            </div>
+            </AnimatedElement>
           ))}
         </div>
       </div>
