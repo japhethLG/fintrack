@@ -30,6 +30,11 @@ const faqs = [
       "Yes! FinTrack supports multiple expense types including cash loans (with amortization schedules), credit cards (with APR and payoff projections), installments, and recurring bills.",
   },
   {
+    question: "How do financial projections work?",
+    answer:
+      "FinTrack automatically generates projected transactions based on your income sources and expense rules. It calculates when each payment will occur using your configured frequency (daily, weekly, monthly, etc.) and creates a day-by-day balance forecast. For loans, it computes full amortization schedules; for credit cards, it projects payoff timelines based on your payment strategy. The system then shows you your expected cash flow and future balance on the calendar and dashboard.",
+  },
+  {
     question: "What happens to my data if I delete my account?",
     answer:
       "When you delete your account, all your data is permanently removed from our servers. This includes your profile, income sources, expenses, transactions, and any other information you've entered.",

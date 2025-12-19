@@ -3,8 +3,9 @@
 import { useState, FormEvent, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
-import { Button, Input, Alert, Divider, LoadingSpinner, Card, Icon } from "@/components/common";
+import { Button, Input, Alert, Divider, LoadingSpinner, Icon } from "@/components/common";
 import { getAssetPath } from "@/lib/utils/assetPath";
+import Link from "next/link";
 
 const getAuthErrorMessage = (error: unknown): string => {
   const errorMessage = error instanceof Error ? error.message : String(error);
@@ -77,25 +78,32 @@ export default function LoginPage() {
 
   if (authLoading) {
     return (
-      <Card variant="elevated" padding="lg">
+      <div className="bg-dark-800/60 backdrop-blur-xl rounded-2xl border border-white/10 p-8 shadow-2xl">
         <div className="flex flex-col items-center justify-center py-10">
           <LoadingSpinner size="md" color="primary" text="Loading..." />
         </div>
-      </Card>
+      </div>
     );
   }
 
   return (
-    <Card variant="elevated" padding="lg">
+    <div className="bg-dark-800/60 backdrop-blur-xl rounded-2xl border border-white/10 p-8 shadow-2xl shadow-black/50">
+      {/* Header */}
       <div className="text-center mb-8">
-        <div className="w-16 h-16 rounded-2xl mx-auto overflow-hidden mb-4 shadow-lg shadow-primary/20">
-          <img
-            src={getAssetPath("/logo.png")}
-            alt="FinTrack"
-            className="w-full h-full object-cover"
-          />
-        </div>
-        <h1 className="text-3xl font-bold text-white mb-2">Welcome to FinTrack</h1>
+        <Link href="/" className="inline-block">
+          <div className="w-16 h-16 rounded-2xl mx-auto overflow-hidden mb-4 shadow-lg shadow-primary/30 hover:shadow-primary/50 transition-shadow">
+            <img
+              src={getAssetPath("/logo.png")}
+              alt="FinTrack"
+              className="w-full h-full object-cover"
+            />
+          </div>
+        </Link>
+        <h1 className="text-3xl font-bold mb-2">
+          <span className="bg-gradient-to-r from-white via-gray-100 to-gray-300 bg-clip-text text-transparent">
+            Welcome Back
+          </span>
+        </h1>
         <p className="text-gray-400">Sign in to manage your finances</p>
       </div>
 
@@ -109,7 +117,7 @@ export default function LoginPage() {
       <button
         onClick={handleGoogleLogin}
         disabled={loading}
-        className="w-full mb-6 flex items-center justify-center gap-3 px-4 py-3 bg-white text-gray-900 rounded-lg font-semibold hover:bg-gray-100 transition-colors disabled:opacity-50 disabled:cursor-not-allowed shadow-lg"
+        className="w-full mb-6 flex items-center justify-center gap-3 px-4 py-3.5 bg-white text-gray-900 rounded-xl font-semibold hover:bg-gray-100 hover:shadow-lg hover:shadow-white/20 transition-all disabled:opacity-50 disabled:cursor-not-allowed shadow-lg"
       >
         <svg className="w-5 h-5" viewBox="0 0 24 24">
           <path
@@ -163,6 +171,7 @@ export default function LoginPage() {
           fullWidth
           loading={loading}
           disabled={loading}
+          className="shadow-lg shadow-primary/25 hover:shadow-primary/40 transition-shadow"
         >
           {loading ? "Signing in..." : "Sign In"}
         </Button>
@@ -170,10 +179,13 @@ export default function LoginPage() {
 
       <p className="mt-6 text-center text-sm text-gray-400">
         Don&apos;t have an account?{" "}
-        <a href="/signup" className="text-primary hover:text-primary/80 font-medium">
+        <Link
+          href="/signup"
+          className="text-primary hover:text-primary/80 font-medium transition-colors"
+        >
           Sign up
-        </a>
+        </Link>
       </p>
-    </Card>
+    </div>
   );
 }
