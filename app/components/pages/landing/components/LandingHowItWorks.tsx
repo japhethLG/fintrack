@@ -106,7 +106,7 @@ export const LandingHowItWorks: React.FC = () => {
               Start Your Free Account
             </Button>
           </Link>
-          <p className="mt-4 text-sm text-gray-500">No credit card required • Free forever</p>
+          <p className="mt-4 text-sm text-gray-500">No credit card required</p>
         </AnimatedElement>
       </div>
     </section>

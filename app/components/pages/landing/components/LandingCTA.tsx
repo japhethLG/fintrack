@@ -41,7 +41,7 @@ export const LandingCTA: React.FC = () => {
           <div className="flex items-center gap-4 text-sm text-gray-400">
             <span className="flex items-center gap-1.5">
               <Icon name="check_circle" size={18} className="text-success" />
-              Free forever
+              Start for free
             </span>
             <span className="flex items-center gap-1.5">
               <Icon name="check_circle" size={18} className="text-success" />
