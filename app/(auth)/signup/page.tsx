@@ -81,11 +81,11 @@ export default function SignupPage() {
   }
 
   return (
-    <div className="bg-dark-800/60 backdrop-blur-xl rounded-2xl border border-white/10 p-8 shadow-2xl shadow-black/50">
+    <div className="bg-dark-800/60 backdrop-blur-xl rounded-2xl border border-white/10 p-5 sm:p-8 shadow-2xl shadow-black/50">
       {/* Header */}
-      <div className="text-center mb-8">
+      <div className="text-center mb-6 sm:mb-8">
         <Link href="/" className="inline-block">
-          <div className="w-16 h-16 rounded-2xl mx-auto overflow-hidden mb-4 shadow-lg shadow-primary/30 hover:shadow-primary/50 transition-shadow">
+          <div className="w-12 h-12 sm:w-16 sm:h-16 rounded-xl sm:rounded-2xl mx-auto overflow-hidden mb-3 sm:mb-4 shadow-lg shadow-primary/30 hover:shadow-primary/50 transition-shadow">
             <img
               src={getAssetPath("/logo.png")}
               alt="FinTrack"
@@ -93,12 +93,12 @@ export default function SignupPage() {
             />
           </div>
         </Link>
-        <h1 className="text-3xl font-bold mb-2">
+        <h1 className="text-2xl sm:text-3xl font-bold mb-1 sm:mb-2">
           <span className="bg-gradient-to-r from-white via-gray-100 to-gray-300 bg-clip-text text-transparent">
             Create Account
           </span>
         </h1>
-        <p className="text-gray-400">Start managing your finances today</p>
+        <p className="text-sm sm:text-base text-gray-400">Start managing your finances today</p>
       </div>
 
       {error && (

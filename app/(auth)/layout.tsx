@@ -1,15 +1,15 @@
 export default function AuthLayout({ children }: { children: React.ReactNode }) {
   return (
-    <div className="flex min-h-screen items-center justify-center bg-dark-900 overflow-hidden">
+    <div className="flex min-h-[100dvh] items-center justify-center bg-dark-900 overflow-x-hidden overflow-y-auto py-6 sm:py-8">
       {/* Animated Background */}
-      <div className="absolute inset-0">
-        {/* Gradient orbs */}
-        <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-primary/20 rounded-full blur-3xl animate-pulse" />
+      <div className="fixed inset-0 pointer-events-none">
+        {/* Gradient orbs - smaller on mobile */}
+        <div className="absolute top-1/4 left-0 sm:left-1/4 w-48 sm:w-96 h-48 sm:h-96 bg-primary/20 rounded-full blur-3xl animate-pulse -translate-x-1/2 sm:translate-x-0" />
         <div
-          className="absolute bottom-1/4 right-1/4 w-80 h-80 bg-blue-500/15 rounded-full blur-3xl animate-pulse"
+          className="absolute bottom-1/4 right-0 sm:right-1/4 w-40 sm:w-80 h-40 sm:h-80 bg-blue-500/15 rounded-full blur-3xl animate-pulse translate-x-1/2 sm:translate-x-0"
           style={{ animationDelay: "1s" }}
         />
-        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[600px] bg-gradient-to-br from-primary/10 to-transparent rounded-full blur-3xl" />
+        <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-80 sm:w-[600px] h-80 sm:h-[600px] bg-gradient-to-br from-primary/10 to-transparent rounded-full blur-3xl" />
 
         {/* Grid pattern overlay */}
         <div
@@ -21,8 +21,8 @@ export default function AuthLayout({ children }: { children: React.ReactNode }) 
         />
       </div>
 
-      {/* Content */}
-      <div className="relative z-10 w-full max-w-md px-6 py-8">{children}</div>
+      {/* Content - better mobile padding */}
+      <div className="relative z-10 w-full max-w-md px-4 sm:px-6">{children}</div>
     </div>
   );
 }
