@@ -1,5 +1,5 @@
 ---
-trigger: model_decision
+trigger: always_on
 description: Governs usage of reusable UI components from `components/common/` instead of raw HTML elements. Apply when building any UI with buttons, inputs, forms, cards, or interactive elements.
 ---
 

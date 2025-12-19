@@ -1,5 +1,5 @@
 ---
-trigger: model_decision
+trigger: always_on
 description: Governs form implementation using React Hook Form with Yup validation, including form helpers, multi-step forms, and form elements. Apply when creating or modifying any form component.
 ---
 

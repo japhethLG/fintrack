@@ -17,13 +17,18 @@ const navLinks = [
 export const LandingNavbar: React.FC = () => {
   const { user, userProfile, loading, logout } = useAuth();
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const mobileMenuRef = useRef<HTMLDivElement>(null);
 
   // Close dropdown when clicking outside
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
         setIsDropdownOpen(false);
+      }
+      if (mobileMenuRef.current && !mobileMenuRef.current.contains(event.target as Node)) {
+        setIsMobileMenuOpen(false);
       }
     };
 
@@ -36,20 +41,22 @@ export const LandingNavbar: React.FC = () => {
     await logout();
   };
 
+  const closeMobileMenu = () => setIsMobileMenuOpen(false);
+
   return (
     <nav className="fixed top-0 left-0 right-0 z-50">
       <div className="absolute inset-0 bg-dark-900/70 backdrop-blur-xl border-b border-white/5" />
-      <div className="relative max-w-7xl mx-auto px-6 py-4">
+      <div className="relative max-w-7xl mx-auto px-4 sm:px-6 py-3 sm:py-4">
         <div className="flex items-center justify-between">
           {/* Logo */}
-          <Link href="/" className="flex items-center gap-3 group">
-            <div className="relative w-10 h-10 rounded-xl overflow-hidden shadow-lg shadow-primary/20 group-hover:shadow-primary/40 transition-shadow">
+          <Link href="/" className="flex items-center gap-2 sm:gap-3 group">
+            <div className="relative w-9 h-9 sm:w-10 sm:h-10 rounded-xl overflow-hidden shadow-lg shadow-primary/20 group-hover:shadow-primary/40 transition-shadow">
               <Image src={getAssetPath("/logo.png")} alt="FinTrack" fill className="object-cover" />
             </div>
-            <span className="text-xl font-bold text-white">FinTrack</span>
+            <span className="text-lg sm:text-xl font-bold text-white">FinTrack</span>
           </Link>
 
-          {/* Navigation Links */}
+          {/* Desktop Navigation Links */}
           <div className="hidden md:flex items-center gap-8">
             {navLinks.map((link) => (
               <a
@@ -63,12 +70,12 @@ export const LandingNavbar: React.FC = () => {
             ))}
           </div>
 
-          {/* Auth Section */}
-          <div className="flex items-center gap-3">
+          {/* Right Section */}
+          <div className="flex items-center gap-2 sm:gap-3">
             {loading ? (
               <div className="w-8 h-8 rounded-full bg-dark-700 animate-pulse" />
             ) : user ? (
-              <div className="flex items-center gap-3">
+              <div className="flex items-center gap-2 sm:gap-3">
                 {/* User Profile Dropdown */}
                 <div className="relative" ref={dropdownRef}>
                   <Button
@@ -79,7 +86,7 @@ export const LandingNavbar: React.FC = () => {
                     variant="ghost"
                     className="flex items-center gap-2 px-2 sm:px-3 py-1.5 rounded-full bg-dark-800 border border-white/10 hover:border-white/20 hover:bg-dark-700"
                   >
-                    <span className="text-sm text-gray-300 font-medium max-w-[120px] truncate">
+                    <span className="hidden sm:inline text-sm text-gray-300 font-medium max-w-[120px] truncate">
                       {userProfile?.displayName || user.email?.split("@")[0]}
                     </span>
                     <Icon
@@ -89,14 +96,13 @@ export const LandingNavbar: React.FC = () => {
                     />
                   </Button>
 
-                  {/* Dropdown Menu */}
+                  {/* User Dropdown Menu */}
                   {isDropdownOpen && (
                     <div className="absolute right-0 mt-2 w-48 py-2 bg-dark-800 border border-white/10 rounded-xl shadow-xl shadow-black/50 animate-in fade-in slide-in-from-top-2 duration-200">
-                      {/* Dashboard - only visible in dropdown on mobile */}
                       <Link
                         href="/dashboard"
                         onClick={() => setIsDropdownOpen(false)}
-                        className="sm:hidden flex items-center gap-3 px-4 py-2.5 text-sm text-gray-300 hover:text-white hover:bg-dark-700 transition-colors"
+                        className="flex items-center gap-3 px-4 py-2.5 text-sm text-gray-300 hover:text-white hover:bg-dark-700 transition-colors"
                       >
                         <Icon name="dashboard" size={18} className="text-gray-400" />
                         Dashboard
@@ -120,7 +126,7 @@ export const LandingNavbar: React.FC = () => {
                   )}
                 </div>
 
-                {/* Dashboard button - hidden on mobile, visible on desktop */}
+                {/* Dashboard button - hidden on mobile */}
                 <Link href="/dashboard" className="hidden sm:block">
                   <Button variant="primary" size="sm">
                     <Icon name="dashboard" size={18} className="mr-1.5" />
@@ -130,16 +136,69 @@ export const LandingNavbar: React.FC = () => {
               </div>
             ) : (
               <>
-                <Link href="/login">
-                  <Button variant="ghost" size="sm">
-                    Log In
+                {/* Desktop: Show buttons directly */}
+                <div className="hidden sm:flex items-center gap-3">
+                  <Link href="/login">
+                    <Button variant="ghost" size="sm">
+                      Log In
+                    </Button>
+                  </Link>
+                  <Link href="/signup">
+                    <Button variant="primary" size="sm">
+                      Sign Up Free
+                    </Button>
+                  </Link>
+                </div>
+
+                {/* Mobile: Hamburger menu */}
+                <div className="sm:hidden relative" ref={mobileMenuRef}>
+                  <Button
+                    onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
+                    className="p-2 rounded-lg bg-dark-800 border border-white/10 hover:border-white/20 hover:bg-dark-700 transition-colors"
+                    aria-label="Menu"
+                  >
+                    <Icon
+                      name={isMobileMenuOpen ? "close" : "menu"}
+                      size={22}
+                      className="text-gray-300"
+                    />
                   </Button>
-                </Link>
-                <Link href="/signup">
-                  <Button variant="primary" size="sm">
-                    Sign Up Free
-                  </Button>
-                </Link>
+
+                  {/* Mobile Menu Dropdown */}
+                  {isMobileMenuOpen && (
+                    <div className="absolute right-0 mt-2 w-56 py-3 bg-dark-800 border border-white/10 rounded-xl shadow-xl shadow-black/50 animate-in fade-in slide-in-from-top-2 duration-200">
+                      {/* Navigation Links */}
+                      <div className="px-2 pb-3 border-b border-white/10">
+                        {navLinks.map((link) => (
+                          <a
+                            key={link.href}
+                            href={link.href}
+                            onClick={closeMobileMenu}
+                            className="flex items-center gap-3 px-3 py-2.5 text-sm text-gray-300 hover:text-white hover:bg-dark-700 rounded-lg transition-colors"
+                          >
+                            {link.label}
+                          </a>
+                        ))}
+                      </div>
+
+                      {/* Auth Buttons */}
+                      <div className="px-3 pt-3 space-y-2">
+                        <Link href="/login" onClick={closeMobileMenu} className="block">
+                          <Button variant="secondary" size="md" fullWidth>
+                            <Icon name="login" size={18} className="mr-2" />
+                            Log In
+                          </Button>
+                        </Link>
+                        <Link href="/signup" onClick={closeMobileMenu} className="block">
+                          <Button variant="primary" size="md" fullWidth>
+                            <Icon name="person_add" size={18} className="mr-2" />
+                            Sign Up Free
+                          </Button>
+                        </Link>
+                      </div>
+                    </div>
+                  )}
+                </div>
               </>
             )}
           </div>

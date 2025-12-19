@@ -1,5 +1,5 @@
 ---
-trigger: model_decision
+trigger: always_on
 description: Governs component structure, code organization, and UI composition patterns for page components and sub-components. Apply when building page managers, list-detail layouts, modals, or any feature UI.
 ---
 

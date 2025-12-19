@@ -1,5 +1,5 @@
 ---
-trigger: model_decision
+trigger: always_on
 description: Governs project organization, file naming conventions, and import patterns for the Next.js App Router structure. Apply when creating new features, components, or reorganizing code.
 ---
 

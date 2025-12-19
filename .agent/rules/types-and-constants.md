@@ -1,5 +1,5 @@
 ---
-trigger: model_decision
+trigger: always_on
 description: Governs TypeScript type definitions in `lib/types.ts` and constant organization across global and feature-specific scopes. Apply when defining new types, interfaces, or constant values.
 ---
 

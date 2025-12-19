@@ -1,5 +1,5 @@
 ---
-trigger: model_decision
+trigger: always_on
 description: Governs React Context structure for global state management, including provider composition, custom hooks, and real-time subscriptions. Apply when working with AuthContext, FinancialContext, or creating new context providers.
 ---
 

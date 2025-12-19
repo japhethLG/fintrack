@@ -1,5 +1,5 @@
 ---
-trigger: model_decision
+trigger: always_on
 description: Governs when and how to update rule files as the codebase evolves. Apply after implementing new patterns, abstractions, or architectural changes that should be documented for consistency.
 ---
 

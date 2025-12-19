@@ -3,6 +3,7 @@
 import React, { useState, useCallback, useEffect } from "react";
 import Image from "next/image";
 import { Icon } from "@/components/common";
+import { getAssetPath } from "@/lib/utils/assetPath";
 
 interface TourSlide {
   id: string;
@@ -64,34 +65,67 @@ const tourSlides: TourSlide[] = [
 export const LandingProductTour: React.FC = () => {
   const [activeSlide, setActiveSlide] = useState(0);
   const [isAutoPlaying, setIsAutoPlaying] = useState(true);
+  const [isTransitioning, setIsTransitioning] = useState(false);
+  const [displayedSlide, setDisplayedSlide] = useState(0);
+  const [slideDirection, setSlideDirection] = useState<"left" | "right">("right");
+  const [animationKey, setAnimationKey] = useState(0);
+
+  const transitionToSlide = useCallback(
+    (newIndex: number, direction?: "left" | "right") => {
+      if (newIndex === displayedSlide) return;
+
+      // Determine direction based on index if not specified
+      const dir = direction ?? (newIndex > displayedSlide ? "right" : "left");
+      setSlideDirection(dir);
+      setIsTransitioning(true);
+
+      // After slide out, update the displayed slide
+      setTimeout(() => {
+        setDisplayedSlide(newIndex);
+        setActiveSlide(newIndex);
+        setAnimationKey((k) => k + 1);
+        // After a brief moment, slide back in
+        setTimeout(() => {
+          setIsTransitioning(false);
+        }, 50);
+      }, 250);
+    },
+    [displayedSlide]
+  );
 
   const handlePrevious = useCallback(() => {
     setIsAutoPlaying(false);
-    setActiveSlide((prev) => (prev === 0 ? tourSlides.length - 1 : prev - 1));
-  }, []);
+    const newIndex = activeSlide === 0 ? tourSlides.length - 1 : activeSlide - 1;
+    transitionToSlide(newIndex, "left");
+  }, [activeSlide, transitionToSlide]);
 
   const handleNext = useCallback(() => {
     setIsAutoPlaying(false);
-    setActiveSlide((prev) => (prev === tourSlides.length - 1 ? 0 : prev + 1));
-  }, []);
+    const newIndex = activeSlide === tourSlides.length - 1 ? 0 : activeSlide + 1;
+    transitionToSlide(newIndex, "right");
+  }, [activeSlide, transitionToSlide]);
 
-  const handleSlideClick = useCallback((index: number) => {
-    setIsAutoPlaying(false);
-    setActiveSlide(index);
-  }, []);
+  const handleSlideClick = useCallback(
+    (index: number) => {
+      setIsAutoPlaying(false);
+      transitionToSlide(index);
+    },
+    [transitionToSlide]
+  );
 
   // Auto-advance slides
   useEffect(() => {
     if (!isAutoPlaying) return;
 
     const interval = setInterval(() => {
-      setActiveSlide((prev) => (prev === tourSlides.length - 1 ? 0 : prev + 1));
+      const newIndex = activeSlide === tourSlides.length - 1 ? 0 : activeSlide + 1;
+      transitionToSlide(newIndex, "right");
     }, 5000);
 
     return () => clearInterval(interval);
-  }, [isAutoPlaying]);
+  }, [isAutoPlaying, activeSlide, transitionToSlide]);
 
-  const currentSlide = tourSlides[activeSlide];
+  const currentSlide = tourSlides[displayedSlide];
 
   return (
     <section id="product-tour" className="relative py-24 overflow-hidden scroll-mt-20">
@@ -132,7 +166,7 @@ export const LandingProductTour: React.FC = () => {
               <div className="flex-1 mx-4">
                 <div className="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-dark-700 text-xs text-gray-400 max-w-xs mx-auto">
                   <Icon name="lock" size={12} className="text-success" />
-                  <span>app.fintrack.ai/{currentSlide.id}</span>
+                  <span className="truncate">app.fintrack.ai/{currentSlide.id}</span>
                 </div>
               </div>
               {/* Auto-play indicator */}
@@ -146,12 +180,15 @@ export const LandingProductTour: React.FC = () => {
             </div>
 
             {/* Image Container */}
-            <div className="relative aspect-[16/9] bg-dark-900">
+            <div className="relative aspect-[16/9] bg-dark-900 overflow-hidden">
               <Image
-                src={currentSlide.imageSrc}
+                key={displayedSlide}
+                src={getAssetPath(currentSlide.imageSrc)}
                 alt={currentSlide.title}
                 fill
-                className="object-cover object-top transition-all duration-500"
+                className={`object-cover object-top transition-all duration-200 ease-out ${
+                  isTransitioning ? "opacity-0 scale-[1.01]" : "opacity-100 scale-100"
+                }`}
                 priority
               />
             </div>
@@ -175,13 +212,13 @@ export const LandingProductTour: React.FC = () => {
         </div>
 
         {/* Horizontal Icon Navigation */}
-        <div className="mt-8 max-w-3xl mx-auto">
-          <div className="flex justify-center gap-3">
+        <div className="mt-8 max-w-3xl mx-auto px-2">
+          <div className="flex justify-center gap-1.5 sm:gap-2 md:gap-3">
             {tourSlides.map((slide, index) => (
               <button
                 key={slide.id}
                 onClick={() => handleSlideClick(index)}
-                className={`group/tab relative flex flex-col items-center gap-2 p-3 rounded-xl transition-all duration-300 ${
+                className={`group/tab relative flex flex-col items-center gap-1 sm:gap-2 p-1.5 sm:p-2 md:p-3 rounded-lg sm:rounded-xl transition-all duration-200 ease-out ${
                   activeSlide === index
                     ? "bg-dark-700 border border-primary/30"
                     : "bg-dark-900/50 border border-transparent hover:border-white/10"
@@ -189,43 +226,50 @@ export const LandingProductTour: React.FC = () => {
               >
                 {/* Icon */}
                 <div
-                  className={`w-11 h-11 rounded-xl flex items-center justify-center transition-all duration-300 ${
+                  className={`w-9 h-9 sm:w-10 sm:h-10 md:w-11 md:h-11 rounded-lg sm:rounded-xl flex items-center justify-center transition-all duration-200 ease-out ${
                     activeSlide === index
-                      ? `bg-gradient-to-br ${slide.gradient} shadow-lg`
+                      ? `bg-gradient-to-br ${slide.gradient} shadow-md`
                       : "bg-dark-700 group-hover/tab:bg-dark-600"
                   }`}
                 >
                   <Icon
                     name={slide.icon}
-                    size={22}
-                    className={activeSlide === index ? "text-white" : "text-gray-400"}
+                    size={18}
+                    className={`sm:!text-[20px] md:!text-[22px] transition-colors duration-200 ${
+                      activeSlide === index ? "text-white" : "text-gray-400"
+                    }`}
                   />
                 </div>
 
-                {/* Label - Only show on active or hover */}
+                {/* Label - Only show on active or hover on larger screens */}
                 <span
-                  className={`text-xs font-medium whitespace-nowrap transition-all duration-300 ${
+                  className={`text-[10px] sm:text-xs font-medium whitespace-nowrap transition-opacity duration-200 ${
                     activeSlide === index
                       ? "text-white opacity-100"
-                      : "text-gray-500 opacity-0 group-hover/tab:opacity-100"
+                      : "text-gray-500 opacity-0 group-hover/tab:opacity-100 hidden sm:block"
                   }`}
                 >
                   {slide.title.split(" ")[0]}
                 </span>
 
                 {/* Active indicator line */}
-                {activeSlide === index && (
-                  <div
-                    className={`absolute -bottom-1 left-1/2 -translate-x-1/2 w-8 h-1 rounded-full bg-gradient-to-r ${slide.gradient}`}
-                  />
-                )}
+                <div
+                  className={`absolute -bottom-0.5 sm:-bottom-1 left-1/2 -translate-x-1/2 h-0.5 sm:h-1 rounded-full bg-gradient-to-r ${slide.gradient} transition-all duration-200 ease-out ${
+                    activeSlide === index ? "w-6 sm:w-8 opacity-100" : "w-0 opacity-0"
+                  }`}
+                />
               </button>
             ))}
           </div>
         </div>
 
         {/* Active Slide Info */}
-        <div className="mt-8 text-center max-w-2xl mx-auto">
+        <div
+          key={animationKey}
+          className={`mt-8 text-center max-w-2xl mx-auto transition-opacity duration-200 ease-out ${
+            isTransitioning ? "opacity-0" : "opacity-100"
+          }`}
+        >
           <h3
             className={`text-2xl font-bold text-white mb-3 bg-gradient-to-r ${currentSlide.gradient} bg-clip-text text-transparent`}
           >
