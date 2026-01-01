@@ -52,9 +52,11 @@ const TransactionRow: React.FC<IProps> = ({ transaction, onAction }) => {
               <Badge variant="default" className="text-xs">
                 {transaction.category}
               </Badge>
-              <span className="text-xs text-gray-500">
-                {transaction.sourceType === "manual" ? "Manual" : "Scheduled"}
-              </span>
+              {transaction.sourceType === "manual" && (
+                <Badge variant="primary" className="text-xs">
+                  Manual
+                </Badge>
+              )}
             </div>
           </div>
         </div>

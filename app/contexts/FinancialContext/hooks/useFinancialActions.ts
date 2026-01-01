@@ -24,13 +24,18 @@ import {
 } from "../actions/sourceActions";
 import {
   addManualTransactionAction,
+  updateManualTransactionAction,
   markTransactionCompleteAction,
   markTransactionSkippedAction,
   rescheduleTransactionAction,
   removeTransactionAction,
   revertTransactionToProjectedAction,
 } from "../actions/transactionActions";
-import { updateProfileAction, setCurrentBalanceAction } from "../actions/userActions";
+import {
+  updateProfileAction,
+  setCurrentBalanceAction,
+  updateProfilePictureAction,
+} from "../actions/userActions";
 import { markAlertReadAction, dismissAlertAction } from "../actions/alertActions";
 import {
   getUserProfile,
@@ -85,6 +90,14 @@ export function useFinancialActions({
     async (balance: number) => {
       if (!user) return;
       await setCurrentBalanceAction(user.uid, balance);
+    },
+    [user]
+  );
+
+  const updateProfilePicture = useCallback(
+    async (profilePictureUrl: string) => {
+      if (!user) return;
+      await updateProfilePictureAction(user.uid, profilePictureUrl);
     },
     [user]
   );
@@ -151,6 +164,25 @@ export function useFinancialActions({
     [user]
   );
 
+  const updateManualTransaction = useCallback(
+    async (
+      id: string,
+      updates: Partial<Omit<Transaction, "id" | "userId" | "createdAt" | "updatedAt">>
+    ): Promise<void> => {
+      if (!user) throw new Error("User not authenticated");
+      await updateManualTransactionAction(id, updates, user.uid);
+    },
+    [user]
+  );
+
+  const deleteManualTransaction = useCallback(
+    async (id: string): Promise<void> => {
+      if (!user) throw new Error("User not authenticated");
+      await removeTransactionAction(id, user.uid);
+    },
+    [user]
+  );
+
   const markTransactionComplete = useCallback(
     async (id: string, data: CompleteTransactionData) => {
       if (!user) throw new Error("User not authenticated");
@@ -197,9 +229,13 @@ export function useFinancialActions({
     [user, incomeSourcesRef, expenseRulesRef]
   );
 
-  const removeTransaction = useCallback(async (id: string) => {
-    await removeTransactionAction(id);
-  }, []);
+  const removeTransaction = useCallback(
+    async (id: string) => {
+      if (!user) throw new Error("User not authenticated");
+      await removeTransactionAction(id, user.uid);
+    },
+    [user]
+  );
 
   const revertTransactionToProjected = useCallback(async (id: string) => {
     await revertTransactionToProjectedAction(id);
@@ -282,6 +318,7 @@ export function useFinancialActions({
     // User actions
     updateProfile,
     setCurrentBalance,
+    updateProfilePicture,
     // Income source actions
     createIncomeSource,
     editIncomeSource,
@@ -294,6 +331,8 @@ export function useFinancialActions({
     toggleExpenseRuleActive,
     // Transaction actions
     addManualTransaction,
+    updateManualTransaction,
+    deleteManualTransaction,
     markTransactionComplete,
     markTransactionSkipped,
     rescheduleTransaction,

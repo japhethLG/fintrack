@@ -26,6 +26,7 @@ export interface FinancialContextValue {
   userProfile: UserProfile | null;
   updateProfile: (updates: Partial<UserProfile["preferences"]>) => Promise<void>;
   setCurrentBalance: (balance: number) => Promise<void>;
+  updateProfilePicture: (profilePictureUrl: string) => Promise<void>;
 
   // Income Sources
   incomeSources: IncomeSource[];
@@ -46,6 +47,11 @@ export interface FinancialContextValue {
   addManualTransaction: (
     transaction: Omit<Transaction, "id" | "userId" | "createdAt" | "updatedAt">
   ) => Promise<Transaction>;
+  updateManualTransaction: (
+    id: string,
+    updates: Partial<Omit<Transaction, "id" | "userId" | "createdAt" | "updatedAt">>
+  ) => Promise<void>;
+  deleteManualTransaction: (id: string) => Promise<void>;
   markTransactionComplete: (id: string, data: CompleteTransactionData) => Promise<void>;
   markTransactionSkipped: (id: string, notes?: string) => Promise<void>;
   rescheduleTransaction: (id: string, newDate: string) => Promise<void>;

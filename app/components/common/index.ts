@@ -13,6 +13,8 @@ export { Icon, type IconProps } from "./Icon";
 export { LoadingSpinner, type LoadingSpinnerProps } from "./LoadingSpinner";
 export { Table, type TableProps, type TableColumn } from "./Table";
 export { Avatar, type AvatarProps } from "./Avatar";
+export { ProfilePictureUpload, type ProfilePictureUploadProps } from "./ProfilePictureUpload";
+export { UserAvatar, type UserAvatarProps } from "./UserAvatar";
 export {
   AnimatedElement,
   type AnimationType,

@@ -156,7 +156,12 @@ const TransactionsManager: React.FC = () => {
         title="Transactions"
         description="View and manage all your financial transactions."
         actions={
-          <Button variant="primary" icon={<Icon name="add" />} iconPosition="left">
+          <Button
+            variant="primary"
+            icon={<Icon name="add" />}
+            iconPosition="left"
+            onClick={() => openModal("ManualTransactionFormModal")}
+          >
             Add Transaction
           </Button>
         }

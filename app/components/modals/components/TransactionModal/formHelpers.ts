@@ -1,25 +1,41 @@
 import * as yup from "yup";
+import { Transaction } from "@/lib/types";
+
+// Mode for rule-based transactions
+export type RuleBasedMode = "complete" | "skip" | "revert";
+
+// Mode for manual transactions (edit is handled via separate modal)
+export type ManualTransactionMode = "complete" | "skip" | "revert" | "delete";
 
 export interface CompleteTransactionFormValues {
-  mode: "complete" | "skip" | "revert";
+  mode: RuleBasedMode | ManualTransactionMode;
   actualAmount: string;
   actualDate: string;
   notes: string;
+  // Manual transaction edit fields
+  name?: string;
+  category?: string;
+  scheduledDate?: string;
 }
 
-export const getDefaultValues = (
-  projectedAmount: number,
-  scheduledDate: string,
-  existingNotes?: string
-): CompleteTransactionFormValues => ({
-  mode: "complete",
-  actualAmount: projectedAmount.toString(),
-  actualDate: scheduledDate,
-  notes: existingNotes || "",
-});
+export const getDefaultValues = (transaction: Transaction): CompleteTransactionFormValues => {
+  const isManual = transaction.sourceType === "manual";
+  const defaultMode = isManual ? "edit" : "complete";
+
+  return {
+    mode: defaultMode as any,
+    actualAmount: (transaction.actualAmount ?? transaction.projectedAmount).toString(),
+    actualDate: transaction.actualDate || transaction.scheduledDate,
+    notes: transaction.notes || "",
+    // Manual transaction fields
+    name: isManual ? transaction.name : undefined,
+    category: isManual ? transaction.category : undefined,
+    scheduledDate: isManual ? transaction.scheduledDate : undefined,
+  };
+};
 
 export const completeTransactionSchema = yup.object({
-  mode: yup.string().oneOf(["complete", "skip", "revert"]).required(),
+  mode: yup.string().oneOf(["complete", "skip", "revert", "delete"]).required(),
   actualAmount: yup.string().when("mode", {
     is: "complete",
     then: (schema) => schema.required("Amount is required"),
@@ -31,4 +47,8 @@ export const completeTransactionSchema = yup.object({
     otherwise: (schema) => schema.optional(),
   }),
   notes: yup.string().optional(),
+  // Manual transaction edit fields (not used in TransactionModal anymore)
+  name: yup.string().optional(),
+  category: yup.string().optional(),
+  scheduledDate: yup.string().optional(),
 });

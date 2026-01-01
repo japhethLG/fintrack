@@ -8,6 +8,7 @@ export interface UserProfile {
   uid: string;
   email: string;
   displayName: string;
+  profilePictureUrl?: string;
   currentBalance: number;
   initialBalance: number;
   balanceLastUpdatedAt: string;
@@ -365,6 +366,16 @@ export interface VarianceReport {
 export type IncomeSourceFormData = Omit<IncomeSource, "id" | "userId" | "createdAt" | "updatedAt">;
 
 export type ExpenseRuleFormData = Omit<ExpenseRule, "id" | "userId" | "createdAt" | "updatedAt">;
+
+export interface ManualTransactionFormData {
+  name: string;
+  type: TransactionType;
+  category: string;
+  amount: number;
+  scheduledDate: string;
+  status: TransactionStatus;
+  notes?: string;
+}
 
 export interface CompleteTransactionData {
   actualAmount: number;

@@ -279,13 +279,77 @@ export async function addManualTransactionAction(
 }
 
 /**
+ * Update manual transaction
+ * Handles balance adjustments during status and amount changes
+ */
+export async function updateManualTransactionAction(
+  id: string,
+  updates: Partial<Omit<Transaction, "id" | "userId" | "createdAt" | "updatedAt">>,
+  userId: string
+): Promise<void> {
+  // Get existing transaction
+  const existing = await getTransaction(id);
+  if (!existing) {
+    throw new Error("Transaction not found");
+  }
+
+  // Validate this is a manual transaction
+  if (existing.sourceType !== "manual") {
+    throw new Error("This action is only for manual transactions");
+  }
+
+  // Determine old and new state
+  const wasCompleted = existing.status === "completed";
+  const nowCompleted = (updates.status ?? existing.status) === "completed";
+
+  const oldAmount = existing.actualAmount ?? existing.projectedAmount;
+  const newAmount = updates.actualAmount ?? updates.projectedAmount ?? oldAmount;
+
+  // Handle balance adjustments based on status transitions
+  if (wasCompleted && !nowCompleted) {
+    // Completed → Projected/Skipped: Reverse the old balance impact
+    const reversalDelta = existing.type === "income" ? -oldAmount : oldAmount;
+    await adjustUserBalance(userId, reversalDelta);
+  } else if (!wasCompleted && nowCompleted) {
+    // Projected/Skipped → Completed: Apply balance impact
+    const delta = existing.type === "income" ? newAmount : -newAmount;
+    await adjustUserBalance(userId, delta);
+  } else if (wasCompleted && nowCompleted && oldAmount !== newAmount) {
+    // Completed → Completed with amount change: Adjust the difference
+    const oldDelta = existing.type === "income" ? oldAmount : -oldAmount;
+    const newDelta = existing.type === "income" ? newAmount : -newAmount;
+    const adjustmentDelta = newDelta - oldDelta;
+    await adjustUserBalance(userId, adjustmentDelta);
+  }
+
+  // Apply the updates
+  await updateTransaction(id, updates);
+}
+
+/**
  * Remove transaction
+ * Handles balance reversal for manual transactions
  * Can only delete stored transactions, not projections
  */
-export async function removeTransactionAction(id: string): Promise<void> {
-  if (!id.startsWith("proj_")) {
-    await deleteTransaction(id);
+export async function removeTransactionAction(id: string, userId: string): Promise<void> {
+  if (id.startsWith("proj_")) {
+    throw new Error("Cannot delete projected transactions");
   }
+
+  // Get the transaction to check if balance reversal is needed
+  const transaction = await getTransaction(id);
+  if (!transaction) {
+    throw new Error("Transaction not found");
+  }
+
+  // Reverse balance if this is a completed manual transaction
+  if (transaction.sourceType === "manual" && transaction.status === "completed") {
+    const amount = transaction.actualAmount ?? transaction.projectedAmount;
+    const reversalDelta = transaction.type === "income" ? -amount : amount;
+    await adjustUserBalance(userId, reversalDelta);
+  }
+
+  await deleteTransaction(id);
 }
 
 /**

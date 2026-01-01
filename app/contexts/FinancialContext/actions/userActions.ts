@@ -21,3 +21,12 @@ export async function setCurrentBalanceAction(userId: string, balance: number): 
   await updateUserBalance(userId, balance);
 }
 
+/**
+ * Update user's profile picture
+ */
+export async function updateProfilePictureAction(
+  userId: string,
+  profilePictureUrl: string
+): Promise<void> {
+  await updateUserProfile(userId, { profilePictureUrl });
+}

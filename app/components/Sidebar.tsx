@@ -5,7 +5,7 @@ import { useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
 import { useAuth } from "@/contexts/AuthContext";
-import { Button, Icon, Tooltip, Avatar } from "@/components/common";
+import { Button, Icon, Tooltip, UserAvatar } from "@/components/common";
 import { cn } from "@/lib/utils/cn";
 import { getAssetPath } from "@/lib/utils/assetPath";
 
@@ -159,11 +159,11 @@ const Sidebar: React.FC = () => {
             tabIndex={0}
             onKeyDown={(e) => e.key === "Enter" && router.push("/settings")}
           >
-            <Avatar
+            <UserAvatar
+              imageUrl={userProfile?.profilePictureUrl}
               name={userProfile?.displayName || user?.displayName}
               email={user?.email}
               size="md"
-              className="border-2 border-gray-700"
             />
             <div
               className={cn(

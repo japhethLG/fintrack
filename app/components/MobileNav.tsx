@@ -5,7 +5,7 @@ import { useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
 import Image from "next/image";
 import { useAuth } from "@/contexts/AuthContext";
-import { Button, Icon, Avatar } from "@/components/common";
+import { Button, Icon, UserAvatar } from "@/components/common";
 import {
   Drawer,
   DrawerRoot,
@@ -115,7 +115,8 @@ const MobileNav: React.FC = () => {
                 onClick={() => handleNavigation("/settings")}
                 className="w-full flex items-center gap-3 p-3 rounded-xl hover:bg-gray-800 transition-colors"
               >
-                <Avatar
+                <UserAvatar
+                  imageUrl={userProfile?.profilePictureUrl}
                   name={userProfile?.displayName || user?.displayName}
                   email={user?.email}
                   size="md"
@@ -165,7 +166,8 @@ const MobileNav: React.FC = () => {
           className="p-1"
           aria-label="Settings"
         >
-          <Avatar
+          <UserAvatar
+            imageUrl={userProfile?.profilePictureUrl}
             name={userProfile?.displayName || user?.displayName}
             email={user?.email}
             size="sm"

@@ -4,9 +4,10 @@ import React, { useState } from "react";
 import { useForm } from "react-hook-form";
 import { yupResolver } from "@hookform/resolvers/yup";
 import * as yup from "yup";
-import { Button, Card, Icon, Alert } from "@/components/common";
+import { Button, Card, Icon, Alert, ProfilePictureUpload } from "@/components/common";
 import { Form, FormInput } from "@/components/formElements";
 import { useAuth } from "@/contexts/AuthContext";
+import { useFinancial } from "@/contexts/FinancialContext";
 import { updateUserProfile } from "@/lib/firebase/firestore";
 import { reauthenticateUser, updateUserEmail, updateUserPassword } from "@/lib/firebase/auth";
 
@@ -65,6 +66,7 @@ const getAuthErrorMessage = (error: unknown): string => {
 
 const ProfileSection: React.FC = () => {
   const { user, userProfile } = useAuth();
+  const { updateProfilePicture } = useFinancial();
   const [editMode, setEditMode] = useState<EditMode>("none");
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -92,6 +94,19 @@ const ProfileSection: React.FC = () => {
     passwordMethods.reset({ currentPassword: "", newPassword: "", confirmPassword: "" });
     setEditMode("none");
     setError(null);
+  };
+
+  const handleProfilePictureUpload = async (imageUrl: string) => {
+    setError(null);
+    setSuccess(null);
+
+    try {
+      await updateProfilePicture(imageUrl);
+      setSuccess("Profile picture updated successfully!");
+      setTimeout(() => setSuccess(null), 3000);
+    } catch (err) {
+      throw new Error(getAuthErrorMessage(err));
+    }
   };
 
   const handleSaveDisplayName = async (values: DisplayNameForm) => {
@@ -161,12 +176,19 @@ const ProfileSection: React.FC = () => {
 
   return (
     <Card padding="lg">
-      <div className="flex items-center gap-3 mb-6">
-        <div className="w-10 h-10 rounded-xl bg-primary/20 flex items-center justify-center">
-          <Icon name="person" size={20} className="text-primary" />
-        </div>
-        <div>
-          <h3 className="text-lg font-bold text-white">Profile</h3>
+      {/* Header with Profile Picture */}
+      <div className="flex flex-col items-center gap-4 mb-6 pb-6 border-b border-gray-800">
+        {/* Profile Picture */}
+        <ProfilePictureUpload
+          currentImageUrl={userProfile?.profilePictureUrl}
+          displayName={userProfile?.displayName}
+          onUploadComplete={handleProfilePictureUpload}
+          size="lg"
+        />
+
+        {/* Header Text */}
+        <div className="text-center">
+          <h3 className="text-xl font-bold text-white mb-1">Profile</h3>
           <p className="text-sm text-gray-400">Manage your account information</p>
         </div>
       </div>

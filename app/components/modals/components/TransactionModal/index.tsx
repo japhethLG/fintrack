@@ -5,12 +5,17 @@ import { useRouter } from "next/navigation";
 import dayjs from "dayjs";
 import { useForm, Resolver } from "react-hook-form";
 import { yupResolver } from "@hookform/resolvers/yup";
-import { Transaction } from "@/lib/types";
-import { Button, Icon, Alert, Badge } from "@/components/common";
-import { Form, FormInput, FormDatePicker } from "@/components/formElements";
+import { Transaction, TransactionType } from "@/lib/types";
+import { Button, Icon, Alert, Badge, Divider } from "@/components/common";
+import { Form, FormInput, FormDatePicker, FormSelect } from "@/components/formElements";
 import { cn } from "@/lib/utils/cn";
 import { useCurrency } from "@/lib/hooks/useCurrency";
 import { useFinancial } from "@/contexts/FinancialContext";
+import { useModal } from "@/components/modals";
+import {
+  INCOME_CATEGORY_OPTIONS,
+  EXPENSE_CATEGORY_OPTIONS,
+} from "@/components/pages/transactions/components/ManualTransactionForm/constants";
 import {
   completeTransactionSchema,
   getDefaultValues,
@@ -30,18 +35,20 @@ export interface IProps {
 const TransactionModal: React.FC<IProps> = ({ closeModal, modalData }) => {
   const { transaction } = modalData;
   const router = useRouter();
-  const { markTransactionComplete, markTransactionSkipped, revertTransactionToProjected } =
-    useFinancial();
+  const {
+    markTransactionComplete,
+    markTransactionSkipped,
+    revertTransactionToProjected,
+    updateManualTransaction,
+    deleteManualTransaction,
+  } = useFinancial();
+  const { openModal } = useModal();
   const { formatCurrency, formatCurrencyWithSign, currencySymbol } = useCurrency();
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   const methods = useForm<CompleteTransactionFormValues>({
-    defaultValues: getDefaultValues(
-      transaction.projectedAmount,
-      transaction.scheduledDate,
-      transaction.notes
-    ),
+    defaultValues: getDefaultValues(transaction),
     resolver: yupResolver(completeTransactionSchema) as Resolver<CompleteTransactionFormValues>,
     mode: "onChange",
   });
@@ -69,16 +76,47 @@ const TransactionModal: React.FC<IProps> = ({ closeModal, modalData }) => {
     setIsSubmitting(true);
 
     try {
-      if (values.mode === "complete") {
-        await markTransactionComplete(transaction.id, {
-          actualAmount: parseFloat(values.actualAmount),
-          actualDate: values.actualDate,
-          notes: values.notes?.trim() || undefined,
-        });
-      } else if (values.mode === "skip") {
-        await markTransactionSkipped(transaction.id, values.notes?.trim() || undefined);
-      } else if (values.mode === "revert") {
-        await revertTransactionToProjected(transaction.id);
+      if (transaction.sourceType === "manual") {
+        // Manual transaction actions (Complete/Skip/Revert/Delete)
+        // Edit is handled via separate modal
+        if (values.mode === "complete") {
+          // Mark manual transaction as completed
+          await updateManualTransaction(transaction.id, {
+            status: "completed",
+            actualAmount: parseFloat(values.actualAmount),
+            actualDate: values.actualDate,
+            notes: values.notes?.trim() || undefined,
+          });
+        } else if (values.mode === "skip") {
+          // Mark manual transaction as skipped
+          await updateManualTransaction(transaction.id, {
+            status: "skipped",
+            notes: values.notes?.trim() || undefined,
+          });
+        } else if (values.mode === "revert") {
+          // Revert manual transaction to projected
+          await updateManualTransaction(transaction.id, {
+            status: "projected",
+            actualAmount: undefined,
+            actualDate: undefined,
+          });
+        } else if (values.mode === "delete") {
+          // Delete manual transaction
+          await deleteManualTransaction(transaction.id);
+        }
+      } else {
+        // Rule-based transaction actions
+        if (values.mode === "complete") {
+          await markTransactionComplete(transaction.id, {
+            actualAmount: parseFloat(values.actualAmount),
+            actualDate: values.actualDate,
+            notes: values.notes?.trim() || undefined,
+          });
+        } else if (values.mode === "skip") {
+          await markTransactionSkipped(transaction.id, values.notes?.trim() || undefined);
+        } else if (values.mode === "revert") {
+          await revertTransactionToProjected(transaction.id);
+        }
       }
       closeModal();
     } catch (err) {
@@ -88,9 +126,8 @@ const TransactionModal: React.FC<IProps> = ({ closeModal, modalData }) => {
     }
   };
 
-  // Determine if revert is available: non-manual, stored transaction
+  // Determine if revert is available
   const canRevert =
-    transaction.sourceType !== "manual" &&
     !transaction.id.startsWith("proj_") &&
     (transaction.status === "completed" || transaction.status === "skipped");
 
@@ -104,6 +141,11 @@ const TransactionModal: React.FC<IProps> = ({ closeModal, modalData }) => {
     const basePath = transaction.sourceType === "income_source" ? "/income" : "/expenses";
     router.push(`${basePath}?source=${transaction.sourceId}`);
   };
+
+  const isManual = transaction.sourceType === "manual";
+  const transactionType = transaction.type as TransactionType;
+  const categoryOptions =
+    transactionType === "income" ? INCOME_CATEGORY_OPTIONS : EXPENSE_CATEGORY_OPTIONS;
 
   return (
     <div className="flex flex-col max-h-[80vh]">
@@ -178,8 +220,8 @@ const TransactionModal: React.FC<IProps> = ({ closeModal, modalData }) => {
           )}
         </div>
 
-        {/* Source Link */}
-        {hasSource && (
+        {/* Source Link / Manual Transaction Info */}
+        {hasSource ? (
           <div className="flex w-full justify-between items-center mb-4 py-2 px-4 bg-gray-800/50 rounded-lg border border-gray-700">
             <div className="flex items-center gap-2 text-gray-400">
               <Icon name={isIncome ? "attach_money" : "receipt"} size="sm" />
@@ -198,7 +240,42 @@ const TransactionModal: React.FC<IProps> = ({ closeModal, modalData }) => {
               <Icon name="arrow_forward" size="sm" className="ml-1" />
             </Button>
           </div>
-        )}
+        ) : isManual ? (
+          <div className="flex w-full justify-between items-center mb-4 py-2 px-4 bg-gray-800/50 rounded-lg border border-gray-700">
+            <div className="flex items-center gap-2">
+              <Badge variant="primary" className="text-xs">
+                Manual Transaction
+              </Badge>
+            </div>
+            <div className="flex gap-2">
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={() => {
+                  closeModal();
+                  openModal("ManualTransactionFormModal", {
+                    transaction,
+                    onSuccess: () => {},
+                  });
+                }}
+              >
+                <Icon name="edit" size="sm" className="mr-1" />
+                Edit
+              </Button>
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={() => setValue("mode", "delete")}
+                className={mode === "delete" ? "text-danger" : ""}
+              >
+                <Icon name="delete" size="sm" className="mr-1" />
+                Delete
+              </Button>
+            </div>
+          </div>
+        ) : null}
 
         {/* Status Warning */}
         {(transaction.status === "completed" || transaction.status === "skipped") && (
@@ -248,7 +325,23 @@ const TransactionModal: React.FC<IProps> = ({ closeModal, modalData }) => {
         </div>
 
         {/* Scrollable Form Fields */}
-        <div className="overflow-y-auto max-h-[200px] pr-1">
+        <div className="overflow-y-auto max-h-[300px] pr-1">
+          {/* Delete Mode */}
+          {mode === "delete" && (
+            <div className="bg-danger/10 border border-danger/30 rounded-lg p-3">
+              <div className="flex items-start gap-2">
+                <Icon name="warning" size="sm" className="text-danger mt-0.5" />
+                <div>
+                  <p className="text-danger text-sm font-medium">Delete this transaction?</p>
+                  <p className="text-danger/80 text-xs mt-1">
+                    This action cannot be undone.
+                    {transaction.status === "completed" && " Your balance will be adjusted."}
+                  </p>
+                </div>
+              </div>
+            </div>
+          )}
+
           {/* Complete Mode */}
           {mode === "complete" && (
             <div className="space-y-4">
@@ -341,7 +434,9 @@ const TransactionModal: React.FC<IProps> = ({ closeModal, modalData }) => {
                 ? "Mark Complete"
                 : mode === "revert"
                   ? "Revert to Projected"
-                  : "Skip Transaction"}
+                  : mode === "delete"
+                    ? "Delete Transaction"
+                    : "Skip Transaction"}
           </Button>
         </div>
       </Form>

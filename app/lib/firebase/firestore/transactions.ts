@@ -339,8 +339,9 @@ export const subscribeToTransactions = (
 };
 
 /**
- * Subscribe to stored transactions only (excludes projected status).
- * Used with on-the-fly projection computation - only fetches actual/completed transactions.
+ * Subscribe to stored transactions only (excludes projected status from rules).
+ * Used with on-the-fly projection computation - fetches completed, skipped, AND manual projected transactions.
+ * Manual transactions with projected status need to be fetched since they're stored, not generated.
  * No date filtering - fetches all stored transactions for the user.
  */
 export const subscribeToStoredTransactions = (
@@ -348,16 +349,22 @@ export const subscribeToStoredTransactions = (
   callback: (transactions: Transaction[]) => void
 ): (() => void) => {
   const transactionsRef = collection(db, "transactions");
-  // Fetch all non-projected transactions (completed, skipped)
-  const q = query(
-    transactionsRef,
-    where("userId", "==", userId),
-    where("status", "in", ["completed", "skipped"]),
-    orderBy("scheduledDate", "asc")
-  );
+
+  // Fetch all stored transactions
+  // Rule-based: only completed/skipped (projected are generated on-the-fly)
+  // Manual: all statuses (projected, completed, skipped) since they're all stored
+  const q = query(transactionsRef, where("userId", "==", userId), orderBy("scheduledDate", "asc"));
 
   return onSnapshot(q, (snapshot) => {
     const transactions = snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }) as Transaction);
-    callback(transactions);
+
+    // Filter to only include:
+    // 1. Manual transactions (all statuses)
+    // 2. Rule-based transactions that are completed or skipped
+    const filteredTransactions = transactions.filter(
+      (t) => t.sourceType === "manual" || t.status === "completed" || t.status === "skipped"
+    );
+
+    callback(filteredTransactions);
   });
 };

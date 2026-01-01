@@ -4,7 +4,7 @@ import React, { useState, useRef, useEffect } from "react";
 import Link from "next/link";
 import Image from "next/image";
 import { useAuth } from "@/contexts/AuthContext";
-import { Button, Icon, Avatar } from "@/components/common";
+import { Button, Icon, UserAvatar } from "@/components/common";
 import { getAssetPath } from "@/lib/utils/assetPath";
 
 const navLinks = [
@@ -81,7 +81,12 @@ export const LandingNavbar: React.FC = () => {
                   <Button
                     onClick={() => setIsDropdownOpen(!isDropdownOpen)}
                     startIcon={
-                      <Avatar name={userProfile?.displayName} email={user.email} size="sm" />
+                      <UserAvatar
+                        imageUrl={userProfile?.profilePictureUrl}
+                        name={userProfile?.displayName}
+                        email={user.email}
+                        size="sm"
+                      />
                     }
                     variant="ghost"
                     className="flex items-center gap-2 px-2 sm:px-3 py-1.5 rounded-full bg-dark-800 border border-white/10 hover:border-white/20 hover:bg-dark-700"
