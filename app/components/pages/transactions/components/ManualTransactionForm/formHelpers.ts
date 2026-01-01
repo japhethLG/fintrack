@@ -43,7 +43,7 @@ export const getDefaultValues = (
     category: "other",
     amount: "",
     scheduledDate: today,
-    status: "completed", // Default to completed for today's date
+    status: "projected", // Default to projected
     notes: "",
   };
 };

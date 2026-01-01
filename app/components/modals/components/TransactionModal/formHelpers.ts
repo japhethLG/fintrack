@@ -20,7 +20,7 @@ export interface CompleteTransactionFormValues {
 
 export const getDefaultValues = (transaction: Transaction): CompleteTransactionFormValues => {
   const isManual = transaction.sourceType === "manual";
-  const defaultMode = isManual ? "edit" : "complete";
+  const defaultMode = "complete"; // Default to complete for all transactions
 
   return {
     mode: defaultMode as any,

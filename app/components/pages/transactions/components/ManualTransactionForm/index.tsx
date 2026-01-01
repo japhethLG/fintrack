@@ -23,6 +23,7 @@ import {
 
 interface IProps {
   initialData?: Transaction;
+  prefilledDate?: string;
   onSubmit: (data: Omit<Transaction, "id" | "userId" | "createdAt" | "updatedAt">) => Promise<void>;
   onCancel: () => void;
   onDelete?: () => Promise<void>;
@@ -31,6 +32,7 @@ interface IProps {
 
 const ManualTransactionForm: React.FC<IProps> = ({
   initialData,
+  prefilledDate,
   onSubmit,
   onCancel,
   onDelete,
@@ -41,7 +43,7 @@ const ManualTransactionForm: React.FC<IProps> = ({
   const [error, setError] = useState<string | null>(null);
 
   const methods = useForm<ManualTransactionFormValues>({
-    defaultValues: getDefaultValues(initialData),
+    defaultValues: getDefaultValues(initialData, prefilledDate),
     resolver: yupResolver(formSchema) as never,
     mode: "onChange",
   });
@@ -54,14 +56,6 @@ const ManualTransactionForm: React.FC<IProps> = ({
   const categoryOptions = useMemo(() => {
     return transactionType === "income" ? INCOME_CATEGORY_OPTIONS : EXPENSE_CATEGORY_OPTIONS;
   }, [transactionType]);
-
-  // Auto-adjust status when date changes (only if not editing)
-  useEffect(() => {
-    if (!isEditing && selectedDate) {
-      const smartStatus = getSmartStatus(selectedDate);
-      setValue("status", smartStatus);
-    }
-  }, [selectedDate, isEditing, setValue]);
 
   // Reset category when type changes
   useEffect(() => {

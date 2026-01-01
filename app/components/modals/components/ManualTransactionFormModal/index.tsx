@@ -11,6 +11,7 @@ import ManualTransactionForm from "@/components/pages/transactions/components/Ma
 
 export interface IModalData {
   transaction?: Transaction; // For editing
+  prefilledDate?: string; // For prefilling date when creating new transaction
   onClose?: () => void;
   onSuccess?: () => void;
 }
@@ -63,6 +64,7 @@ const ManualTransactionFormModal: React.FC<IProps> = ({ modalData, closeModal })
   return (
     <ManualTransactionForm
       initialData={modalData?.transaction}
+      prefilledDate={modalData?.prefilledDate}
       onSubmit={handleSubmit}
       onCancel={handleCancel}
       onDelete={isEditing ? handleDelete : undefined}

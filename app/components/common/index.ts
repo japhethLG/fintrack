@@ -15,6 +15,7 @@ export { Table, type TableProps, type TableColumn } from "./Table";
 export { Avatar, type AvatarProps } from "./Avatar";
 export { ProfilePictureUpload, type ProfilePictureUploadProps } from "./ProfilePictureUpload";
 export { UserAvatar, type UserAvatarProps } from "./UserAvatar";
+export { ContextMenu, type ContextMenuProps, type ContextMenuItem } from "./ContextMenu";
 export {
   AnimatedElement,
   type AnimationType,
