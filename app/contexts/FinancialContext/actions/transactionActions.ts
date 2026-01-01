@@ -261,7 +261,7 @@ export async function rescheduleTransactionAction(
     occurrenceId,
   };
 
-  if (existing.status === "completed") {
+  if (existing.status === "completed" || existing.actualDate) {
     updates.actualDate = newDate;
   }
 
