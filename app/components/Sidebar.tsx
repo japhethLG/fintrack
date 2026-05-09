@@ -41,7 +41,7 @@ const Sidebar: React.FC = () => {
     { id: "forecast", path: "/forecast", label: "AI Forecast", icon: "smart_toy" },
     { id: "settings", path: "/settings", label: "Settings", icon: "settings" },
   ];
-
+// comment
   const handleLogout = async () => {
     await logout();
     router.push("/login");
