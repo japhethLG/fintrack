@@ -44,6 +44,20 @@ const scheduledDates = (list: Proj[]): string[] => list.map((t) => t.scheduledDa
 const amounts = (list: Proj[]): number[] => list.map((t) => t.projectedAmount);
 const occurrenceIds = (list: Proj[]): (string | undefined)[] => list.map((t) => t.occurrenceId);
 
+/**
+ * The projections whose scheduledDate falls outside an inclusive "YYYY-MM-DD"
+ * window. Returning the offenders (rather than asserting inside a loop) keeps
+ * the window check non-vacuous on an empty list and gives a readable diff.
+ */
+const outsideWindow = (
+  list: Proj[],
+  start: string,
+  end: string
+): { occurrenceId: string | undefined; scheduledDate: string }[] =>
+  list
+    .filter((t) => t.scheduledDate < start || t.scheduledDate > end)
+    .map((t) => ({ occurrenceId: t.occurrenceId, scheduledDate: t.scheduledDate }));
+
 /** Q1 2026 — wide enough for three monthly occurrences. */
 const Q1_START = d("2026-01-01");
 const Q1_END = d("2026-03-31");
@@ -437,6 +451,10 @@ describe("createProjectedTransaction", () => {
      * longer sums to the amount charged (400 + 100 = 500, amount 700).
      * CORRECT: the breakdown must either be re-split against the overridden amount
      * or dropped, so the persisted numbers stay internally consistent.
+     *
+     * The assertion below accepts BOTH of those fixes and only those: the split
+     * total must be 700 (re-split) or the breakdown must be absent (dropped).
+     * Today it is 500, which is neither.
      */
     it.fails("KNOWN DEFECT: keeps the breakdown consistent with an overridden amount", () => {
       const result = createProjectedTransaction(
@@ -450,8 +468,14 @@ describe("createProjectedTransaction", () => {
       );
 
       expect(result?.projectedAmount).toBe(700);
+
       const breakdown = result?.paymentBreakdown;
-      expect(cents((breakdown?.principalPaid ?? 0) + (breakdown?.interestPaid ?? 0))).toBe(700);
+      const splitTotal =
+        breakdown === undefined ? null : cents(breakdown.principalPaid + breakdown.interestPaid);
+
+      // 700 => re-split against the override; null => the stale breakdown was
+      // dropped. Either keeps the persisted row internally consistent.
+      expect([700, null]).toContain(splitTotal);
     });
   });
 });
@@ -651,30 +675,54 @@ describe("generateIncomeProjections", () => {
     /**
      * DEFECT: incomeProjections.ts:47-55 applies `override.scheduledDate` after the
      * window filter in `calculateOccurrences`, and neither the generator nor
-     * projectionGenerator.ts re-filters, so a moved occurrence escapes the window
-     * the caller asked for. January's salary dragged to 2026-02-15 is still returned
-     * for a January-only request (and the February window will never see it either,
-     * because it is keyed to the January occurrence) — the amount is lost from one
-     * period and double-counted in the other by any consumer that trusts the window.
-     * CORRECT: every returned transaction's scheduledDate lies inside the requested
-     * window.
+     * projectionGenerator.ts re-filters (projectionGenerator.ts:36-41 only sorts by
+     * scheduledDate), so a moved occurrence escapes the window the caller asked for.
+     * January's salary dragged to 2026-02-15 is still returned for a January-only
+     * request, and the February window never sees it, because the override is keyed
+     * to the January occurrence id.
+     *
+     * DECISION on the contested premise: [viewStartDate, viewEndDate] is a window
+     * over EFFECTIVE DATES, not over logical periods — every caller buckets the
+     * returned rows by `scheduledDate` (calculateDailyBalances groups on
+     * `actualDate || scheduledDate`; generateProjections sorts on scheduledDate).
+     * So the row belongs to whichever window contains its post-override date, and
+     * two invariants must hold together:
+     *   (1) nothing a caller receives sits outside the window it asked for, and
+     *   (2) the occurrence is not silently lost — it comes back from exactly one of
+     *       the two windows involved.
+     * Both a fix that re-filters and emits the row in the TARGET window, and a fix
+     * that refuses the move and clamps the date back into the SOURCE window,
+     * satisfy this pair; only "filter it out of January and forget about it"
+     * (which deletes a real payment from every projection) stays red.
+     * OBSERVED: the January request returns it dated 2026-02-15, violating (1).
      */
-    it.fails("KNOWN DEFECT: keeps overridden dates inside the requested window", () => {
-      const result = generateIncomeProjections(
-        makeIncomeSource({
+    it.fails(
+      "KNOWN DEFECT: an occurrence moved out of its window is neither leaked nor lost",
+      () => {
+        const source = makeIncomeSource({
           occurrenceOverrides: {
             "inc-1_2026-01": makeOverride({ scheduledDate: "2026-02-15" }),
           },
-        }),
-        d("2026-01-01"),
-        d("2026-01-31")
-      );
+        });
 
-      for (const projection of result) {
-        expect(projection.scheduledDate >= "2026-01-01").toBe(true);
-        expect(projection.scheduledDate <= "2026-01-31").toBe(true);
+        const january = generateIncomeProjections(source, d("2026-01-01"), d("2026-01-31"));
+        const february = generateIncomeProjections(source, d("2026-02-01"), d("2026-02-28"));
+
+        // (1) Window contract. Mapped to an array rather than asserted inside a
+        // loop, so an empty result cannot make this pass vacuously.
+        expect(outsideWindow(january, "2026-01-01", "2026-01-31")).toEqual([]);
+        expect(outsideWindow(february, "2026-02-01", "2026-02-28")).toEqual([]);
+
+        // (2) Not silently lost: returned by the target window under a re-filter
+        // fix, or by the source window under a clamp fix — but by exactly one, so
+        // it is never double-counted either.
+        const moved = [...january, ...february].filter((t) => t.occurrenceId === "inc-1_2026-01");
+        expect(moved).toHaveLength(1);
+
+        // February's own occurrence is untouched under either fix.
+        expect(occurrenceIds(february)).toContain("inc-1_2026-02");
       }
-    });
+    );
   });
 });
 

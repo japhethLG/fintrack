@@ -32,14 +32,46 @@ import { freezeToday } from "../helpers/time";
  * EVERY test freezes the clock. An unfrozen clock would make these suites pass
  * or fail depending on the day they are run.
  *
- * Two cross-cutting decisions are pinned repeatedly, because the modules
- * DISAGREE with each other and the disagreement is user-visible:
- *   1. WHICH TRANSACTIONS — `getRunway`/`getNextCrunch` walk completed
- *      transactions as well as projected ones, `calculateRunwayScore` and
- *      `calculateForecast` exclude completed entirely.
+ * Two cross-cutting questions run through the modules, and they are NOT of the
+ * same kind:
+ *   1. WHICH TRANSACTIONS — the modules disagree, but only one answer can be
+ *      right. It is stated as THE COMPLETED-TRANSACTION CONTRACT below and
+ *      applied identically to all four projections: a module that complies gets
+ *      a passing test saying so, a module that violates it gets an `it.fails`.
  *   2. WHICH DATE — most filters use `actualDate || scheduledDate`;
  *      `getBillCoverageReport.daysUntilDue`, `calculateBillPaymentScore` and
- *      `calculateForecast` use `scheduledDate` only.
+ *      `calculateForecast` use `scheduledDate` only. Nothing in the app
+ *      designates one of those as authoritative, so each is pinned as-is
+ *      rather than being judged.
+ */
+
+/**
+ * THE COMPLETED-TRANSACTION CONTRACT (pinned for every projection in this file)
+ *
+ * Forward-looking projections start from `userProfile.currentBalance`, and that
+ * balance ALREADY contains every completed transaction, so a projection must
+ * never re-apply a completed row — doing so spends the same money twice.
+ *
+ * Why `currentBalance` already contains them: it is
+ * `initialBalance` plus every completed row
+ * (app/lib/logic/balanceCalculator/computedBalance.ts:16-34), and it is
+ * adjusted the moment a transaction flips to completed
+ * (app/contexts/FinancialContext/actions/transactionActions.ts:308-322).
+ * Neither of those looks at the transaction's DATE, so a completed row dated
+ * today or later sits inside the projected window AND inside the starting
+ * balance. Production really does hand these functions that balance:
+ * app/components/pages/forecast/Forecast.tsx:272-274 calls
+ * `getRunway(userProfile.currentBalance, transactions)` and
+ * `getNextCrunch(userProfile.currentBalance, transactions)`.
+ *
+ * COMPLIANT — a passing test in each block below says so:
+ *   - `calculateRunwayScore` excludes completed (scoreCalculators.ts:34-37)
+ *   - `calculateForecast` keeps only `status === "projected"`
+ *     (forecastCalculator.ts:27-29)
+ *   - `getBillCoverageReport` excludes completed (billCoverage.ts:26-31)
+ * VIOLATING — filed as an `it.fails` defect in each block below:
+ *   - `getRunway` walks completed rows (runway.ts:32-39)
+ *   - `getNextCrunch` walks completed rows (runway.ts:82-92)
  */
 
 // ============================================================================
@@ -130,6 +162,9 @@ describe("getBillCoverageReport", () => {
     });
 
     it("excludes completed and skipped transactions — only unrealized bills need covering", () => {
+      // COMPLIANT with THE COMPLETED-TRANSACTION CONTRACT (top of this file):
+      // the 400 already paid is inside the 1,000 balance, so counting it as
+      // "still to cover" would demand the money twice.
       const report = getBillCoverageReport(1_000, [
         makeCompletedTransaction({ id: "paid", scheduledDate: "2026-03-12", projectedAmount: 400 }),
         makeSkippedTransaction({
@@ -363,6 +398,14 @@ describe("getBillCoverageReport", () => {
 describe("getRunway", () => {
   beforeEach(() => freezeToday(TODAY));
 
+  // CONTRACT (see THE COMPLETED-TRANSACTION CONTRACT at the top of this file):
+  // a forward projection starts from `currentBalance`, which already contains
+  // every completed transaction, so completed rows must not be re-applied.
+  // `getRunway` re-applies them (runway.ts:32-39), which is the defect filed at
+  // the end of this block. The completed-row tests in between CHARACTERIZE that
+  // arithmetic — they pin what today's code does so a fix is a deliberate,
+  // visible change — they do not endorse it.
+
   it("returns the day index and date on which the balance first goes negative", () => {
     // 1,000 - 400 (11th) - 400 (12th) - 400 (13th) => -200 on the 13th, day 3.
     const result = getRunway(1_000, [
@@ -421,7 +464,10 @@ describe("getRunway", () => {
     ).toEqual({ days: 30, runOutDate: null });
   });
 
-  it("uses actualAmount for completed transactions and projectedAmount for projected ones", () => {
+  // The next three tests characterize HOW getRunway spends completed rows. Per
+  // the contract it should not spend them at all; these exist so that the
+  // arithmetic (which amount, which date) is pinned rather than accidental.
+  it("characterizes the defect: spends a completed row at actualAmount, projected rows at projectedAmount", () => {
     // The completed bill's projectedAmount (5,000) would overdraw on the 11th;
     // its actualAmount (200) does not, so the run-out is driven by the
     // projected 900 on the 12th: 1,000 - 200 - 900 = -100.
@@ -442,7 +488,8 @@ describe("getRunway", () => {
     expect(result).toEqual({ days: 2, runOutDate: "2026-03-12" });
   });
 
-  it("falls back to projectedAmount for a completed transaction with no actualAmount", () => {
+  it("characterizes the defect: falls back to projectedAmount for a completed row with no actualAmount", () => {
+    // Branch coverage for runway.ts:39 (`t.actualAmount ?? t.projectedAmount`).
     const result = getRunway(1_000, [
       completedWithoutActual({ scheduledDate: "2026-03-11", projectedAmount: 1_200 }),
     ]);
@@ -450,7 +497,7 @@ describe("getRunway", () => {
     expect(result).toEqual({ days: 1, runOutDate: "2026-03-11" });
   });
 
-  it("buckets a completed transaction on its actualDate, not its scheduledDate", () => {
+  it("characterizes the defect: buckets a completed row on its actualDate, not its scheduledDate", () => {
     const result = getRunway(1_000, [
       makeCompletedTransaction({
         scheduledDate: "2026-03-11",
@@ -486,9 +533,13 @@ describe("getRunway", () => {
     ).toEqual({ days: 30, runOutDate: null });
   });
 
-  it("contrasts with calculateRunwayScore, which excludes completed transactions", () => {
-    // Identical input, opposite treatment of the completed bill: getRunway
-    // spends it again, calculateRunwayScore ignores it.
+  it("is contradicted by calculateRunwayScore, which applies the contract correctly", () => {
+    // Identical input, and only one of these two answers can be right. The
+    // 1,000 balance handed in ALREADY paid the completed 1,200 bill, so
+    // calculateRunwayScore is correct to leave the 90-day horizon untouched;
+    // the getRunway half of this assertion is the double-count filed as a
+    // defect immediately below, kept side by side so the divergence is visible
+    // in one place instead of being inferred from two separate blocks.
     const completed = makeCompletedTransaction({
       scheduledDate: "2026-03-11",
       projectedAmount: 1_200,
@@ -501,12 +552,20 @@ describe("getRunway", () => {
 
   describe("known defects", () => {
     /**
-     * DEFECT: `getRunway` walks every non-skipped transaction, including
-     * completed ones (app/lib/logic/balanceCalculator/runway.ts:32-35), and
-     * subtracts them from `currentBalance` — but `currentBalance` is the
-     * account balance TODAY and therefore already reflects money that has
-     * actually moved. A completed transaction dated in the future is spent
-     * twice: once inside the real balance, once again by the projection.
+     * DEFECT: this breaks THE COMPLETED-TRANSACTION CONTRACT stated at the top
+     * of this file. `getRunway` filters only on `t.status !== "skipped"`
+     * (app/lib/logic/balanceCalculator/runway.ts:32-35) and then subtracts
+     * completed rows from `currentBalance` (runway.ts:37-46) — but
+     * `currentBalance` is `initialBalance` plus every completed row already
+     * (computedBalance.ts:22-30), date-blind, so the money has been taken out
+     * once before the loop even starts.
+     *
+     * THE CONCRETE DOUBLE-COUNT: a 1,200 expense marked completed and dated
+     * tomorrow (2026-03-11) has already reduced the balance to the 1,000 the
+     * caller passes in. getRunway subtracts the same 1,200 a second time,
+     * reaches -200 on the 11th, and tells the user on the forecast page
+     * (Forecast.tsx:273) that they run out of money in one day. Marking a bill
+     * PAID makes the runway shorter — the opposite of the truth.
      *
      * CORRECT: completed transactions must not move the projected balance, the
      * way calculateRunwayScore does it
@@ -537,6 +596,12 @@ describe("getRunway", () => {
 
 describe("getNextCrunch", () => {
   beforeEach(() => freezeToday(TODAY));
+
+  // CONTRACT (see THE COMPLETED-TRANSACTION CONTRACT at the top of this file):
+  // completed rows must not be re-applied to `currentBalance`. `getNextCrunch`
+  // re-applies them (runway.ts:82-92), exactly as `getRunway` does, so it
+  // breaks the same contract in the same way — filed as a defect at the end of
+  // this block. The completed-row tests in between characterize the arithmetic.
 
   it("returns the first day whose expenses push the balance negative, with the shortfall", () => {
     // 1,000 - 600 (11th) = 400; 400 - 600 (12th) = -200.
@@ -588,7 +653,7 @@ describe("getNextCrunch", () => {
     ).toBeNull();
   });
 
-  it("uses actualAmount for completed transactions", () => {
+  it("characterizes the defect: uses actualAmount for the completed rows it should not be spending", () => {
     // actualAmount 5,000 overdraws where projectedAmount 10 would not.
     expect(
       getNextCrunch(1_000, [
@@ -596,6 +661,21 @@ describe("getNextCrunch", () => {
           scheduledDate: "2026-03-11",
           projectedAmount: 10,
           actualAmount: 5_000,
+        }),
+      ])
+    ).toEqual({ date: "2026-03-11", shortfall: 4_000 });
+  });
+
+  it("characterizes the defect: falls back to projectedAmount for a completed row with no actualAmount", () => {
+    // Branch coverage for runway.ts:92 (`t.actualAmount ?? t.projectedAmount`).
+    // No actualAmount, so the projected 5,000 is what gets spent:
+    // 1,000 - 5,000 = -4,000 on the 11th.
+    expect(
+      getNextCrunch(1_000, [
+        completedWithoutActual({
+          scheduledDate: "2026-03-11",
+          actualDate: "2026-03-11",
+          projectedAmount: 5_000,
         }),
       ])
     ).toEqual({ date: "2026-03-11", shortfall: 4_000 });
@@ -639,6 +719,41 @@ describe("getNextCrunch", () => {
       expect(getNextCrunch(-500, [])).toBeNull();
     });
   });
+
+  describe("known defects", () => {
+    /**
+     * DEFECT: the same breach of THE COMPLETED-TRANSACTION CONTRACT as
+     * `getRunway`. `getNextCrunch` filters only on `t.status !== "skipped"`
+     * (app/lib/logic/balanceCalculator/runway.ts:82-85) and then spends
+     * completed rows out of `currentBalance` (runway.ts:90-101), even though
+     * `currentBalance` is `initialBalance` plus every completed row already
+     * (computedBalance.ts:22-30).
+     *
+     * THE CONCRETE DOUBLE-COUNT: a 1,200 expense marked completed and dated
+     * tomorrow has already brought the balance down to the 1,000 handed in.
+     * getNextCrunch subtracts it again and warns of a 200 shortfall tomorrow
+     * (Forecast.tsx:274 renders exactly this) — a crunch that cannot happen,
+     * caused by the user marking the bill PAID.
+     *
+     * CORRECT: no crunch, matching calculateRunwayScore's treatment of the same
+     * input (app/lib/logic/healthScore/scoreCalculators.ts:34-37).
+     */
+    it.fails("KNOWN DEFECT: does not re-spend a completed transaction dated in the future", () => {
+      const result = getNextCrunch(
+        1_000,
+        [
+          makeCompletedTransaction({
+            scheduledDate: "2026-03-11",
+            projectedAmount: 1_200,
+            actualAmount: 1_200,
+          }),
+        ],
+        30
+      );
+
+      expect(result).toBeNull();
+    });
+  });
 });
 
 // ============================================================================
@@ -647,6 +762,10 @@ describe("getNextCrunch", () => {
 
 describe("calculateForecast", () => {
   beforeEach(() => freezeToday(TODAY));
+
+  // CONTRACT (see the top of this file): `calculateForecast` COMPLIES — it
+  // keeps only `status === "projected"` rows, so it never re-applies a
+  // completed transaction that `currentBalance` already paid for.
 
   /**
    * NOTE: the forecast keys its days with `toISOString().split("T")[0]` — a UTC
@@ -725,11 +844,17 @@ describe("calculateForecast", () => {
     expect(forecast.map((p) => p.balance)).toEqual([1_000, 1_000, 1_000]);
   });
 
-  it("ignores completed and skipped transactions entirely", () => {
-    // Opposite of getRunway/getNextCrunch, which spend completed transactions
-    // again (see the getRunway known defect). calculateForecast filters on
-    // `status === "projected"` (forecastCalculator.ts:27-29), so the same input
-    // that runs the runway dry leaves the forecast perfectly flat.
+  it("honours the contract: ignores completed transactions, which currentBalance already reflects", () => {
+    // COMPLIANT with THE COMPLETED-TRANSACTION CONTRACT: the filter is
+    // `status === "projected"` (forecastCalculator.ts:27-29), and the module
+    // says why in its own comment ("Assumption: currentBalance is the ACTUAL
+    // balance TODAY", forecastCalculator.ts:24-25). The completed 1,200 is
+    // already inside the 1,000 balance, so the forecast is correctly flat.
+    //
+    // The second assertion is the same input through getRunway, which breaks
+    // the contract and reports a run-out tomorrow — the defect filed in the
+    // getRunway block. It is asserted here to keep the two treatments of one
+    // input adjacent; the forecast's answer is the correct one.
     const transactions = [
       makeCompletedTransaction({
         id: "paid",
@@ -782,6 +907,11 @@ describe("calculateForecast", () => {
 describe("calculateRunwayScore", () => {
   beforeEach(() => freezeToday(TODAY));
 
+  // CONTRACT (see the top of this file): `calculateRunwayScore` COMPLIES — its
+  // filter excludes completed rows (scoreCalculators.ts:34-37), so the balance
+  // it projects forward never pays the same bill twice. This is the correct
+  // convention; `getRunway` and `getNextCrunch` are the ones that need fixing.
+
   /** Balance 1,000 wiped out by a single projected 5,000 bill `offset` days out. */
   const scoreForRunOutOn = (offset: number) =>
     calculateRunwayScore(1_000, [
@@ -828,7 +958,10 @@ describe("calculateRunwayScore", () => {
       expect(scoreForRunOutOn(120)).toEqual({ score: 100, daysRemaining: 90 });
     });
 
-    it("excludes completed and skipped transactions", () => {
+    it("honours the contract by excluding completed transactions, and ignores skipped ones", () => {
+      // The completed 9,999 is already inside the 1,000 balance, so excluding
+      // it is correct — not merely "different from getRunway". Fed to getRunway
+      // the same row reports a run-out tomorrow (see that block's defect).
       const result = calculateRunwayScore(1_000, [
         makeCompletedTransaction({
           id: "paid",
@@ -1075,24 +1208,67 @@ describe("calculateSavingsRateScore", () => {
       // (2,000 - 1,000) / 2,000 = 50%
       expect(result).toEqual({ score: 100, rate: 50 });
     });
+
+    it("falls back to projectedAmount for a completed transaction with no actualAmount", () => {
+      // Branch coverage for scoreCalculators.ts:91
+      // (`t.actualAmount ?? t.projectedAmount`). The expense is completed but
+      // carries no actualAmount, so its projected 700 is what counts:
+      // (1,000 - 700) / 1,000 = 30%.
+      const result = calculateSavingsRateScore(
+        [
+          makeCompletedTransaction({
+            id: "pay",
+            type: "income",
+            scheduledDate: "2026-03-05",
+            projectedAmount: 1_000,
+            actualAmount: 1_000,
+          }),
+          completedWithoutActual({
+            id: "spend",
+            scheduledDate: "2026-03-06",
+            actualDate: "2026-03-06",
+            projectedAmount: 700,
+          }),
+        ],
+        PERIOD.start,
+        PERIOD.end
+      );
+
+      expect(result).toEqual({ score: 100, rate: 30 });
+    });
   });
 
   describe("known defects", () => {
     /**
-     * DEFECT: with zero income and non-zero spending, `rate` is hard-coded to 0
+     * VERDICT: DEFECT, not intended behaviour. With zero income and non-zero
+     * spending, `rate` is hard-coded to 0
      * (app/lib/logic/healthScore/scoreCalculators.ts:106) because the division
      * would be undefined, and 0 then lands in the `rate >= 0` band and scores
      * 20 (scoreCalculators.ts:113) — the same score as a household that exactly
      * broke even. A month of pure outflow with no income whatsoever is the
-     * worst possible savings picture, strictly worse than the "spending more
-     * than you earn" case that scores 0.
+     * worst possible savings picture, strictly worse than the "earned 1,000,
+     * spent 1,001" case that scores 0 on the very next line.
      *
-     * It also mis-drives the insights: `generateInsights` only special-cases
-     * rate 0 when the score is 100 (insights.ts:38), so this case is described
-     * as "try to increase your savings rate to at least 10%".
+     * USER-VISIBLE CONSEQUENCE, twice over:
+     *   1. The composite health score is inflated. Savings is weighted 30%
+     *      (healthScoreCalculator.ts:52-55), so a month with income 0 and
+     *      spending 1,000 contributes 20 * 0.3 = 6 points that it has not
+     *      earned, and it takes them from the band a genuinely overspending
+     *      month would score.
+     *   2. The advice is wrong. `generateInsights` only special-cases rate 0
+     *      when the score is 100 — the "no transactions at all" case
+     *      (insights.ts:38) — so with score 20 this falls through to
+     *      `savingsRate < 10` (insights.ts:41) and the user burning down
+     *      savings with no income is told to "try to increase your savings rate
+     *      to at least 10%", never "you're spending more than you earn"
+     *      (insights.ts:36-37).
      *
      * CORRECT: spending with no income should score 0, like any other negative
-     * savings rate.
+     * savings rate. Note that the genuinely neutral case — no income AND no
+     * spending — is already handled separately and keeps its 100
+     * (scoreCalculators.ts:101-103), so fixing this cannot penalize an empty
+     * month; the passing test "returns a neutral 100 with a 0 rate when there
+     * are no transactions at all" above guards that.
      */
     it.fails("KNOWN DEFECT: scores 0 for spending in a month with no income", () => {
       const result = calculateSavingsRateScore(

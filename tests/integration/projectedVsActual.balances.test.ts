@@ -673,7 +673,8 @@ describe("calculateDailyBalances", () => {
     /**
      * DEFECT: `projectedIncome` / `projectedExpenses` are hardcoded to 0.
      *
-     * `dailyBalance.ts:87-88` writes literal zeros. The `DayBalance` type
+     * `dailyBalance.ts:87-88` writes literal zeros — every day of every window
+     * reports 0 / 0 regardless of what it holds. The `DayBalance` type
      * (app/lib/types.ts:296-306) advertises a projected-vs-actual split
      * alongside `totalIncome`/`totalExpenses`, but the calculator never
      * populates it, so no consumer can render "projected vs actual" per day.
@@ -681,6 +682,12 @@ describe("calculateDailyBalances", () => {
      * CORRECT: a day holding a projected income of 1000 and a projected expense
      * of 400 should report projectedIncome 1000 / projectedExpenses 400.
      * OBSERVED: 0 / 0.
+     *
+     * Deliberately ONE test for this behaviour: the input below is all
+     * `projected`, so it reads the same under either reasonable definition of
+     * the fields (the projected-status subtotal, or the projected amount of
+     * every non-skipped row). No sibling test pins the hardcoded 0s, because
+     * doing so would turn a correct fix into a test failure.
      */
     it.fails("KNOWN DEFECT: populates projectedIncome and projectedExpenses per day", () => {
       const balances = calculateDailyBalances(
@@ -705,38 +712,6 @@ describe("calculateDailyBalances", () => {
 
       expect(day(balances, "2026-01-02").projectedIncome).toBe(1_000);
       expect(day(balances, "2026-01-02").projectedExpenses).toBe(400);
-    });
-
-    it("currently reports projectedIncome and projectedExpenses as 0 on every day", () => {
-      // Current behaviour, pinned so the shape of the defect is explicit.
-      const balances = calculateDailyBalances(
-        10_000,
-        [
-          makeProjectedTransaction({
-            id: "p1",
-            type: "income",
-            projectedAmount: 1_000,
-            scheduledDate: "2026-01-02",
-          }),
-          makeCompletedTransaction({
-            id: "c1",
-            type: "expense",
-            projectedAmount: 400,
-            actualAmount: 400,
-            scheduledDate: "2026-01-03",
-          }),
-        ],
-        d("2026-01-01"),
-        d("2026-01-03")
-      );
-
-      expect(
-        Array.from(balances.values()).map((b) => [b.projectedIncome, b.projectedExpenses])
-      ).toEqual([
-        [0, 0],
-        [0, 0],
-        [0, 0],
-      ]);
     });
   });
 });
@@ -1233,9 +1208,17 @@ describe("calculateVarianceReport", () => {
         variance: 0,
         variancePercent: 0,
       });
-      expect(report.byCategory).toEqual([
-        { category: "housing", projected: 1_200, actual: 1_200, variance: 0 },
-      ]);
+      // `toContainEqual`, not `toEqual`: the point here is that the fallback
+      // feeds the category row with the projected amount. Whether an income
+      // ("salary") row exists alongside it is the separate, contested question
+      // owned by the "tracks income variance by category" defect test below —
+      // asserting its absence here would contradict that test.
+      expect(report.byCategory).toContainEqual({
+        category: "housing",
+        projected: 1_200,
+        actual: 1_200,
+        variance: 0,
+      });
     });
 
     it("returns all zeros for an empty transaction list", () => {
@@ -1379,34 +1362,6 @@ describe("calculateVarianceReport", () => {
         { category: "food", projected: 400, actual: 450, variance: 50 },
       ]);
     });
-
-    it("does not create a category row for income (current behaviour)", () => {
-      // Pinned: variance.ts:42-46 only touches categoryMap in the expense branch.
-      const report = calculateVarianceReport(
-        [
-          makeCompletedTransaction({
-            id: "inc",
-            type: "income",
-            category: "salary",
-            projectedAmount: 3_000,
-            actualAmount: 2_800,
-            scheduledDate: "2026-01-15",
-          }),
-          makeCompletedTransaction({
-            id: "exp",
-            type: "expense",
-            category: "housing",
-            projectedAmount: 1_200,
-            actualAmount: 1_350,
-            scheduledDate: "2026-01-05",
-          }),
-        ],
-        "2026-01-01",
-        "2026-01-31"
-      );
-
-      expect(report.byCategory.map((row) => row.category)).toEqual(["housing"]);
-    });
   });
 
   describe("known defects", () => {
@@ -1423,7 +1378,14 @@ describe("calculateVarianceReport", () => {
      *
      * CORRECT: a completed income transaction should contribute a category row
      * (salary: projected 3000, actual 2800, variance -200).
-     * OBSERVED: byCategory contains only the "housing" expense row.
+     * OBSERVED: byCategory contains only the "housing" expense row — today the
+     * income row simply does not exist.
+     *
+     * Deliberately ONE test for this behaviour. No sibling test pins
+     * "byCategory lists expenses only", because that would make fixing
+     * variance.ts:42-46 look like a regression. `toContainEqual` (not `toEqual`)
+     * also leaves the row ORDER of a fixed implementation free — only the
+     * presence of the income row is required.
      */
     it.fails("KNOWN DEFECT: tracks income variance by category as well as expenses", () => {
       const report = calculateVarianceReport(
@@ -2015,7 +1977,15 @@ describe("getCategoryBreakdown", () => {
      *
      * CORRECT: percentages should be relative to the row's own type total —
      * housing = 250/500 = 50%.
-     * OBSERVED: 16.666...% (250/1500).
+     * OBSERVED: rows [salary, housing, food] with totals [1000, 250, 250] and
+     * percentages [66.67, 16.67, 16.67] — i.e. every row divided by the mixed
+     * 1500 denominator.
+     *
+     * Deliberately ONE test for this behaviour. No sibling test pins those
+     * observed percentages, because a correct fix necessarily changes them (and
+     * may legitimately regroup or reorder the rows while doing so), which would
+     * make the fix read as a regression. Only the per-type percentage is
+     * asserted, so any fix that scopes the denominator correctly passes.
      */
     it.fails("KNOWN DEFECT: scopes percentages per type when no type filter is given", () => {
       const breakdown = getCategoryBreakdown([
@@ -2039,40 +2009,11 @@ describe("getCategoryBreakdown", () => {
         }),
       ]);
 
+      // Assert the row exists FIRST so the failure below is always an
+      // assertion about the percentage, never a matcher error on `undefined`.
       const housing = breakdown.find((row) => row.category === "housing");
+      expect(housing).toEqual({ category: "housing", total: 250, percentage: expect.any(Number) });
       expect(housing?.percentage).toBeCloseTo(50, 2);
-    });
-
-    it("currently divides mixed income and expense rows by their combined total", () => {
-      // Current behaviour, pinned: grandTotal = 1000 + 250 + 250 = 1500.
-      const breakdown = getCategoryBreakdown([
-        makeProjectedTransaction({
-          id: "s",
-          type: "income",
-          category: "salary",
-          projectedAmount: 1_000,
-        }),
-        makeProjectedTransaction({
-          id: "h",
-          type: "expense",
-          category: "housing",
-          projectedAmount: 250,
-        }),
-        makeProjectedTransaction({
-          id: "f",
-          type: "expense",
-          category: "food",
-          projectedAmount: 250,
-        }),
-      ]);
-
-      expect(breakdown.map((row) => row.category)).toEqual(["salary", "housing", "food"]);
-      expect(breakdown.map((row) => row.total)).toEqual([1_000, 250, 250]);
-      expect(breakdown.map((row) => row.percentage)).toEqual([
-        expect.closeTo(66.6667, 3),
-        expect.closeTo(16.6667, 3),
-        expect.closeTo(16.6667, 3),
-      ]);
     });
   });
 });

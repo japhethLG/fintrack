@@ -316,7 +316,10 @@ const runQuery = (target: QueryRef | CollectionRef) => {
 // LISTENERS
 // ============================================================================
 
-type Listener = { target: DocRef | QueryRef | CollectionRef; callback: (snapshot: unknown) => void };
+type Listener = {
+  target: DocRef | QueryRef | CollectionRef;
+  callback: (snapshot: unknown) => void;
+};
 const listeners: Listener[] = [];
 
 const emit = (listener: Listener) => {

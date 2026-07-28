@@ -2,8 +2,10 @@ import { describe, it, expect } from "vitest";
 
 import { generateOccurrenceId } from "@/lib/logic/projectionEngine/occurrenceIdGenerator";
 import { calculateOccurrences } from "@/lib/logic/projectionEngine/occurrenceCalculator";
+import { adjustForWeekend } from "@/lib/logic/projectionEngine/dateUtils";
 import type { IncomeFrequency, ScheduleConfig } from "@/lib/types";
 
+import { makeOccurrenceParams, type OccurrenceParamsLike } from "../../helpers/builders";
 import { d, ymd, ymdAll, weekday, duplicates } from "../../helpers/dates";
 
 /**
@@ -46,18 +48,37 @@ const isoWeekIdRef = (dateYmd: string): string => {
 };
 
 /**
- * Test-side weekend adjustment, mirroring the documented rule in
- * app/lib/logic/projectionEngine/dateUtils.ts:20-33 (Sat/Sun -> Fri for
- * "before", -> Mon for "after"). Reimplemented locally so the identity-drift
- * tests do not depend on the engine's own date arithmetic.
+ * The REAL weekend adjustment (app/lib/logic/projectionEngine/dateUtils.ts:20-33),
+ * expressed as "YYYY-MM-DD" for readable assertions. Never re-implemented here:
+ * every expectation about where a date lands is pinned against a literal, so a
+ * change in the production rule shows up as a failure instead of being mirrored.
  */
-const adjustWeekend = (dateYmd: string, mode: "before" | "after"): string => {
-  const date = d(dateYmd);
-  const day = date.getDay();
-  if (day !== 0 && day !== 6) return dateYmd;
-  const shift = day === 0 ? (mode === "before" ? -2 : 1) : mode === "before" ? -1 : 2;
-  date.setDate(date.getDate() + shift);
-  return ymd(date);
+const adjusted = (dateYmd: string, mode: "before" | "after" | "none"): string =>
+  ymd(adjustForWeekend(d(dateYmd), mode));
+
+/**
+ * Drive the REAL production composition end to end.
+ *
+ * `calculateOccurrences` is what actually applies weekend adjustment
+ * (occurrenceCalculator.ts:45-186 -> dateUtils.ts:20-33), and its output dates
+ * are exactly what `generateOccurrenceId` is fed in production — see
+ * incomeProjections.ts:24-44 and expenseProjections.ts:43-63. The
+ * identity-drift assertions below must observe THAT composition, not a
+ * hand-rolled one, so that fixing either half turns the defect tests red.
+ */
+const runSchedule = (
+  overrides: Partial<OccurrenceParamsLike>,
+  viewStartYmd: string,
+  viewEndYmd: string
+): { dates: string[]; ids: string[] } => {
+  const params = makeOccurrenceParams(overrides);
+  const occurrences = calculateOccurrences(params, d(viewStartYmd), d(viewEndYmd));
+  return {
+    dates: ymdAll(occurrences),
+    ids: occurrences.map((date) =>
+      generateOccurrenceId(SRC, params.frequency, date, params.startDate, params.scheduleConfig)
+    ),
+  };
 };
 
 /** Every day of a calendar month as "YYYY-MM-DD", for sweep assertions. */
@@ -267,12 +288,14 @@ describe("generateOccurrenceId", () => {
     it("keeps distinct ids for every occurrence of a weekend-adjusted schedule", () => {
       // A bi-weekly rule anchored on Sat 2026-01-03 with "before" adjustment
       // lands on Fridays; the whole series shifts one bucket down (BW0, BW1, ...)
-      // but stays collision-free.
-      const adjusted = ["2026-01-03", "2026-01-17", "2026-01-31"].map((day) =>
-        adjustWeekend(day, "before")
+      // but stays collision-free. Driven through the real calculator, so the
+      // adjusted dates are production output rather than a test fixture.
+      const { dates, ids } = runSchedule(
+        { frequency: "bi-weekly", startDate: "2026-01-03", weekendAdjustment: "before" },
+        "2026-01-03",
+        "2026-02-01"
       );
-      expect(adjusted).toEqual(["2026-01-02", "2026-01-16", "2026-01-30"]);
-      const ids = adjusted.map((day) => idFor("bi-weekly", day, "2026-01-03"));
+      expect(dates).toEqual(["2026-01-02", "2026-01-16", "2026-01-30"]);
       expect(ids).toEqual(["src_BW0", "src_BW1", "src_BW2"]);
       expect(duplicates(ids)).toEqual([]);
     });
@@ -460,26 +483,54 @@ describe("generateOccurrenceId", () => {
 
     it("keeps the weekly id when weekend adjustment moves a Sunday back into the same ISO week", () => {
       // Sun 2026-01-11 -> Fri 2026-01-09 under "before": still 2026-W02.
-      const before = adjustWeekend("2026-01-11", "before");
-      expect(before).toBe("2026-01-09");
-      expect(weekday(before)).toBe("Fri");
-      expect(idFor("weekly", before)).toBe(idFor("weekly", "2026-01-11"));
-      expect(idFor("weekly", before)).toBe("src_2026-W02");
+      expect(weekday("2026-01-11")).toBe("Sun");
+      expect(adjusted("2026-01-11", "before")).toBe("2026-01-09");
+      const { dates, ids } = runSchedule(
+        { frequency: "weekly", startDate: "2026-01-11", weekendAdjustment: "before" },
+        "2026-01-11",
+        "2026-01-11"
+      );
+      expect(dates).toEqual(["2026-01-09"]);
+      expect(ids).toEqual(["src_2026-W02"]);
+      // Same id the unadjusted Sunday would have produced.
+      expect(ids).toEqual([idFor("weekly", "2026-01-11")]);
     });
 
     it("keeps the monthly id when weekend adjustment stays inside the month", () => {
       // Sun 2026-03-15 -> Fri 2026-03-13 under "before".
-      const before = adjustWeekend("2026-03-15", "before");
-      expect(before).toBe("2026-03-13");
-      expect(idFor("monthly", before)).toBe(idFor("monthly", "2026-03-15"));
+      expect(adjusted("2026-03-15", "before")).toBe("2026-03-13");
+      const { dates, ids } = runSchedule(
+        {
+          frequency: "monthly",
+          startDate: "2026-03-15",
+          scheduleConfig: { dayOfMonth: 15 },
+          weekendAdjustment: "before",
+        },
+        "2026-03-01",
+        "2026-03-31"
+      );
+      expect(dates).toEqual(["2026-03-13"]);
+      expect(ids).toEqual(["src_2026-03"]);
+      expect(ids).toEqual([idFor("monthly", "2026-03-15")]);
     });
 
     it("keeps the semi-monthly slot when weekend adjustment stays inside the month", () => {
-      // Sun 2026-03-15 (slot 1 of [15, 30]) -> Fri 2026-03-13; 13 <= 15 so the
-      // nearest-slot fallback still resolves to slot 1.
-      const before = adjustWeekend("2026-03-15", "before");
-      expect(idFor("semi-monthly", before)).toBe(idFor("semi-monthly", "2026-03-15"));
-      expect(idFor("semi-monthly", before)).toBe("src_2026-03-1");
+      // Slots [15, 30]: Sun 2026-03-15 -> Fri 2026-03-13; 13 <= 15 so the
+      // nearest-slot fallback still resolves to slot 1, and Mon 2026-03-30 is
+      // untouched, so the two slots keep their own identities.
+      const { dates, ids } = runSchedule(
+        {
+          frequency: "semi-monthly",
+          startDate: "2026-03-01",
+          scheduleConfig: { specificDays: [15, 30] },
+          weekendAdjustment: "before",
+        },
+        "2026-03-01",
+        "2026-03-31"
+      );
+      expect(dates).toEqual(["2026-03-13", "2026-03-30"]);
+      expect(ids).toEqual(["src_2026-03-1", "src_2026-03-2"]);
+      expect(duplicates(ids)).toEqual([]);
     });
 
     it("gives two different calendar days two different daily ids", () => {
@@ -557,6 +608,15 @@ describe("generateOccurrenceId", () => {
   });
 
   describe("known defects", () => {
+    it("collapses Sat, Sun and Mon onto one Monday under 'after' adjustment", () => {
+      // The mechanism behind the daily-id collision asserted below, pinned on the
+      // REAL adjustment function against literal dates: Sat -> Mon (+2),
+      // Sun -> Mon (+1), Mon unchanged.
+      expect(
+        ["2026-01-03", "2026-01-04", "2026-01-05"].map((day) => adjusted(day, "after"))
+      ).toEqual(["2026-01-05", "2026-01-05", "2026-01-05"]);
+    });
+
     /**
      * DEFECT (daily + weekend adjustment): occurrenceCalculator.ts:50-57 emits
      * one occurrence per calendar day and pushes each through
@@ -574,39 +634,33 @@ describe("generateOccurrenceId", () => {
     it.fails(
       "KNOWN DEFECT: daily occurrences on Sat, Sun and Mon keep three distinct ids under weekend adjustment",
       () => {
-        const adjusted = ["2026-01-03", "2026-01-04", "2026-01-05"].map((day) =>
-          adjustWeekend(day, "after")
+        const { dates, ids } = runSchedule(
+          { frequency: "daily", startDate: "2026-01-03", weekendAdjustment: "after" },
+          "2026-01-03",
+          "2026-01-05"
         );
-        // Sat -> Mon (+2), Sun -> Mon (+1), Mon unchanged: all three land on 2026-01-05.
-        expect(adjusted).toEqual(["2026-01-05", "2026-01-05", "2026-01-05"]);
-        const ids = adjusted.map((day) => idFor("daily", day));
+        // Three separate daily occurrences, all pushed onto Mon 2026-01-05.
+        expect(dates).toEqual(["2026-01-05", "2026-01-05", "2026-01-05"]);
+        expect(ids).toHaveLength(3);
         expect(duplicates(ids)).toEqual([]);
         expect(new Set(ids).size).toBe(3);
       }
     );
 
     /**
-     * Same defect, driven end-to-end through the real occurrence calculator so
-     * the collision is shown on production output rather than a test fixture.
+     * Same defect over a Fri..Mon window, so the surviving Friday id shows that
+     * only the weekend-adjusted days collide.
      * Source: app/lib/logic/projectionEngine/occurrenceCalculator.ts:50-57 ->
      * app/lib/logic/projectionEngine/occurrenceIdGenerator.ts:67-68.
      */
     it.fails("KNOWN DEFECT: a daily schedule over a weekend produces one id per occurrence", () => {
-      const occurrences = calculateOccurrences(
-        {
-          frequency: "daily",
-          startDate: "2026-01-02",
-          scheduleConfig: {},
-          weekendAdjustment: "after",
-        },
-        d("2026-01-02"),
-        d("2026-01-05")
+      const { dates, ids } = runSchedule(
+        { frequency: "daily", startDate: "2026-01-02", weekendAdjustment: "after" },
+        "2026-01-02",
+        "2026-01-05"
       );
       // Fri, Sat, Sun, Mon -> Fri, Mon, Mon, Mon
-      expect(ymdAll(occurrences)).toEqual(["2026-01-02", "2026-01-05", "2026-01-05", "2026-01-05"]);
-      const ids = occurrences.map((date) =>
-        generateOccurrenceId(SRC, "daily", date, "2026-01-02", {})
-      );
+      expect(dates).toEqual(["2026-01-02", "2026-01-05", "2026-01-05", "2026-01-05"]);
       expect(ids).toHaveLength(4);
       expect(duplicates(ids)).toEqual([]);
     });
@@ -628,25 +682,50 @@ describe("generateOccurrenceId", () => {
     it.fails(
       "KNOWN DEFECT: a monthly occurrence shifted into the previous month keeps its own month's id",
       () => {
-        const adjusted = adjustWeekend("2026-03-01", "before");
-        expect(adjusted).toBe("2026-02-27");
         expect(weekday("2026-03-01")).toBe("Sun");
-        expect(idFor("monthly", adjusted)).toBe("src_2026-03");
+        const { dates, ids } = runSchedule(
+          {
+            frequency: "monthly",
+            startDate: "2026-03-01",
+            scheduleConfig: { dayOfMonth: 1 },
+            weekendAdjustment: "before",
+          },
+          "2026-03-01",
+          "2026-03-31"
+        );
+        // The real calculator emits the March occurrence on Fri 2026-02-27.
+        expect(dates).toEqual(["2026-02-27"]);
+        expect(ids).toEqual(["src_2026-03"]);
       }
     );
 
     /**
      * DEFECT (monthly id collision across a month boundary): with the id taken
-     * from the adjusted date, the March occurrence shifted to 2026-02-27 lands
-     * in February's id namespace. If the rule also has a February occurrence
-     * that stays in February, both occurrences resolve to `src_2026-02`.
+     * from the adjusted date, an occurrence shifted back over the 1st lands in
+     * the PREVIOUS month's id namespace. A monthly-on-the-1st rule run over
+     * Jan..Mar 2026 therefore emits two occurrences labelled `src_2026-01` (the
+     * January one, and the February one shifted to Fri 2026-01-30).
      * Correct behaviour: two occurrences must never share an id.
      * Source: app/lib/logic/projectionEngine/occurrenceIdGenerator.ts:86-87.
      */
     it.fails("KNOWN DEFECT: monthly ids stay unique when an occurrence shifts month", () => {
-      const february = idFor("monthly", "2026-02-16");
-      const shiftedMarch = idFor("monthly", adjustWeekend("2026-03-01", "before"));
-      expect(shiftedMarch).not.toBe(february);
+      // Monthly on the 1st across Jan..Mar 2026: both 2026-02-01 and 2026-03-01
+      // are Sundays, so February's occurrence lands on Fri 2026-01-30 — inside
+      // January's id namespace, which January's own occurrence already owns.
+      const { dates, ids } = runSchedule(
+        {
+          frequency: "monthly",
+          startDate: "2026-01-01",
+          scheduleConfig: { dayOfMonth: 1 },
+          weekendAdjustment: "before",
+        },
+        "2026-01-01",
+        "2026-03-31"
+      );
+      expect(dates).toEqual(["2026-01-01", "2026-01-30", "2026-02-27"]);
+      expect(ids).toHaveLength(3);
+      expect(duplicates(ids)).toEqual([]);
+      expect(ids).toEqual(["src_2026-01", "src_2026-02", "src_2026-03"]);
     });
 
     /**
@@ -655,53 +734,104 @@ describe("generateOccurrenceId", () => {
      * following Monday, which is week N+1. The weekly id is derived from the
      * adjusted date (occurrenceIdGenerator.ts:70-73), so a weekly-on-Saturday
      * rule labels every occurrence with the NEXT week.
-     * Correct behaviour: the occurrence belongs to 2026-W02 and must keep
-     * `src_2026-W02`. Today, toggling weekendAdjustment off shifts every id back
-     * one week and orphans every stored override.
+     * Correct behaviour: the four Saturdays of January 2026 belong to
+     * 2026-W02..W05 and must keep those ids; today the series is labelled
+     * W03..W06, so toggling weekendAdjustment off shifts every id back one week
+     * and orphans every stored override.
      * Source: app/lib/logic/projectionEngine/occurrenceIdGenerator.ts:70-73.
      */
     it.fails(
       "KNOWN DEFECT: a weekly Saturday occurrence keeps its own ISO week id when moved to Monday",
       () => {
-        const adjusted = adjustWeekend("2026-01-10", "after");
-        expect(adjusted).toBe("2026-01-12");
-        expect(weekday("2026-01-10")).toBe("Sat");
-        expect(idFor("weekly", "2026-01-10")).toBe("src_2026-W02");
-        expect(idFor("weekly", adjusted)).toBe("src_2026-W02");
+        const saturdays = ["2026-01-10", "2026-01-17", "2026-01-24", "2026-01-31"];
+        expect(saturdays.map((day) => weekday(day))).toEqual(["Sat", "Sat", "Sat", "Sat"]);
+        // The ids the occurrences logically belong to, i.e. the ISO weeks of the
+        // scheduled Saturdays themselves.
+        const logicalIds = saturdays.map((day) => idFor("weekly", day));
+        expect(logicalIds).toEqual([
+          "src_2026-W02",
+          "src_2026-W03",
+          "src_2026-W04",
+          "src_2026-W05",
+        ]);
+
+        const { dates, ids } = runSchedule(
+          { frequency: "weekly", startDate: "2026-01-10", weekendAdjustment: "after" },
+          "2026-01-10",
+          "2026-01-31"
+        );
+        expect(dates).toEqual(["2026-01-12", "2026-01-19", "2026-01-26", "2026-02-02"]);
+        expect(ids).toEqual(logicalIds);
       }
     );
 
     /**
      * DEFECT (quarterly + weekend adjustment across a quarter boundary): 2028-01-01
      * is a Saturday; "before" moves it to Fri 2027-12-31, so the Q1-2028
-     * occurrence is labelled `src_2027-Q4`.
-     * Correct behaviour: the id must stay `src_2028-Q1`.
+     * occurrence is labelled `src_2027-Q4`. Every 2028 quarter opens on a
+     * weekend, so the whole series is labelled one quarter early.
+     * Correct behaviour: the ids must stay `src_2028-Q1`..`src_2028-Q4`.
      * Source: app/lib/logic/projectionEngine/occurrenceIdGenerator.ts:89-92.
      */
     it.fails(
       "KNOWN DEFECT: a quarterly occurrence shifted into the previous quarter keeps its own quarter id",
       () => {
-        const adjusted = adjustWeekend("2028-01-01", "before");
-        expect(adjusted).toBe("2027-12-31");
         expect(weekday("2028-01-01")).toBe("Sat");
-        expect(idFor("quarterly", adjusted)).toBe("src_2028-Q1");
+        const { dates, ids } = runSchedule(
+          {
+            frequency: "quarterly",
+            startDate: "2028-01-01",
+            scheduleConfig: { dayOfMonth: 1 },
+            weekendAdjustment: "before",
+          },
+          "2028-01-01",
+          "2028-12-31"
+        );
+        // Every 2028 quarter opens on a weekend, so all four shift back to Friday.
+        expect(dates).toEqual(["2027-12-31", "2028-03-31", "2028-06-30", "2028-09-29"]);
+        expect(ids).toEqual(["src_2028-Q1", "src_2028-Q2", "src_2028-Q3", "src_2028-Q4"]);
       }
     );
 
     /**
      * DEFECT (yearly + weekend adjustment across a year boundary): same root
      * cause in the yearly id space — Sat 2028-01-01 shifted to Fri 2027-12-31
-     * is labelled `src_2027`, colliding with the previous year's occurrence.
-     * Correct behaviour: the id must stay `src_2028`.
+     * is labelled `src_2027`. Run over 2028..2033 the drift also collides: Sat
+     * 2033-01-01 shifts to Fri 2032-12-31 and takes `src_2032`, the id the 2032
+     * occurrence already owns.
+     * Correct behaviour: each year's occurrence keeps its own year id
+     * (`src_2028`..`src_2033`) and no two occurrences share one.
      * Source: app/lib/logic/projectionEngine/occurrenceIdGenerator.ts:94-95.
      */
     it.fails(
       "KNOWN DEFECT: a yearly occurrence shifted into the previous year keeps its own year id",
       () => {
-        const adjusted = adjustWeekend("2028-01-01", "before");
-        expect(idFor("yearly", adjusted)).toBe("src_2028");
-        // …and must not collide with the 2027 occurrence.
-        expect(idFor("yearly", adjusted)).not.toBe(idFor("yearly", "2027-06-01"));
+        const { dates, ids } = runSchedule(
+          { frequency: "yearly", startDate: "2028-01-01", weekendAdjustment: "before" },
+          "2028-01-01",
+          "2033-12-31"
+        );
+        // 2028-01-01 (Sat) and 2033-01-01 (Sat) both shift into the previous
+        // December, so their ids read 2027 and 2032 — and the 2032 one collides
+        // with the 2032 occurrence's own id.
+        expect(dates).toEqual([
+          "2027-12-31",
+          "2029-01-01",
+          "2030-01-01",
+          "2031-01-01",
+          "2032-01-01",
+          "2032-12-31",
+        ]);
+        expect(ids).toHaveLength(6);
+        expect(duplicates(ids)).toEqual([]);
+        expect(ids).toEqual([
+          "src_2028",
+          "src_2029",
+          "src_2030",
+          "src_2031",
+          "src_2032",
+          "src_2033",
+        ]);
       }
     );
 
@@ -735,33 +865,53 @@ describe("generateOccurrenceId", () => {
      * Source: app/lib/logic/projectionEngine/occurrenceIdGenerator.ts:43-44.
      */
     it.fails("KNOWN DEFECT: semi-monthly ids stay unique when a slot is weekend-adjusted", () => {
-      const cfg: ScheduleConfig = { specificDays: [5, 15, 25] };
       expect(weekday("2026-04-25")).toBe("Sat");
-      const shifted = adjustWeekend("2026-04-25", "before");
-      expect(shifted).toBe("2026-04-24");
-      const slot2 = idFor("semi-monthly", "2026-04-15", "2026-01-01", cfg);
-      const shiftedSlot3 = idFor("semi-monthly", shifted, "2026-01-01", cfg);
-      expect(shiftedSlot3).not.toBe(slot2);
+      const { dates, ids } = runSchedule(
+        {
+          frequency: "semi-monthly",
+          startDate: "2026-04-01",
+          scheduleConfig: { specificDays: [5, 15, 25] },
+          weekendAdjustment: "before",
+        },
+        "2026-04-01",
+        "2026-04-30"
+      );
+      // Sun 2026-04-05 -> Fri 04-03 (still slot 1), Wed 04-15 untouched (slot 2),
+      // Sat 04-25 -> Fri 04-24 which the capped fallback also calls slot 2.
+      expect(dates).toEqual(["2026-04-03", "2026-04-15", "2026-04-24"]);
+      expect(ids).toHaveLength(3);
+      expect(duplicates(ids)).toEqual([]);
+      expect(ids).toEqual(["src_2026-04-1", "src_2026-04-2", "src_2026-04-3"]);
     });
 
     /**
      * DEFECT (semi-monthly first slot crossing a month boundary): with
      * specificDays [1, 15], Sun 2026-03-01 moves to Fri 2026-02-27 under
      * "before". The id is then built from February AND from the capped fallback
-     * (27 > 1 -> slot 2), producing `src_2026-02-2` — the exact id February's own
-     * 15th occurrence gets (Sun 2026-02-15 -> Fri 2026-02-13 is slot 1, but an
-     * unadjusted 15th is slot 2). Two occurrences, one id.
-     * Correct behaviour: the March slot-1 occurrence must keep `src_2026-03-1`.
+     * (27 > 1 -> slot 2), producing `src_2026-02-2` — both halves of the identity
+     * are wrong, and that id belongs to February's second slot, so a February
+     * occurrence of the same rule would collide with it.
+     * Correct behaviour: the March slot-1 occurrence must keep `src_2026-03-1`
+     * and the March slot-2 occurrence `src_2026-03-2`.
      * Source: app/lib/logic/projectionEngine/occurrenceIdGenerator.ts:37-44 and
      * :81-84.
      */
     it.fails(
       "KNOWN DEFECT: a semi-monthly slot-1 occurrence shifted into the previous month keeps its own month and slot",
       () => {
-        const cfg: ScheduleConfig = { specificDays: [1, 15] };
-        const shifted = adjustWeekend("2026-03-01", "before");
-        expect(shifted).toBe("2026-02-27");
-        expect(idFor("semi-monthly", shifted, "2026-01-01", cfg)).toBe("src_2026-03-1");
+        const { dates, ids } = runSchedule(
+          {
+            frequency: "semi-monthly",
+            startDate: "2026-03-01",
+            scheduleConfig: { specificDays: [1, 15] },
+            weekendAdjustment: "before",
+          },
+          "2026-03-01",
+          "2026-03-31"
+        );
+        // Sun 2026-03-01 -> Fri 2026-02-27, Sun 2026-03-15 -> Fri 2026-03-13.
+        expect(dates).toEqual(["2026-02-27", "2026-03-13"]);
+        expect(ids).toEqual(["src_2026-03-1", "src_2026-03-2"]);
       }
     );
 

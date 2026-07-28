@@ -26,12 +26,7 @@ export const freezeToday = (ymd: string): void => {
  * Use when the time-of-day matters (e.g. asserting that a calculation which
  * calls `new Date()` mid-day still lands on the right calendar day).
  */
-export const freezeAt = (
-  ymd: string,
-  hours: number,
-  minutes = 0,
-  seconds = 0
-): void => {
+export const freezeAt = (ymd: string, hours: number, minutes = 0, seconds = 0): void => {
   const [y, m, d] = ymd.split("-").map(Number);
   vi.useFakeTimers({
     toFake: ["Date"],

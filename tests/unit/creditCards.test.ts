@@ -309,6 +309,25 @@ describe("calculateCreditCardPayoff", () => {
       const rows = schedule();
       expect(paymentsOf(rows.slice(0, -1))).toEqual(Array(11).fill(500));
     });
+
+    it("conserves money: balance equals opening plus interest charged minus paid", () => {
+      // The accounting identity a payoff schedule must obey, month by month:
+      //   remainingBalance_n = opening + cumulativeInterest_n - (payments so far)
+      // It falls straight out of `principal = payment - interest` and
+      // `balance -= principal`, and it is what makes the schedule an honest
+      // statement of the debt. It is pinned here as the module's own contract so
+      // that the negative-amortisation defect below can be stated as a breach of
+      // it rather than as a matter of taste.
+      const rows = schedule();
+      let paid = 0;
+      rows.forEach((row) => {
+        paid += row.payment;
+        expect(row.remainingBalance).toBeCloseTo(5_000 + row.cumulativeInterest - paid, 8);
+      });
+      // Closing the books: 5,000 borrowed + 635.16 interest = 5,635.16 paid.
+      expect(paid).toBeCloseTo(5_000 + 635.16, 2);
+      expect(rows[rows.length - 1].remainingBalance).toBe(0);
+    });
   });
 
   describe("zero APR", () => {
@@ -402,17 +421,48 @@ describe("calculateCreditCardPayoff", () => {
   describe("known defects", () => {
     /**
      * DEFECT (additional, not on the assigned list): negative amortisation is
-     * swallowed. app/lib/logic/creditCardCalculator/payoffCalculator.ts:40-41
-     * computes `principal = Math.max(0, payment - interest)` and then
-     * `balance = balance - principal`, so when the payment does not cover the
-     * interest the shortfall simply vanishes: the balance stays flat forever.
-     * Correct behaviour: unpaid interest capitalises, so the balance must GROW
-     * (5,000 -> 5,050 with a 50 payment against 100 of interest).
+     * swallowed, and the schedule's own accounting identity is broken with it.
+     *
+     * VERDICT — this is a real modelling defect, not a defensible loop guard.
+     * app/lib/logic/creditCardCalculator/payoffCalculator.ts:40-41 computes
+     * `principal = Math.max(0, payment - interest)` and then
+     * `balance = Math.max(0, balance - principal)`. When the payment does not
+     * cover the interest, the shortfall does not go anywhere: principal clamps to
+     * 0, the balance stays flat, and yet `cumulativeInterest` keeps charging
+     * 100/month. After 13 rows the schedule reports 1,300 of interest charged,
+     * 650 of payments made, and a balance still sitting at exactly 5,000 — so
+     * 650 of debt has vanished from the books. That breaches the identity
+     * `remainingBalance = opening + cumulativeInterest - paid` that every solvent
+     * schedule in this module obeys (pinned as a passing test above), which is
+     * what distinguishes a bug from a modelling choice: money is not conserved.
+     * It also cannot be justified as protection against an infinite loop — the
+     * loop is already bounded by `maxMonths` (default 600), and the separate
+     * `month > 12 && principal < 0.01` break at line 60 is what stops it early.
+     *
+     * USER-VISIBLE CONSEQUENCE: someone paying 50/month against a 5,000 card at
+     * 24% is shown a debt that never grows and a schedule that simply ends after
+     * 13 months. The projection calendar then has no further payments due, so the
+     * app tells the user the card is behind them, when in reality the balance
+     * compounds at ~2%/month indefinitely. Understating the minimum-payment trap
+     * is the precise opposite of what a payoff projection exists to do.
+     *
+     * CORRECT: unpaid interest capitalises, so the balance GROWS
+     * (5,000 -> 5,050 -> 5,101 -> ...) and the conservation identity holds here
+     * exactly as it does for a schedule that does pay itself off.
      */
     it.fails("KNOWN DEFECT: grows the balance when the payment does not cover interest", () => {
       const rows = calculateCreditCardPayoff(5_000, 24, 50, d("2026-01-15"));
-      expect(rows[0].remainingBalance).toBeCloseTo(5_050, 10);
-      expect(rows[1].remainingBalance).toBeGreaterThan(rows[0].remainingBalance);
+      // Length first: never index into a possibly-shorter array inside it.fails.
+      expect(rows.length).toBeGreaterThanOrEqual(2);
+      const first = rows[0];
+      const second = rows[1];
+      // 5,000 owed + 100 of interest - 50 paid = 5,050 still owed.
+      expect(first.remainingBalance).toBeCloseTo(5_050, 8);
+      expect(first.remainingBalance).toBeCloseTo(
+        5_000 + first.cumulativeInterest - first.payment,
+        8
+      );
+      expect(second.remainingBalance).toBeGreaterThan(first.remainingBalance);
     });
   });
 });
@@ -841,21 +891,42 @@ describe("generateCreditProjections", () => {
     });
 
     /**
-     * DEFECT 2: the card balance is never reduced as payments complete.
-     * Loans and instalments record progress (LoanConfig.paymentsMade,
-     * InstallmentConfig.installmentsPaid) and the completion path in
-     * app/contexts/FinancialContext/actions/transactionActions.ts
-     * (markTransactionCompleteAction, ~lines 122-140) writes those fields back —
-     * but it has no creditConfig branch at all, and CreditConfig has no progress
-     * field for it to write. generateCreditProjections therefore always restarts
-     * from creditConfig.currentBalance, so the same schedule is re-projected
-     * forever no matter how many payments the user has completed.
-     * Correct behaviour: once the first of four payments is done, three remain
-     * and the first projected remaining balance reflects the reduced debt.
-     * This test feeds the only progress marker the codebase has (paymentsMade,
-     * as used by LoanConfig) and asserts the schedule shortens.
+     * NOT A DEFECT IN THIS MODULE — the current contract, pinned deliberately.
+     *
+     * The gap is real: loans and instalments record progress
+     * (`LoanConfig.paymentsMade`, `InstallmentConfig.installmentsPaid`) and
+     * markTransactionCompleteAction
+     * (app/contexts/FinancialContext/actions/transactionActions.ts:123-139)
+     * writes those fields back, but that branch has no `creditConfig` case at
+     * all. So nothing ever reduces a card, and `generateCreditProjections`
+     * re-projects the same schedule for ever however many payments the user has
+     * completed.
+     *
+     * It cannot honestly be encoded as an `it.fails` HERE, which is why this is a
+     * passing contract test instead. `CreditConfig` (app/lib/types.ts:121-132)
+     * has no progress field of any name, and this engine's only inputs are the
+     * rule and the window — so there is no input a fix could set that would
+     * change this function's output. A correct fix lives in the write-back path
+     * and leaves this function's behaviour untouched, meaning no assertion
+     * against `generateCreditProjections` could ever turn red on it. The previous
+     * version of this test passed a `paymentsMade` field that does not exist on
+     * `CreditConfig`, so it was asserting against an invented API.
+     *
+     * The defect IS asserted against real code, in the two suites that own the
+     * write-back path:
+     *   - tests/integration/actualMutation.actions.test.ts
+     *     "KNOWN DEFECT: reduces the card balance when a card payment is
+     *     completed"
+     *   - tests/integration/actualMutation.firestore.test.ts
+     *     "KNOWN DEFECT: completing a card payment reduces the card balance"
+     *
+     * What this test pins is the observable half of the finding: the schedule is
+     * a pure function of `creditConfig`, and the ONE lever that shortens it is a
+     * smaller `currentBalance` — fed here from the schedule's own
+     * `remainingBalance`, which is exactly the value the missing write-back would
+     * have stored.
      */
-    it.fails("KNOWN DEFECT: shortens the schedule once a payment has been completed", () => {
+    it("re-projects an identical schedule until currentBalance itself is reduced", () => {
       const config: Partial<CreditConfig> = {
         currentBalance: 1_200,
         apr: 0,
@@ -863,15 +934,38 @@ describe("generateCreditProjections", () => {
       };
       const before = generateCreditProjections(fixedCard({}, config), window.start, window.end);
       expect(before).toHaveLength(4);
+      expect(before.map((t) => t.scheduledDate)).toEqual([
+        "2026-01-15",
+        "2026-02-15",
+        "2026-03-15",
+        "2026-04-15",
+      ]);
+      expect(before.map((t) => t.paymentBreakdown?.remainingBalance)).toEqual([900, 600, 300, 0]);
 
-      const afterOnePayment = generateCreditProjections(
-        fixedCard({}, { ...config, paymentsMade: 1 } as Partial<CreditConfig>),
+      // Completing payments is invisible to the engine: re-running it against an
+      // untouched card reproduces the whole schedule, first payment included.
+      const again = generateCreditProjections(fixedCard({}, config), window.start, window.end);
+      expect(again).toEqual(before);
+
+      // The only lever that does shorten it: the balance the schedule itself says
+      // is left after the first payment.
+      const remainingAfterFirst = before[0].paymentBreakdown?.remainingBalance;
+      expect(remainingAfterFirst).toBe(900);
+      const after = generateCreditProjections(
+        fixedCard({}, { ...config, currentBalance: remainingAfterFirst }),
         window.start,
         window.end
       );
-      // Three payments of 300 should remain, opening at a 900 balance.
-      expect(afterOnePayment).toHaveLength(3);
-      expect(afterOnePayment[0].paymentBreakdown?.remainingBalance).toBe(600);
+      expect(after).toHaveLength(3);
+      // Same three payments and the same descending balances as the tail of the
+      // original schedule; only the dates and the numbering restart, because the
+      // engine has no notion of a schedule already in progress.
+      expect(after.map((t) => t.projectedAmount)).toEqual([300, 300, 300]);
+      expect(after.map((t) => t.paymentBreakdown?.remainingBalance)).toEqual(
+        before.slice(1).map((t) => t.paymentBreakdown?.remainingBalance)
+      );
+      expect(after.map((t) => t.paymentBreakdown?.paymentNumber)).toEqual([1, 2, 3]);
+      expect(after.map((t) => t.scheduledDate)).toEqual(["2026-01-15", "2026-02-15", "2026-03-15"]);
     });
 
     /**
@@ -890,8 +984,13 @@ describe("generateCreditProjections", () => {
         d("2026-04-01"),
         d("2026-08-31")
       );
-      expect(result[0].scheduledDate).toBe("2026-04-30");
-      expect(result[0].occurrenceId).toBe("card-1_2026-04");
+      // Map first, and assert the length before reading index 0, so a fix that
+      // returned fewer rows would still fail through an assertion, not a crash.
+      const dates = result.map((t) => t.scheduledDate);
+      const ids = result.map((t) => t.occurrenceId);
+      expect(dates.length).toBeGreaterThan(0);
+      expect(dates[0]).toBe("2026-04-30");
+      expect(ids[0]).toBe("card-1_2026-04");
     });
 
     /**
@@ -932,6 +1031,11 @@ describe("generateCreditProjections", () => {
         d("2026-01-01"),
         d("2026-03-10")
       );
+      // Non-vacuity guard: `every` on an empty array is true, so pin that the
+      // window really does contain payments before asserting they are all inside
+      // it. Today this passes (January and the drifted March row) and the second
+      // assertion is the one that fails.
+      expect(result.length).toBeGreaterThan(0);
       expect(result.every((t) => t.scheduledDate <= "2026-03-10")).toBe(true);
     });
 

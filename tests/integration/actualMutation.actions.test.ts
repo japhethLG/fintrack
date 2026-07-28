@@ -5,6 +5,7 @@ vi.mock("@/lib/firebase/config", () => import("../helpers/firebaseConfigMock"));
 
 import type { ExpenseRule, IncomeSource, Transaction, UserProfile } from "@/lib/types";
 import {
+  addManualTransactionAction,
   markTransactionCompleteAction,
   markTransactionSkippedAction,
   rescheduleTransactionAction,
@@ -611,6 +612,13 @@ describe("markTransactionCompleteAction", () => {
      * stale summary field, so the stored row records a projected figure that
      * never appeared anywhere, and every variance computed from it is wrong.
      * CORRECT: store the amount of the projection being completed.
+     *
+     * CANONICAL assertion for the "materialized completion records rule.amount"
+     * defect — this is the action layer that does it. lifecycle.test.ts
+     * ("KNOWN DEFECT: the realized row records the amount that was actually
+     * projected") re-asserts the same root cause end-to-end, as do the two
+     * sibling cases just below (card, occurrence override). One fix at
+     * transactionActions.ts:95 clears all of them.
      */
     it.fails(
       "KNOWN DEFECT: records the amortized payment as the projected amount for a loan occurrence",
@@ -636,6 +644,9 @@ describe("markTransactionCompleteAction", () => {
      * the projected payment comes from the payoff schedule
      * (creditProjections.ts), not from `rule.amount`.
      * CORRECT: store the amount of the projection being completed.
+     *
+     * Same root cause as the loan case above; kept separate only because the
+     * amount comes from a different schedule generator.
      */
     it.fails(
       "KNOWN DEFECT: records the scheduled minimum payment as the projected amount for a card occurrence",
@@ -663,6 +674,8 @@ describe("markTransactionCompleteAction", () => {
      * Completing an occurrence the user had re-priced to 1,500 at exactly
      * 1,500 records projectedAmount 1,200 — a phantom 300 variance.
      * CORRECT: projectedAmount 1,500, zero variance.
+     *
+     * Same root cause as the two cases above (transactionActions.ts:95).
      */
     it.fails(
       "KNOWN DEFECT: honours an occurrence amount override when recording the projected amount",
@@ -694,6 +707,14 @@ describe("markTransactionCompleteAction", () => {
      * `transaction.variance`, so a completed projection silently shows no
      * variance no matter how far the actual drifted.
      * CORRECT: variance = actualAmount - projectedAmount.
+     *
+     * CANONICAL assertion for the "materialized completion stores no variance"
+     * defect — this is the action layer that omits the field. lifecycle.test.ts
+     * ("KNOWN DEFECT: persists the variance on a first-time completion")
+     * re-asserts the same root cause end-to-end; the variance tests in
+     * actualMutation.firestore.test.ts cover the stored path, which does compute
+     * it, and are the contrast this defect is measured against. One fix at
+     * transactionActions.ts:89-110 clears both failures.
      */
     it.fails("KNOWN DEFECT: stores the variance of a materialized completion", async () => {
       seedUser();
@@ -1238,6 +1259,167 @@ describe("rescheduleTransactionAction", () => {
 });
 
 // ============================================================================
+// addManualTransactionAction
+// ============================================================================
+
+describe("addManualTransactionAction", () => {
+  /**
+   * The exact payload shape the manual-transaction form submits
+   * (ManualTransactionForm/formHelpers.ts `transformToTransactionData`): every
+   * optional field is sent explicitly as `undefined` rather than omitted, which
+   * is what makes the undefined-stripping in the repo layer load-bearing.
+   */
+  const formPayload = (
+    overrides: Partial<Omit<Transaction, "id" | "userId" | "createdAt" | "updatedAt">> = {}
+  ): Omit<Transaction, "id" | "userId" | "createdAt" | "updatedAt"> => ({
+    sourceType: "manual",
+    sourceId: undefined,
+    name: "Dentist",
+    type: "expense",
+    category: "healthcare",
+    projectedAmount: 400,
+    actualAmount: undefined,
+    scheduledDate: "2026-03-10",
+    actualDate: undefined,
+    status: "projected",
+    notes: undefined,
+    occurrenceId: undefined,
+    ...overrides,
+  });
+
+  it("persists the transaction under the given userId", async () => {
+    seedUser();
+
+    await addManualTransactionAction(formPayload(), USER);
+
+    expect(onlyRow()).toMatchObject({
+      userId: USER,
+      sourceType: "manual",
+      name: "Dentist",
+      type: "expense",
+      category: "healthcare",
+      projectedAmount: 400,
+      scheduledDate: "2026-03-10",
+      status: "projected",
+    });
+  });
+
+  it("writes to no collection other than transactions", async () => {
+    seedUser();
+
+    await addManualTransactionAction(formPayload(), USER);
+
+    expect(store.__ops.map((op) => op.collection)).toEqual(["transactions"]);
+  });
+
+  it("returns the created entity carrying the id the store generated", async () => {
+    seedUser();
+
+    const created = await addManualTransactionAction(formPayload(), USER);
+
+    // The id is invented by the repo on write, so the only way to know it is
+    // through the return value — the form's caller has nothing else to go on.
+    expect(created.id).toBe(onlyRow().id);
+    expect(created).toMatchObject({
+      userId: USER,
+      name: "Dentist",
+      projectedAmount: 400,
+      status: "projected",
+    });
+    // createdAt/updatedAt are stamped by the repo, not supplied by the caller.
+    expect(created.createdAt).toBeDefined();
+    expect(created.updatedAt).toBeDefined();
+  });
+
+  it("strips the undefined fields the form sends for an unrealized row", async () => {
+    seedUser();
+
+    const created = await addManualTransactionAction(formPayload(), USER);
+
+    const stored = onlyRow();
+    expect("sourceId" in stored).toBe(false);
+    expect("actualAmount" in stored).toBe(false);
+    expect("actualDate" in stored).toBe(false);
+    expect("notes" in stored).toBe(false);
+    expect("occurrenceId" in stored).toBe(false);
+
+    // Only the PERSISTED document is cleaned (transactions.ts `removeUndefined`).
+    // The returned entity is built by spreading the raw input over the id, so it
+    // still carries those keys with an undefined value.
+    expect("actualAmount" in created).toBe(true);
+    expect(created.actualAmount).toBeUndefined();
+  });
+
+  it("keeps the optional fields the form does supply", async () => {
+    seedUser();
+
+    await addManualTransactionAction(
+      formPayload({
+        status: "completed",
+        actualAmount: 450,
+        actualDate: "2026-03-11",
+        notes: "paid at the desk",
+      }),
+      USER
+    );
+
+    expect(onlyRow()).toMatchObject({
+      status: "completed",
+      actualAmount: 450,
+      actualDate: "2026-03-11",
+      notes: "paid at the desk",
+    });
+  });
+
+  describe("known defects", () => {
+    /**
+     * DEFECT (transactionActions.ts:274-279): the action is a bare passthrough
+     * to `addTransaction`, which only writes the document. "Completed" is a
+     * first-class choice on the form (ManualTransactionForm/constants.ts
+     * STATUS_OPTIONS — "Completed / Transaction has occurred"), and
+     * `getSmartStatus` in formHelpers.ts even defaults any date on or before
+     * today to it. So the common gesture "log the coffee I just bought" writes
+     * a completed row and leaves `currentBalance` exactly where it was: the
+     * money never moves.
+     *
+     * No other layer compensates. `syncComputedBalance`
+     * (logic/balanceCalculator/computedBalance.ts) is the only code that
+     * recomputes the balance from the rows, and its only callers are the two
+     * manual controls on the settings Balance section (Recalculate, and editing
+     * the initial balance); `generateReconciliationReport` /
+     * `fixBalanceDiscrepancy` in reconciliation.ts have no callers at all. The
+     * drift therefore persists until the user happens to visit Settings and
+     * press a button.
+     *
+     * Every sibling action here maintains the balance incrementally instead —
+     * `updateManualTransactionAction` on projected -> completed
+     * (transactionActions.ts:313-316) and `removeTransactionAction` on delete
+     * (transactionActions.ts:346) — so the add path is the odd one out. Worse,
+     * deleting the row afterwards REVERSES an impact that was never applied,
+     * pushing the balance 400 in the wrong direction and leaving no record of
+     * why.
+     * CORRECT: adding an already-completed 400 expense leaves 9,600.
+     */
+    it.fails(
+      "KNOWN DEFECT: applies the balance impact of an already-completed manual row",
+      async () => {
+        seedUser({ currentBalance: 10_000 });
+
+        await addManualTransactionAction(
+          formPayload({ status: "completed", actualAmount: 400, actualDate: "2026-03-10" }),
+          USER
+        );
+
+        // The row is on the ledger as money that has already moved...
+        expect(onlyRow()).toMatchObject({ status: "completed", actualAmount: 400 });
+        // ...but the account never noticed.
+        expect(balance()).toBe(9_600);
+      }
+    );
+  });
+});
+
+// ============================================================================
 // updateManualTransactionAction — THE ACTUAL-MUTATION MATRIX
 // ============================================================================
 
@@ -1502,6 +1684,164 @@ describe("updateManualTransactionAction", () => {
 
       expect(store.__opsFor("users")).toEqual([]);
       expect(balance()).toBe(10_000);
+    });
+  });
+
+  // --------------------------------------------------------------------------
+  // The remaining corners of the matrix. Every transition below has "not
+  // completed" on BOTH sides, so it falls past all three branches of
+  // transactionActions.ts:309-323 into the unbranched `else` and must be a
+  // balance no-op. Each one asserts through `store.__opsFor("users")` as well as
+  // the number, because a write that happens to store the same balance back is
+  // still a bug (it restamps `balanceLastUpdatedAt` and would mask a real
+  // rounding drift), and only the op log can see it.
+  // --------------------------------------------------------------------------
+
+  describe("projected -> skipped", () => {
+    it("does not move the balance for an expense", async () => {
+      seedUser({ currentBalance: 10_000 });
+      seedManual({ type: "expense", projectedAmount: 400, status: "projected" });
+
+      await updateManualTransactionAction("man-1", { status: "skipped" }, USER);
+
+      expect(store.__opsFor("users")).toEqual([]);
+      expect(balance()).toBe(10_000);
+      expect(store.__get<Transaction>("transactions", "man-1")!.status).toBe("skipped");
+    });
+
+    it("does not move the balance for income", async () => {
+      seedUser({ currentBalance: 10_000 });
+      seedManual({ type: "income", projectedAmount: 400, status: "projected" });
+
+      await updateManualTransactionAction("man-1", { status: "skipped" }, USER);
+
+      expect(store.__opsFor("users")).toEqual([]);
+      expect(balance()).toBe(10_000);
+      expect(store.__get<Transaction>("transactions", "man-1")!.status).toBe("skipped");
+    });
+  });
+
+  describe("skipped -> projected", () => {
+    it("does not move the balance for an expense", async () => {
+      seedUser({ currentBalance: 10_000 });
+      seedManual({ type: "expense", projectedAmount: 400, status: "skipped" });
+
+      await updateManualTransactionAction("man-1", { status: "projected" }, USER);
+
+      expect(store.__opsFor("users")).toEqual([]);
+      expect(balance()).toBe(10_000);
+      expect(store.__get<Transaction>("transactions", "man-1")!.status).toBe("projected");
+    });
+
+    it("does not move the balance for income", async () => {
+      seedUser({ currentBalance: 10_000 });
+      seedManual({ type: "income", projectedAmount: 400, status: "skipped" });
+
+      await updateManualTransactionAction("man-1", { status: "projected" }, USER);
+
+      expect(store.__opsFor("users")).toEqual([]);
+      expect(balance()).toBe(10_000);
+      expect(store.__get<Transaction>("transactions", "man-1")!.status).toBe("projected");
+    });
+  });
+
+  describe("skipped -> skipped", () => {
+    // Restating the status explicitly AND handing the action an actualAmount is
+    // the sharpest version of this corner: an amount lands on a row whose money
+    // never moved, and it still must not reach the balance.
+    it("does not move the balance for an expense", async () => {
+      seedUser({ currentBalance: 10_000 });
+      seedManual({ type: "expense", projectedAmount: 400, status: "skipped" });
+
+      await updateManualTransactionAction("man-1", { status: "skipped", actualAmount: 400 }, USER);
+
+      expect(store.__opsFor("users")).toEqual([]);
+      expect(balance()).toBe(10_000);
+      expect(store.__get<Transaction>("transactions", "man-1")).toMatchObject({
+        status: "skipped",
+        actualAmount: 400,
+      });
+    });
+
+    it("does not move the balance for income", async () => {
+      seedUser({ currentBalance: 10_000 });
+      seedManual({ type: "income", projectedAmount: 400, status: "skipped" });
+
+      await updateManualTransactionAction("man-1", { status: "skipped", actualAmount: 400 }, USER);
+
+      expect(store.__opsFor("users")).toEqual([]);
+      expect(balance()).toBe(10_000);
+      expect(store.__get<Transaction>("transactions", "man-1")).toMatchObject({
+        status: "skipped",
+        actualAmount: 400,
+      });
+    });
+  });
+
+  describe("type flips on a row that is not completed", () => {
+    /**
+     * Nothing has been applied to the balance yet, so re-signing the row is a
+     * pure metadata edit.
+     *
+     * The COMPLETED-row flips are a different story and are already pinned as
+     * defects below — see "KNOWN DEFECT: flipping a completed income row to an
+     * expense reverses the credit" and "KNOWN DEFECT: flipping the type of a
+     * completed row at the same amount re-signs the balance". Not duplicated
+     * here.
+     */
+    it("does not move the balance when a projected income row becomes an expense", async () => {
+      seedUser({ currentBalance: 10_000 });
+      seedManual({ type: "income", projectedAmount: 500, status: "projected" });
+
+      await updateManualTransactionAction("man-1", { type: "expense" }, USER);
+
+      expect(store.__opsFor("users")).toEqual([]);
+      expect(balance()).toBe(10_000);
+      expect(store.__get<Transaction>("transactions", "man-1")).toMatchObject({
+        type: "expense",
+        status: "projected",
+      });
+    });
+
+    it("does not move the balance when a projected expense row becomes income", async () => {
+      seedUser({ currentBalance: 10_000 });
+      seedManual({ type: "expense", projectedAmount: 500, status: "projected" });
+
+      await updateManualTransactionAction("man-1", { type: "income" }, USER);
+
+      expect(store.__opsFor("users")).toEqual([]);
+      expect(balance()).toBe(10_000);
+      expect(store.__get<Transaction>("transactions", "man-1")!.type).toBe("income");
+    });
+
+    it("does not move the balance when the flip also restates the amount", async () => {
+      seedUser({ currentBalance: 10_000 });
+      seedManual({ type: "income", projectedAmount: 500, status: "projected" });
+
+      // A larger amount arrives with the flip; still nothing to reverse or apply
+      // while the row is unrealized.
+      await updateManualTransactionAction("man-1", { type: "expense", projectedAmount: 600 }, USER);
+
+      expect(store.__opsFor("users")).toEqual([]);
+      expect(balance()).toBe(10_000);
+      expect(store.__get<Transaction>("transactions", "man-1")).toMatchObject({
+        type: "expense",
+        projectedAmount: 600,
+      });
+    });
+
+    it("does not move the balance when a skipped row is flipped", async () => {
+      seedUser({ currentBalance: 10_000 });
+      seedManual({ type: "expense", projectedAmount: 500, status: "skipped" });
+
+      await updateManualTransactionAction("man-1", { type: "income" }, USER);
+
+      expect(store.__opsFor("users")).toEqual([]);
+      expect(balance()).toBe(10_000);
+      expect(store.__get<Transaction>("transactions", "man-1")).toMatchObject({
+        type: "income",
+        status: "skipped",
+      });
     });
   });
 

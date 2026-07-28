@@ -3,8 +3,12 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 vi.mock("firebase/firestore", () => import("../helpers/firestoreEmulator"));
 vi.mock("@/lib/firebase/config", () => import("../helpers/firebaseConfigMock"));
 
+import { createElement } from "react";
+import { renderToStaticMarkup } from "react-dom/server";
+
 import type { IncomeFrequency, ScheduleConfig, UserProfile } from "@/lib/types";
 import { formatDate, parseDate } from "@/lib/utils/dateUtils";
+import { useViewDateRange } from "@/contexts/FinancialContext/hooks/useViewDateRange";
 import { calculateOccurrences } from "@/lib/logic/projectionEngine/occurrenceCalculator";
 import { generateOccurrenceId } from "@/lib/logic/projectionEngine/occurrenceIdGenerator";
 import { generateProjections } from "@/lib/logic/projectionEngine/projectionGenerator";
@@ -86,23 +90,25 @@ const idFor = (
 ): string => generateOccurrenceId("src", frequency, d(dateYmd), startDate, scheduleConfig);
 
 /**
- * Verbatim replication of the default-window computation in
- * app/contexts/FinancialContext/hooks/useViewDateRange.ts:15-22. The hook is
- * React state and cannot be exercised without a renderer, so the two
- * expressions are tested here as pure date arithmetic. `startLocal`/`endLocal`
- * are the SAME Date objects rendered with local calendar fields — i.e. the
- * calendar days the hook intends.
+ * Renders the REAL `useViewDateRange` hook and returns the default window its
+ * `useState` initializer produced (useViewDateRange.ts:14-23). The defect lives
+ * in that initializer, so a single static render observes it — no state updates
+ * and no DOM are needed, hence `renderToStaticMarkup` rather than a testing
+ * library. The probe element is built with `React.createElement` because this
+ * file is `.ts` and cannot hold JSX.
+ *
+ * On a render failure this returns a sentinel rather than throwing, so the
+ * `it.fails` cases below can only ever fail through a real assertion diff. The
+ * "renders the real client hook" test guards the probe itself.
  */
-const defaultViewWindow = () => {
-  const today = new Date();
-  const startDate = new Date(today.getFullYear(), today.getMonth() - 2, 1);
-  const endDate = new Date(today.getFullYear(), today.getMonth() + 4, 0);
-  return {
-    start: startDate.toISOString().split("T")[0],
-    end: endDate.toISOString().split("T")[0],
-    startLocal: ymd(startDate),
-    endLocal: ymd(endDate),
+const readDefaultViewWindow = (): { start: string; end: string } => {
+  let captured: { start: string; end: string } | undefined;
+  const Probe = () => {
+    captured = useViewDateRange().viewDateRange;
+    return null;
   };
+  renderToStaticMarkup(createElement(Probe));
+  return captured ?? { start: "<hook did not render>", end: "<hook did not render>" };
 };
 
 /** Scheduled dates of a merge/projection result, in returned order. */
@@ -319,27 +325,23 @@ describe("mergeTransactionsWithProjections", () => {
 // ============================================================================
 
 describe("useViewDateRange default window", () => {
-  it("builds Date objects on the intended local calendar days", () => {
-    freezeToday("2026-03-15");
-    const window = defaultViewWindow();
+  it("renders the real client hook and yields a YYYY-MM-DD window", () => {
+    // Guard on the probe itself. The hook is a client module, but "use client"
+    // is inert under Vitest/node so it imports fine; if that ever stops being
+    // true, or the initializer stops returning strings, this goes red instead
+    // of the it.fails cases below quietly "passing" on a crash.
+    freezeAt("2026-03-15", 5);
 
-    // 2 months back from March is 1 January; 4 months forward with day 0 is the
-    // last day of June.
-    expect(window.startLocal).toBe("2026-01-01");
-    expect(window.endLocal).toBe("2026-06-30");
-  });
+    const window = readDefaultViewWindow();
 
-  it("would serialize correctly through formatDate", () => {
-    freezeToday("2026-03-15");
-    const today = new Date();
-
-    expect(formatDate(new Date(today.getFullYear(), today.getMonth() - 2, 1))).toBe("2026-01-01");
-    expect(formatDate(new Date(today.getFullYear(), today.getMonth() + 4, 0))).toBe("2026-06-30");
+    expect(window.start).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+    expect(window.end).toMatch(/^\d{4}-\d{2}-\d{2}$/);
   });
 
   it("produces a start string strictly before the end string", () => {
-    freezeToday("2026-03-15");
-    const window = defaultViewWindow();
+    freezeAt("2026-03-15", 5);
+
+    const window = readDefaultViewWindow();
 
     // Ordering survives the offset because both bounds shift by the same day.
     expect(window.start < window.end).toBe(true);
@@ -347,45 +349,86 @@ describe("useViewDateRange default window", () => {
 
   describe("known defects", () => {
     /**
-     * DEFECT — app/contexts/FinancialContext/hooks/useViewDateRange.ts:20
-     * `startDate` is built with `new Date(y, m - 2, 1)` (LOCAL midnight) and
-     * then serialized with `toISOString().split("T")[0]`, which reports the UTC
-     * calendar day. At UTC+8 local midnight is 16:00 the previous day in UTC,
-     * so the window start is stamped one day EARLY.
-     * CORRECT: "2026-01-01", the 1st of the month two months back.
+     * DEFECT — app/contexts/FinancialContext/hooks/useViewDateRange.ts:15-22
+     * The `useState` initializer builds `startDate` with
+     * `new Date(y, m - 2, 1)` — LOCAL midnight — and then serializes it with
+     * `toISOString().split("T")[0]`, which reports the UTC calendar day. At
+     * UTC+8 local midnight is 16:00 of the PREVIOUS day in UTC, so the window
+     * start is stamped one day EARLY (here 2025-12-31).
+     * CORRECT: "2026-01-01" — the 1st of the month two months back, in LOCAL
+     * calendar terms.
      */
     it.fails("KNOWN DEFECT: stamps the window start as the intended local calendar day", () => {
-      freezeToday("2026-03-15");
+      // 05:00 local on 2026-03-15 is 21:00 UTC on 2026-03-14, so the frozen
+      // "today" itself already straddles the UTC/local day boundary.
+      freezeAt("2026-03-15", 5);
 
-      expect(defaultViewWindow().start).toBe("2026-01-01");
+      expect(readDefaultViewWindow().start).toBe("2026-01-01");
     });
 
     /**
-     * DEFECT — app/contexts/FinancialContext/hooks/useViewDateRange.ts:21
-     * Same defect on the upper bound: `new Date(y, m + 4, 0)` is local midnight
-     * of the last day of the +3 month, serialized as the previous UTC day, so
-     * the window ends a day SHORT and the final day's projections fall outside
-     * the requested range.
-     * CORRECT: "2026-06-30", the last day of June.
+     * DEFECT — app/contexts/FinancialContext/hooks/useViewDateRange.ts:15-22
+     * Same root cause on the upper bound: `new Date(y, m + 4, 0)` is local
+     * midnight of the last day of the +3 month, serialized as the previous UTC
+     * day, so the window ends a day SHORT and the final day's projections fall
+     * outside the requested range (here 2026-06-29).
+     * CORRECT: "2026-06-30" — the last day of the month before the month four
+     * months forward, in LOCAL calendar terms.
      */
     it.fails("KNOWN DEFECT: stamps the window end as the intended local calendar day", () => {
-      freezeToday("2026-03-15");
+      freezeAt("2026-03-15", 5);
 
-      expect(defaultViewWindow().end).toBe("2026-06-30");
+      expect(readDefaultViewWindow().end).toBe("2026-06-30");
     });
 
     /**
-     * DEFECT — app/contexts/FinancialContext/hooks/useViewDateRange.ts:20-21
+     * DEFECT — app/contexts/FinancialContext/hooks/useViewDateRange.ts:15-22
      * The month-boundary case makes the off-by-one unmistakable: with "today"
-     * in January the start should be the 1st of November, not 31 October.
+     * in January the start should be the 1st of November, not 31 October — the
+     * whole window slides into the wrong month.
      * CORRECT: start "2025-11-01", end "2026-04-30".
      */
     it.fails("KNOWN DEFECT: does not roll the default window back into the previous month", () => {
-      freezeToday("2026-01-20");
+      freezeAt("2026-01-20", 5);
 
-      const window = defaultViewWindow();
+      const window = readDefaultViewWindow();
       expect(window.start).toBe("2025-11-01");
       expect(window.end).toBe("2026-04-30");
+    });
+  });
+
+  /**
+   * These two document the `toISOString` shift in the abstract so the diffs in
+   * the "known defects" block above are easy to read. They are NOT guards on
+   * the app: the real-hook guard is the it.fails block above, which renders
+   * `useViewDateRange` itself. If these two ever disagree with it, the date
+   * arithmetic is what moved, not the hook.
+   */
+  describe("the toISOString shift, in the abstract", () => {
+    it("documents that the month arithmetic lands on the intended local days", () => {
+      freezeAt("2026-03-15", 5);
+
+      const today = new Date();
+      const startDate = new Date(today.getFullYear(), today.getMonth() - 2, 1);
+      const endDate = new Date(today.getFullYear(), today.getMonth() + 4, 0);
+
+      // 2 months back from March is 1 January; month +4 with day 0 is the last
+      // day of June. Read with LOCAL calendar fields both instants are right.
+      expect(ymd(startDate)).toBe("2026-01-01");
+      expect(ymd(endDate)).toBe("2026-06-30");
+
+      // Serializing those SAME instants through toISOString loses a day.
+      expect(startDate.toISOString().split("T")[0]).toBe("2025-12-31");
+      expect(endDate.toISOString().split("T")[0]).toBe("2026-06-29");
+    });
+
+    it("documents that formatDate would serialize the same instants correctly", () => {
+      freezeAt("2026-03-15", 5);
+
+      const today = new Date();
+
+      expect(formatDate(new Date(today.getFullYear(), today.getMonth() - 2, 1))).toBe("2026-01-01");
+      expect(formatDate(new Date(today.getFullYear(), today.getMonth() + 4, 0))).toBe("2026-06-30");
     });
   });
 });
