@@ -74,13 +74,20 @@ export const __reset = (): void => {
   autoId = 0;
 };
 
-/** Insert a document directly, bypassing the SDK surface (test arrangement). */
-export const __seed = (collectionName: string, id: string, data: DocData): void => {
-  getCollection(collectionName).set(id, clone(data));
+/**
+ * Insert a document directly, bypassing the SDK surface (test arrangement).
+ *
+ * Accepts any object rather than `DocData`: the app's entity types are
+ * interfaces without index signatures, so `UserProfile`/`Transaction` are not
+ * assignable to `Record<string, unknown>`. Widening here keeps every call site
+ * cast-free.
+ */
+export const __seed = (collectionName: string, id: string, data: object): void => {
+  getCollection(collectionName).set(id, clone(data as DocData));
 };
 
 /** Seed many documents keyed by id. */
-export const __seedAll = (collectionName: string, docs: Record<string, DocData>): void => {
+export const __seedAll = (collectionName: string, docs: Record<string, object>): void => {
   Object.entries(docs).forEach(([id, data]) => __seed(collectionName, id, data));
 };
 
