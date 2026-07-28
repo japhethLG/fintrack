@@ -1,12 +1,16 @@
 import type { Timestamp } from "firebase/firestore";
 import type {
+  Alert,
+  BalanceSnapshot,
   CreditConfig,
   ExpenseRule,
+  IncomeFrequency,
   IncomeSource,
   InstallmentConfig,
   LoanConfig,
   OccurrenceOverride,
   PaymentBreakdown,
+  ScheduleConfig,
   Transaction,
   UserProfile,
 } from "@/lib/types";
@@ -267,6 +271,65 @@ export const makePaymentBreakdown = (
 });
 
 export const makeOverride = (overrides: Partial<OccurrenceOverride> = {}): OccurrenceOverride => ({
+  ...overrides,
+});
+
+// ============================================================================
+// SCHEDULE PARAMS
+// ============================================================================
+
+/**
+ * The bare parameter object `calculateOccurrences` takes. Its `OccurrenceParams`
+ * interface is not exported by the engine, so this mirrors it structurally —
+ * the shape is asserted by the call itself type-checking.
+ */
+export interface OccurrenceParamsLike {
+  frequency: IncomeFrequency;
+  startDate: string;
+  endDate?: string;
+  scheduleConfig: ScheduleConfig;
+  weekendAdjustment: "before" | "after" | "none";
+}
+
+export const makeOccurrenceParams = (
+  overrides: Partial<OccurrenceParamsLike> = {}
+): OccurrenceParamsLike => ({
+  frequency: "monthly",
+  startDate: "2026-01-01",
+  scheduleConfig: {},
+  weekendAdjustment: "none",
+  ...overrides,
+});
+
+// ============================================================================
+// ALERTS / BALANCE HISTORY
+// ============================================================================
+
+export const makeAlert = (overrides: Partial<Alert> = {}): Alert => ({
+  id: "alert-1",
+  userId: "user-1",
+  type: "low_balance",
+  severity: "warning",
+  title: "Low balance",
+  message: "Your balance is running low.",
+  isRead: false,
+  isDismissed: false,
+  createdAt: TS,
+  ...overrides,
+});
+
+export const makeBalanceSnapshot = (overrides: Partial<BalanceSnapshot> = {}): BalanceSnapshot => ({
+  id: "snap-1",
+  userId: "user-1",
+  date: "2026-01-15",
+  openingBalance: 10_000,
+  closingBalance: 9_500,
+  totalIncome: 0,
+  totalExpenses: 500,
+  projectedIncome: 0,
+  projectedExpenses: 500,
+  isReconciled: false,
+  createdAt: TS,
   ...overrides,
 });
 
