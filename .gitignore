@@ -17,6 +17,9 @@ build
 dist
 dist-ssr
 
+# Test coverage output (vitest.config.ts reportsDirectory)
+coverage
+
 # Environment variables
 .env*.local
 .env.local
