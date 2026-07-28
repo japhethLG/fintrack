@@ -20,6 +20,7 @@ import {
   subscribeToExpenseRules,
   updateCreditBalance,
   updateExpenseRule,
+  updateInstallmentProgress,
 } from "@/lib/firebase/firestore/expenseRules";
 import * as store from "../../helpers/firestoreEmulator";
 import {
@@ -1262,5 +1263,44 @@ describe("subscribeToExpenseRules", () => {
     );
     unsubSources();
     unsubRules();
+  });
+});
+
+// ============================================================================
+// updateInstallmentProgress — the early-return guard
+// ============================================================================
+
+/**
+ * The counter-advancing behaviour is covered through `completeTransaction` in
+ * tests/integration/actualMutation.firestore.test.ts. Only the guard at
+ * expenseRules.ts:155 is covered here, because reaching it needs a direct call
+ * with a rule that has no installmentConfig — something the completion path
+ * never produces.
+ */
+describe("updateInstallmentProgress: the guard", () => {
+  it("does nothing for a rule that does not exist", async () => {
+    await expect(updateInstallmentProgress("missing")).resolves.toBeUndefined();
+
+    expect(store.__opsFor("expense_rules")).toEqual([]);
+  });
+
+  it("does nothing for a rule with no installmentConfig", async () => {
+    // A plain fixed expense reached this function by mistake: it must be left
+    // untouched rather than having a counter invented for it.
+    store.__seedEntities("expense_rules", [makeExpenseRule({ id: "plain", userId: USER_A })]);
+
+    await expect(updateInstallmentProgress("plain")).resolves.toBeUndefined();
+
+    expect(store.__opsFor("expense_rules")).toEqual([]);
+    expect(store.__get<ExpenseRule>("expense_rules", "plain")?.installmentConfig).toBeUndefined();
+  });
+
+  it("does nothing for a loan rule, which has a different config shape", async () => {
+    store.__seedEntities("expense_rules", [makeLoanRule({ id: "loan", userId: USER_A })]);
+
+    await updateInstallmentProgress("loan");
+
+    expect(store.__opsFor("expense_rules")).toEqual([]);
+    expect(store.__get<ExpenseRule>("expense_rules", "loan")?.loanConfig?.paymentsMade).toBe(0);
   });
 });
