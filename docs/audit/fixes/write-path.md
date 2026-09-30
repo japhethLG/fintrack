@@ -142,6 +142,20 @@ model implied 41000, off by 18000)`). Profiles already on version 1 cause no wri
 users' rows are never counted. A profile with no `currentBalance` gets 0. New profiles are created on version 1.
 Hand check: legacy 23,000 with +20,000 and -2,000 of history: 23,000 - 18,000 = 5,000.
 
+### 1.6 Schedule migration for legacy loans and installments (orchestrator addition)
+
+The forms stream makes loan and installment payments honour `scheduleConfig.dayOfMonth`. The old expense form
+saved the day of creation as a hidden `dayOfMonth` that the old engine ignored, so honouring it would move
+existing users' payments to a day they never chose. `migrateLoanInstallmentDayOfMonth` (run by `AuthProvider`
+after the rebase) sets, for `cash_loan` and `installment` rules, `scheduleConfig.dayOfMonth` to the day of
+`startDate` (local `parseDate`), logging each change with `console.info`. It is versioned by
+`UserProfile.scheduleModelVersion` (new profiles are created on 1; fixtures default to 1): the stamp rides in the
+same atomic batch as the rule updates, and it is essential, because without it a rerun would overwrite a day the
+user chose later. Tests (emulator): a legacy loan started on the 10th with a stored 15 would pay Jan 15, Feb 15,
+Mar 15, Apr 15 and pays Jan 10, Feb 10, Mar 10, Apr 10 after migration; a second run writes nothing; a day set
+afterwards (25) survives; installments are migrated (missing `scheduleConfig` is created); fixed and card rules
+and other users' rules are untouched; a login runs it once.
+
 ---
 
 ## 2. Defects fixed
@@ -230,9 +244,16 @@ change made by another tab is seen). Fixtures: both `makeUserProfile` builders d
 
 ---
 
-## 5. Known-defect status
+## 5. Known-defect status (measured on the tree merged with the forms stream)
 
-See the final report for counts. Not run: Playwright (markers removed for JRN-13/14/16/17, ROB-01/02/03/05/07/11, CAL-01/02/04).
+| | Base 3026029 | After |
+| --- | --- | --- |
+| `it.fails` (unit, integration, timezone) | 72 | 39 |
+| `knownDefect(` UI | 178 | 63 |
+| `knownDefect(` E2E (not run) | 29 | 14 |
+
+(The forms stream's conversions are included in the "After" figures.) Not run: Playwright (markers removed for
+E2E-JRN-13/14/16/17, ROB-01/02/03/05/07/11, CAL-01/02/04).
 
 ## 6. Leftovers and risks
 
