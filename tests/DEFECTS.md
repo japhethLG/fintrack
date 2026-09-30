@@ -173,6 +173,8 @@ Completing a payment increments `loanConfig.paymentsMade` but never reduces
 
 ## 9. Credit-card balances are never reduced by payments
 
+**STATUS: FIXED** by the write-path stream (`docs/audit/fixes/write-path.md`). Its tests are now plain `it` tests and stay as regression guards. A completed card payment reduces `creditConfig.currentBalance` by the principal paid, in the same transaction as the row.
+
 **Source:** `app/contexts/FinancialContext/actions/transactionActions.ts:122-140`
 and `app/lib/firebase/firestore/transactions.ts:181-192`
 
@@ -191,6 +193,8 @@ layer) · `actualMutation.actions.test.ts` (the projection path)
 
 ## 10. The two completion paths disagree
 
+**STATUS: FIXED** by the write-path stream (`docs/audit/fixes/write-path.md`). Its tests are now plain `it` tests and stay as regression guards. Projection and stored-row gestures share one planner (`ledger.ts`); revert/skip/delete reverse the loan progress exactly.
+
 **Source:** `transactionActions.ts:122-140` vs `transactions.ts:181-192`
 
 Completing a **stored** transaction calls `updateLoanBalance`, which reduces the
@@ -208,6 +212,8 @@ balance.
 
 ## 11. Materialising a projection records the wrong projected amount
 
+**STATUS: FIXED** by the write-path stream (`docs/audit/fixes/write-path.md`). Its tests are now plain `it` tests and stay as regression guards. The projection is regenerated from its rule, so the row records the amortized/scheduled/override amount and payment breakdown.
+
 **Source:** `app/contexts/FinancialContext/actions/transactionActions.ts:95`
 
 `projectedAmount` is taken from `source.amount` rather than from the projection
@@ -221,6 +227,8 @@ override, the stored projected figure — and therefore the variance — is wron
 
 ## 12. Rescheduling a projection discards its other overrides
 
+**STATUS: FIXED** by the write-path stream (`docs/audit/fixes/write-path.md`). Its tests are now plain `it` tests and stay as regression guards. Reschedule patches only `scheduledDate` through a dotted path.
+
 **Source:** `app/contexts/FinancialContext/actions/transactionActions.ts:228`
 
 `rescheduleTransactionAction` writes a fresh `{ scheduledDate }` object, so any
@@ -231,6 +239,8 @@ existing `amount`, `notes` or `skipped` override for that occurrence is lost.
 ---
 
 ## 13. Reverting loses a custom date for most frequencies
+
+**STATUS: FIXED** by the write-path stream (`docs/audit/fixes/write-path.md`). Its tests are now plain `it` tests and stay as regression guards. The pattern date is asked of the projection engine, so every frequency (and `dayOfMonth`) is handled.
 
 **Source:** `app/contexts/FinancialContext/actions/transactionActions.ts:414-448`
 
@@ -248,6 +258,8 @@ start day gets a spurious override.
 
 ## 14. Deleting a completed rule-based transaction leaves the money applied
 
+**STATUS: FIXED** by the write-path stream (`docs/audit/fixes/write-path.md`). Its tests are now plain `it` tests and stay as regression guards. Delete reverses any completed row's contribution and debt progress.
+
 **Source:** `app/contexts/FinancialContext/actions/transactionActions.ts:346`
 
 The balance reversal is gated on `sourceType === "manual"`. Deleting a completed
@@ -259,6 +271,8 @@ The balance reversal is gated on `sourceType === "manual"`. Deleting a completed
 ---
 
 ## 15. A type flip on a completed transaction corrupts the balance
+
+**STATUS: FIXED** by the write-path stream (`docs/audit/fixes/write-path.md`). Its tests are now plain `it` tests and stay as regression guards. The balance change is contribution(after) - contribution(before).
 
 **Source:** `app/contexts/FinancialContext/actions/transactionActions.ts:309-323`
 

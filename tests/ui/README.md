@@ -345,8 +345,13 @@ closed the dialog.
 
 - One signed-in user per render. Multi-user isolation needs `auth.__setUser`
   mid-test.
-- The emulator does not support sub-collections, transactions or cursor
-  pagination (see its header); none are used by the app.
+- The emulator does not support sub-collections or cursor pagination (see its
+  header); none are used by the app. It DOES model what the write path relies
+  on: `writeBatch` is atomic (validated first, nothing applied on failure, 500
+  writes max), `runTransaction` is optimistic like the client SDK (version-checked
+  reads, up to 5 retries, reads before writes), `undefined` field values reject,
+  and `app.store.__injectFault({ collection, times?, error? })` makes the next
+  matching commit reject before anything is applied.
 - `react-window`, dnd-kit drag gestures and antd's date-range popup are not
   exercised by the smoke suite. antd `DatePicker` popups are portal-heavy; prefer
   driving the page through its non-popup controls or the presets.
