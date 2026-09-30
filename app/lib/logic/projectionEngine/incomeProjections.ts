@@ -3,9 +3,7 @@
  */
 
 import { IncomeSource, Transaction } from "@/lib/types";
-import { calculateOccurrences } from "./occurrenceCalculator";
-import { generateOccurrenceId } from "./occurrenceIdGenerator";
-import { createProjectedTransaction } from "./transactionFactory";
+import { generateRecurringProjections } from "./recurringProjections";
 
 /**
  * Generate projected income transactions from an income source
@@ -21,39 +19,11 @@ export const generateIncomeProjections = (
 ): Omit<Transaction, "id" | "userId" | "createdAt" | "updatedAt">[] => {
   if (!source.isActive) return [];
 
-  const occurrences = calculateOccurrences(
-    {
-      frequency: source.frequency,
-      startDate: source.startDate,
-      endDate: source.endDate,
-      scheduleConfig: source.scheduleConfig,
-      weekendAdjustment: source.weekendAdjustment,
-    },
+  return generateRecurringProjections(
+    source,
+    "income",
+    "income_source",
     viewStartDate,
     viewEndDate
   );
-
-  return occurrences
-    .map((date) => {
-      const occurrenceId = generateOccurrenceId(
-        source.id,
-        source.frequency,
-        date,
-        source.startDate,
-        source.scheduleConfig
-      );
-      const override = source.occurrenceOverrides?.[occurrenceId];
-
-      return createProjectedTransaction(
-        source,
-        date,
-        "income",
-        "income_source",
-        undefined,
-        occurrenceId,
-        override
-      );
-    })
-    .filter((t): t is NonNullable<typeof t> => t !== null);
 };
-

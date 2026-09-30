@@ -644,8 +644,8 @@ describe("mergeTransactionsWithProjections", () => {
      *
      * Correct behaviour: one row per real occurrence, so merged ids are unique.
      */
-    it.fails(
-      "KNOWN DEFECT: keeps merged ids unique for a daily rule with weekend adjustment",
+    it(
+      "keeps merged ids unique for a daily rule with weekend adjustment",
       () => {
         const rule = makeExpenseRule({
           id: "exp-1",
@@ -679,8 +679,8 @@ describe("mergeTransactionsWithProjections", () => {
      * Correct behaviour: exactly one row carries occurrenceId `exp-1_2026-01-05`,
      * and it is the stored one.
      */
-    it.fails(
-      "KNOWN DEFECT: emits one row per occurrence when a stored row matches a collided key",
+    it(
+      "emits one row per occurrence when a stored row matches a collided key",
       () => {
         const rule = makeExpenseRule({
           id: "exp-1",
@@ -724,8 +724,8 @@ describe("mergeTransactionsWithProjections", () => {
      * Correct behaviour: the legacy row on the projection's date replaces it —
      * two rows here (Jan realized, Feb projected), not three.
      */
-    it.fails(
-      "KNOWN DEFECT: a stored row without an occurrenceId replaces the projection on its date",
+    it(
+      "a stored row without an occurrenceId replaces the projection on its date",
       () => {
         const legacy = storedForRule({
           id: "txn-legacy",
@@ -761,7 +761,7 @@ describe("mergeTransactionsWithProjections", () => {
      *
      * Correct behaviour: both realized rows are returned.
      */
-    it.fails("KNOWN DEFECT: keeps both stored rows when two share the same occurrenceId", () => {
+    it("keeps both stored rows when two share the same occurrenceId", () => {
       const firstPayment = storedForRule({
         id: "txn-part-1",
         occurrenceId: "exp-1_2026-01",

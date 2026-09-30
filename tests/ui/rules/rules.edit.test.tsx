@@ -317,9 +317,8 @@ describe("editing only the amount", () => {
     expect(d.engineDates(app, "inc-1")).toEqual(["2026-01-15", "2026-04-15"]);
   });
 
-  knownDefect(
-    "UI-RULE-62",
-    "editing only the amount of a quarterly EXPENSE moves every bill to the 1st (edit wizard rewrites scheduleConfig as {})",
+  it(
+    "UI-RULE-62 — editing only the amount of a quarterly EXPENSE moves every bill to the 1st (edit wizard rewrites scheduleConfig as {})",
     async () => {
       // seeded with a correct dayOfMonth 15: Jan 15, Apr 15. observed after the edit: engine bills only Apr 1
       const app = await renderApp({

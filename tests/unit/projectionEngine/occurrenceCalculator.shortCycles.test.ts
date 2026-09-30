@@ -319,8 +319,8 @@ describe("calculateOccurrences", () => {
        * Source: app/lib/logic/projectionEngine/occurrenceCalculator.ts:50-57
        * (push of `adjustForWeekend(current, ...)` inside the per-day loop).
        */
-      it.fails(
-        "KNOWN DEFECT: daily with 'after' collapses Sat and Sun onto Monday, duplicating it",
+      it(
+        "daily with 'after' collapses Sat and Sun onto Monday, duplicating it",
         () => {
           const result = ymdAll(
             occ(
@@ -341,7 +341,7 @@ describe("calculateOccurrences", () => {
        * Correct behaviour: the returned dates must be unique.
        * Source: app/lib/logic/projectionEngine/occurrenceCalculator.ts:50-57
        */
-      it.fails("KNOWN DEFECT: daily with 'before' collapses Fri, Sat and Sun onto Friday", () => {
+      it("daily with 'before' collapses Fri, Sat and Sun onto Friday", () => {
         const result = ymdAll(
           occ(
             { frequency: "daily", startDate: "2026-02-05", weekendAdjustment: "before" },
@@ -465,17 +465,26 @@ describe("calculateOccurrences", () => {
       expect(ymdAll(result)).toEqual(["2026-01-01", "2026-01-08", "2026-01-15"]);
     });
 
-    it("terminates instead of looping forever when dayOfWeek can never be matched", () => {
-      // dayOfWeek 7 is out of range (0-6). The alignment guard stops after 7
-      // single-day steps, which lands exactly one week past startDate.
+    it("terminates and ignores a dayOfWeek that can never be matched", () => {
+      // dayOfWeek 7 is out of range (0-6), so it is ignored: the series keeps the start
+      // date's own weekday instead of skipping a whole week (OG-11). Jan 1 2026 is a
+      // Thursday, so the series is Thu Jan 1, 8, 15, 22, 29 (Feb 5 is past the window end).
+      // REWRITTEN: the old expectation (["2026-01-08", ...]) pinned the first period being
+      // dropped, which advanced a full 7 days because the alignment loop never matched.
       const result = occ(
         { frequency: "weekly", startDate: "2026-01-01", scheduleConfig: { dayOfWeek: 7 } },
         "2026-01-01",
         "2026-02-01"
       );
 
-      expect(ymdAll(result)).toEqual(["2026-01-08", "2026-01-15", "2026-01-22", "2026-01-29"]);
-      expect(result.map(weekday)).toEqual(new Array(4).fill("Thu"));
+      expect(ymdAll(result)).toEqual([
+        "2026-01-01",
+        "2026-01-08",
+        "2026-01-15",
+        "2026-01-22",
+        "2026-01-29",
+      ]);
+      expect(result.map(weekday)).toEqual(new Array(5).fill("Thu"));
     });
 
     describe("weekendAdjustment", () => {
@@ -523,8 +532,19 @@ describe("calculateOccurrences", () => {
         );
 
         // Sundays Jan 4 / 11 / 18 / 25 shift back two days; "after" shifts forward one.
-        expect(ymdAll(before)).toEqual(["2026-01-02", "2026-01-09", "2026-01-16", "2026-01-23"]);
-        expect(before.map(weekday)).toEqual(new Array(4).fill("Fri"));
+        // REWRITTEN: Sunday Feb 1 (Jan 4 + 28 days) is the next logical occurrence. Under
+        // "before" it lands on Fri Jan 30, INSIDE the window [Jan 1, Jan 31], so it belongs to
+        // this window (the window filters the adjusted date). The old expectation omitted it
+        // because the window test ran on the un-adjusted Feb 1. Under "after" it lands on
+        // Mon Feb 2, outside the window, so that series still has four entries.
+        expect(ymdAll(before)).toEqual([
+          "2026-01-02",
+          "2026-01-09",
+          "2026-01-16",
+          "2026-01-23",
+          "2026-01-30",
+        ]);
+        expect(before.map(weekday)).toEqual(new Array(5).fill("Fri"));
         expect(ymdAll(after)).toEqual(["2026-01-05", "2026-01-12", "2026-01-19", "2026-01-26"]);
         expect(after.map(weekday)).toEqual(new Array(4).fill("Mon"));
       });
@@ -666,7 +686,16 @@ describe("calculateOccurrences", () => {
         "2026-03-01"
       );
 
-      expect(ymdAll(result)).toEqual(["2026-01-08", "2026-01-22", "2026-02-05", "2026-02-19"]);
+      // REWRITTEN (see the weekly twin above): an invalid dayOfWeek is ignored, so the
+      // fortnightly series starts ON the start date, Thu Jan 1, then +14 days each:
+      // Jan 1, Jan 15, Jan 29, Feb 12, Feb 26 (Mar 12 is past the window end Mar 1).
+      expect(ymdAll(result)).toEqual([
+        "2026-01-01",
+        "2026-01-15",
+        "2026-01-29",
+        "2026-02-12",
+        "2026-02-26",
+      ]);
     });
 
     it("skips occurrences before viewStartDate while keeping the phase anchored to startDate", () => {
@@ -842,7 +871,7 @@ describe("calculateOccurrences", () => {
      * [viewStartDate, viewEndDate] and never past endDate.
      * Source: app/lib/logic/projectionEngine/occurrenceCalculator.ts:45, 53, 75, 98
      */
-    it.fails("KNOWN DEFECT: one-time with 'after' emits a date past viewEndDate", () => {
+    it("one-time with 'after' emits a date past viewEndDate", () => {
       const viewEnd = d("2026-02-07"); // Saturday, the last day of the window
       const result = calculateOccurrences(
         params({ frequency: "one-time", startDate: "2026-02-07", weekendAdjustment: "after" }),
@@ -860,7 +889,7 @@ describe("calculateOccurrences", () => {
      * emitting a date before the window began.
      * Correct behaviour: no returned date is earlier than viewStartDate.
      */
-    it.fails("KNOWN DEFECT: daily with 'before' emits a date earlier than viewStartDate", () => {
+    it("daily with 'before' emits a date earlier than viewStartDate", () => {
       const viewStart = d("2026-02-08"); // Sunday, the first day of the window
       const result = calculateOccurrences(
         params({ frequency: "daily", startDate: "2026-02-08", weekendAdjustment: "before" }),
@@ -873,13 +902,17 @@ describe("calculateOccurrences", () => {
     });
 
     /**
-     * DEFECT (same root cause, occurrenceCalculator.ts:75): a weekly series
-     * whose last in-range occurrence is the endDate itself gets pushed past
-     * that endDate by the "after" adjustment.
-     * Correct behaviour: no returned date is later than endDate.
+     * D4 VERDICT (REWRITTEN from "KNOWN DEFECT: weekly with 'after' emits a date past endDate",
+     * which asserted that no returned date may be later than the rule's endDate).
+     *
+     * The rule's startDate/endDate bound the LOGICAL dates; only the VIEW WINDOW bounds the
+     * adjusted date. Saturdays Jan 3, 10 and 17 are all <= endDate Sat Jan 17, so all three
+     * payments are due; "after" pays them on Mon Jan 5, 12 and 19. Enforcing endDate on the
+     * adjusted date would silently DROP the last payment (its Monday is past the end) so that
+     * merely choosing "after" changes how many payments exist. Jan 24 is past endDate on the
+     * logical axis and is never generated. See docs/audit/fixes/engine-dates.md (D4).
      */
-    it.fails("KNOWN DEFECT: weekly with 'after' emits a date past endDate", () => {
-      const endDate = d("2026-01-17"); // Saturday, the rule's own end date
+    it("keeps the last payment of a rule ending on a Saturday, paid the next Monday with 'after'", () => {
       const result = calculateOccurrences(
         params({
           frequency: "weekly",
@@ -891,8 +924,7 @@ describe("calculateOccurrences", () => {
         d("2026-03-01")
       );
 
-      // Actual: ["2026-01-05","2026-01-12","2026-01-19"] — Jan 19 is past the end date.
-      expect(ymdAll(result.filter((date) => date > endDate))).toEqual([]);
+      expect(ymdAll(result)).toEqual(["2026-01-05", "2026-01-12", "2026-01-19"]);
     });
 
     /**
@@ -901,7 +933,7 @@ describe("calculateOccurrences", () => {
      * window into the following month.
      * Correct behaviour: no returned date is later than viewEndDate.
      */
-    it.fails("KNOWN DEFECT: bi-weekly with 'after' emits a date past viewEndDate", () => {
+    it("bi-weekly with 'after' emits a date past viewEndDate", () => {
       const viewEnd = d("2026-03-01"); // Sunday, the last day of the window
       const result = calculateOccurrences(
         params({

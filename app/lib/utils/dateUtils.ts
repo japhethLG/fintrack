@@ -69,3 +69,52 @@ export const addWeeks = (date: Date, weeks: number): Date => {
 export const addYears = (date: Date, years: number): Date => {
   return dayjs(date).add(years, "year").toDate();
 };
+
+// ============================================================================
+// Day numbers: a calendar day as an integer, for iterating and comparing days
+// without wall-clock instants (DST- and time-zone-free).
+// ============================================================================
+
+const MS_PER_DAY = 86_400_000;
+
+/** Day number (days since 1970-01-01) of a calendar day; month is zero-based like `Date`. */
+export const toDayNumber = (year: number, month: number, day: number): number =>
+  Math.floor(Date.UTC(year, month, day) / MS_PER_DAY);
+
+/** Day number of the LOCAL calendar day a `Date` falls on (`NaN` for an invalid Date). */
+export const dayNumberOfDate = (date: Date): number =>
+  toDayNumber(date.getFullYear(), date.getMonth(), date.getDate());
+
+/** Calendar parts of a day number (month zero-based). */
+export const civilFromDayNumber = (n: number): { year: number; month: number; day: number } => {
+  const utc = new Date(n * MS_PER_DAY);
+  return { year: utc.getUTCFullYear(), month: utc.getUTCMonth(), day: utc.getUTCDate() };
+};
+
+/** Local-midnight `Date` for a day number. */
+export const dateFromDayNumber = (n: number): Date => {
+  const { year, month, day } = civilFromDayNumber(n);
+  return new Date(year, month, day);
+};
+
+/** Weekday of a day number: 0 = Sunday ... 6 = Saturday. (1970-01-01 was a Thursday.) */
+export const weekdayOfDayNumber = (n: number): number => (((n + 4) % 7) + 7) % 7;
+
+/** Month index on a continuous axis: `year * 12 + month` (month zero-based). */
+export const monthIndexOfDayNumber = (n: number): number => {
+  const { year, month } = civilFromDayNumber(n);
+  return year * 12 + month;
+};
+
+/**
+ * Every local calendar day from `start` to `end` inclusive, as local-midnight Dates.
+ * Iterates by day index, so a DST change (including one at 00:00, where the wall
+ * clock skips midnight) can neither skip nor repeat a day.
+ */
+export const eachDayBetween = (start: Date, end: Date): Date[] => {
+  const first = dayNumberOfDate(start);
+  const last = dayNumberOfDate(end);
+  const days: Date[] = [];
+  for (let n = first; n <= last; n++) days.push(dateFromDayNumber(n));
+  return days;
+};

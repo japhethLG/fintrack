@@ -35,8 +35,9 @@ export const generateProjections = (
   });
 
   // Sort by date
-  projections.sort(
-    (a, b) => new Date(a.scheduledDate).getTime() - new Date(b.scheduledDate).getTime()
+  // YYYY-MM-DD strings order chronologically; no Date parsing needed (or wanted).
+  projections.sort((a, b) =>
+    a.scheduledDate < b.scheduledDate ? -1 : a.scheduledDate > b.scheduledDate ? 1 : 0
   );
 
   return projections;

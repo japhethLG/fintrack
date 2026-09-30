@@ -1,4 +1,5 @@
 import { useState, useCallback } from "react";
+import { formatDate, getTodayKey, parseDate } from "@/lib/utils/dateUtils";
 
 interface DateRange {
   start: string;
@@ -12,13 +13,15 @@ interface DateRange {
  */
 export function useViewDateRange() {
   const [viewDateRange, setViewDateRangeState] = useState<DateRange>(() => {
-    const today = new Date();
-    // Default: 2 months back to 4 months forward
+    // "Today" is the local calendar day; bounds are local calendar days, serialised with formatDate.
+    // (toISOString() would stamp the UTC day, a day early at any UTC+ offset.)
+    const today = parseDate(getTodayKey());
+    // Default: 2 months back (1st of that month) to 4 months forward (day 0 = last day of month+3)
     const startDate = new Date(today.getFullYear(), today.getMonth() - 2, 1);
     const endDate = new Date(today.getFullYear(), today.getMonth() + 4, 0);
     return {
-      start: startDate.toISOString().split("T")[0],
-      end: endDate.toISOString().split("T")[0],
+      start: formatDate(startDate),
+      end: formatDate(endDate),
     };
   });
 

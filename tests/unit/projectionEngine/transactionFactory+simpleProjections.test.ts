@@ -696,8 +696,8 @@ describe("generateIncomeProjections", () => {
      * (which deletes a real payment from every projection) stays red.
      * OBSERVED: the January request returns it dated 2026-02-15, violating (1).
      */
-    it.fails(
-      "KNOWN DEFECT: an occurrence moved out of its window is neither leaked nor lost",
+    it(
+      "an occurrence moved out of its window is neither leaked nor lost",
       () => {
         const source = makeIncomeSource({
           occurrenceOverrides: {

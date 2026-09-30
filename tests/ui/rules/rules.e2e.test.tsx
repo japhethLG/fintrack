@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { renderApp, knownDefect, moneyNear, type AppHandle, type AppSeed } from "../harness";
+import { renderApp, moneyNear, type AppHandle, type AppSeed } from "../harness";
 import * as d from "./driver";
 
 // Cold first render (antd + radix + wizard) can exceed the 20 s default on a loaded machine.
@@ -49,9 +49,8 @@ describe("wizard -> persisted rule -> calendar month summary (January 2026)", ()
     expect(moneyNear("Expenses", { occurrence: 0 })).toBe(-1200);
   });
 
-  knownDefect(
-    "UI-RULE-70",
-    "a quarterly $300 expense scheduled for Jan 5 in the wizard is missing from the January calendar",
+  it(
+    "UI-RULE-70 — a quarterly $300 expense scheduled for Jan 5 in the wizard is missing from the January calendar",
     async () => {
       // the wizard's Schedule Preview promised Jan 5; the persisted scheduleConfig {} makes the engine bill Apr 1.
       // observed: January Expenses -$0

@@ -29,6 +29,8 @@ Then confirm every failure is an `AssertionError`, not a `TypeError`.
 
 ## 1. Weekend adjustment is applied after the window filter
 
+**STATUS: FIXED** by the engine-dates stream (`docs/audit/fixes/engine-dates.md`). Its tests are now plain `it` tests and stay as regression guards.
+
 **Source:** `app/lib/logic/projectionEngine/occurrenceCalculator.ts:45,53,75,98,141-142`
 
 `adjustForWeekend` is called on the date being pushed, _after_ it has been
@@ -50,6 +52,8 @@ interacts with defect 2, so fix them together.
 
 ## 2. Daily frequency collapses weekend days onto one date
 
+**STATUS: FIXED** by the engine-dates stream (`docs/audit/fixes/engine-dates.md`). Its tests are now plain `it` tests and stay as regression guards. Decision: a daily rule ignores weekend adjustment.
+
 **Source:** `app/lib/logic/projectionEngine/occurrenceCalculator.ts:50-57`
 
 Each day is weekend-adjusted independently inside the per-day loop, so with
@@ -69,6 +73,8 @@ times.
 ---
 
 ## 3. Monthly and quarterly drop trailing occurrences
+
+**STATUS: FIXED** by the engine-dates stream (`docs/audit/fixes/engine-dates.md`). Its tests are now plain `it` tests and stay as regression guards.
 
 **Source:** `app/lib/logic/projectionEngine/occurrenceCalculator.ts:134` (monthly),
 `:154` (quarterly)
@@ -91,6 +97,8 @@ immune (it iterates an integer year). Both are pinned as passing tests.
 
 ## 4. Yearly ignores a configured `monthOfYear` of January
 
+**STATUS: FIXED** by the engine-dates stream (`docs/audit/fixes/engine-dates.md`). Its tests are now plain `it` tests and stay as regression guards.
+
 **Source:** `app/lib/logic/projectionEngine/occurrenceCalculator.ts:171`
 
 `scheduleConfig.monthOfYear || start.getMonth()` treats the valid zero-based
@@ -102,6 +110,8 @@ start date's month.
 ---
 
 ## 5. An unrecognised frequency is silently swallowed
+
+**STATUS: FIXED** by the engine-dates stream (`docs/audit/fixes/engine-dates.md`). Its tests are now plain `it` tests and stay as regression guards.
 
 **Source:** `app/lib/logic/projectionEngine/occurrenceCalculator.ts` (the `switch`
 has no `default`)
@@ -116,6 +126,8 @@ window".
 ---
 
 ## 6. Weekend adjustment silently changes an occurrence's logical identity
+
+**STATUS: FIXED** by the engine-dates stream (`docs/audit/fixes/engine-dates.md`). Its tests are now plain `it` tests and stay as regression guards. The bi-weekly "startDate edited" test is NOT part of this fix and is still a known defect.
 
 **Source:** `occurrenceCalculator.ts:141-142` + `occurrenceIdGenerator.ts`
 
@@ -364,6 +376,8 @@ Also: `totalPayments` is hardcoded to 0 in credit-card payment breakdowns
 ---
 
 ## 24. Timezone: three date conventions in one engine
+
+**STATUS: FIXED** by the engine-dates stream (`docs/audit/fixes/engine-dates.md`). Its tests are now plain `it` tests and stay as regression guards.
 
 **Source:** `useViewDateRange.ts:15-22` · `projectionMerger.ts:31` ·
 `forecastCalculator.ts:26,43` · `users.ts:93`

@@ -532,8 +532,8 @@ describe("calculateOccurrences — monthly", () => {
      * 2026-03-01, which is inside the window.
      * Correct behaviour: ["2026-02-01", "2026-03-01"].
      */
-    it.fails(
-      "KNOWN DEFECT: emits the final occurrence when dayOfMonth precedes the start day",
+    it(
+      "emits the final occurrence when dayOfMonth precedes the start day",
       () => {
         expect(
           occurrences(
@@ -552,7 +552,7 @@ describe("calculateOccurrences — monthly", () => {
      * silently dropped even though it precedes the window end by five days.
      * Correct behaviour: ["2026-02-10", "2026-03-10", "2026-04-10"].
      */
-    it.fails("KNOWN DEFECT: does not lose a month whose cursor overshoots the window end", () => {
+    it("does not lose a month whose cursor overshoots the window end", () => {
       expect(
         occurrences(
           { frequency: "monthly", startDate: "2026-01-25", scheduleConfig: { dayOfMonth: 10 } },
@@ -570,10 +570,14 @@ describe("calculateOccurrences — monthly", () => {
      * 2026-02-01 is a Sunday; with adjustment "before" the engine returns
      * 2026-01-30 — two days before the schedule even begins, and outside the
      * requested February window. See also dateUtils.ts:20-33.
-     * Correct behaviour: no returned occurrence may precede startDate.
+     * Original expectation: no returned occurrence may precede startDate.
+     * D4 VERDICT (REWRITTEN): the WINDOW must hold (nothing outside [Feb 1, Feb 28] is returned),
+     * but the rule's startDate bounds the LOGICAL date, not the adjusted one. Dropping Jan 30
+     * because it precedes startDate would make "pay early" delete the first payment, so a window
+     * that contains Jan 30 does return it (asserted below). See docs/audit/fixes/engine-dates.md.
      */
-    it.fails(
-      "KNOWN DEFECT: never returns a date earlier than startDate after 'before' adjustment",
+    it(
+      "keeps 'before'-adjusted dates inside the window; startDate bounds the logical date",
       () => {
         const result = occurrences(
           {
@@ -586,6 +590,25 @@ describe("calculateOccurrences — monthly", () => {
           "2026-02-28"
         );
         expect(result.every((day) => day >= "2026-02-01")).toBe(true);
+        // STRENGTHENED: the assertion above would also hold for an empty result. Logical Sun
+        // Feb 1 adjusts to Fri Jan 30, which is OUTSIDE the requested window [Feb 1, Feb 28], so
+        // it is not returned here; logical Sun Mar 1 (Feb 1 + 28 days) adjusts to Fri Feb 27,
+        // which is inside, so it is...
+        expect(result).toEqual(["2026-02-27"]);
+        // ...while a window that does contain Jan 30 returns it: the rule's own startDate bounds
+        // the LOGICAL date (Feb 1), not the adjusted one (D4: dropping it would lose a payment).
+        expect(
+          occurrences(
+            {
+              frequency: "monthly",
+              startDate: "2026-02-01",
+              scheduleConfig: { dayOfMonth: 1 },
+              weekendAdjustment: "before",
+            },
+            "2026-01-01",
+            "2026-02-28"
+          )
+        ).toEqual(["2026-01-30", "2026-02-27"]);
       }
     );
 
@@ -597,8 +620,8 @@ describe("calculateOccurrences — monthly", () => {
      * Correct behaviour: no returned occurrence may fall after the effective
      * end of the window.
      */
-    it.fails(
-      "KNOWN DEFECT: never returns a date past the window end after 'after' adjustment",
+    it(
+      "never returns a date past the window end after 'after' adjustment",
       () => {
         const result = occurrences(
           {
@@ -611,6 +634,21 @@ describe("calculateOccurrences — monthly", () => {
           "2026-01-31"
         );
         expect(result.every((day) => day <= "2026-01-31")).toBe(true);
+        // STRENGTHENED: Sat Jan 31 adjusts to Mon Feb 2, outside the window [Jan 1, Jan 31], so
+        // this window holds nothing; a window reaching Feb 2 holds it (it is the same payment).
+        expect(result).toEqual([]);
+        expect(
+          occurrences(
+            {
+              frequency: "monthly",
+              startDate: "2026-01-01",
+              scheduleConfig: { dayOfMonth: 31 },
+              weekendAdjustment: "after",
+            },
+            "2026-01-01",
+            "2026-02-02"
+          )
+        ).toEqual(["2026-02-02"]);
       }
     );
   });
@@ -631,25 +669,27 @@ describe("calculateOccurrences — quarterly", () => {
     ).toEqual(["2026-01-15", "2026-04-15", "2026-07-15", "2026-10-15"]);
   });
 
-  it("defaults dayOfMonth to 1 rather than falling back to the startDate day", () => {
-    // Unlike monthly/yearly, quarterly hardcodes day 1 when dayOfMonth is
-    // absent (occurrenceCalculator.ts:151). With startDate 2026-01-15 the first
-    // candidate is 2026-01-01, which precedes startDate and is therefore
-    // dropped — so the series begins in April, not January, and never lands on
-    // the 15th.
+  it("falls back to the startDate day when dayOfMonth is absent", () => {
+    // REWRITTEN (was: "defaults dayOfMonth to 1"). The old code hardcoded day 1, so with
+    // startDate 2026-01-15 the first candidate 2026-01-01 preceded startDate and was dropped,
+    // and every later quarter moved to the 1st (N-3: every quarterly expense rule the UI
+    // created has an empty scheduleConfig). Like monthly and yearly, quarterly now falls back
+    // to the start date's day: the 15th, every third month from January.
     expect(
       occurrences({ frequency: "quarterly", startDate: "2026-01-15" }, "2026-01-01", "2026-12-31")
-    ).toEqual(["2026-04-01", "2026-07-01", "2026-10-01"]);
+    ).toEqual(["2026-01-15", "2026-04-15", "2026-07-15", "2026-10-15"]);
   });
 
-  it("does not throw when scheduleConfig is undefined and still uses day 1", () => {
+  it("does not throw when scheduleConfig is undefined and uses the startDate day", () => {
+    // REWRITTEN (was: "... still uses day 1", expecting ["2026-04-01"]). startDate 2026-01-10:
+    // quarters are Jan 10, Apr 10 (Jul 10 is past the window end Jun 30).
     expect(
       occurrences(
         { frequency: "quarterly", startDate: "2026-01-10", scheduleConfig: NO_CONFIG },
         "2026-01-01",
         "2026-06-30"
       )
-    ).toEqual(["2026-04-01"]);
+    ).toEqual(["2026-01-10", "2026-04-10"]);
   });
 
   it("honours a custom dayOfMonth on each quarter month", () => {
@@ -717,7 +757,7 @@ describe("calculateOccurrences — quarterly", () => {
      * emitting 2026-07-01, which is inside the window.
      * Correct behaviour: ["2026-04-01", "2026-07-01"].
      */
-    it.fails("KNOWN DEFECT: emits the final quarter when dayOfMonth precedes the start day", () => {
+    it("emits the final quarter when dayOfMonth precedes the start day", () => {
       expect(
         occurrences(
           { frequency: "quarterly", startDate: "2026-01-25", scheduleConfig: { dayOfMonth: 1 } },
@@ -851,7 +891,7 @@ describe("calculateOccurrences — yearly", () => {
      * Correct behaviour: ["2027-01-10", "2028-01-10"] — 2026-01-10 precedes
      * startDate and is correctly excluded.
      */
-    it.fails("KNOWN DEFECT: honours a configured monthOfYear of 0 (January)", () => {
+    it("honours a configured monthOfYear of 0 (January)", () => {
       expect(
         occurrences(
           {

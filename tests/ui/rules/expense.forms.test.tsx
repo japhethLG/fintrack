@@ -322,9 +322,8 @@ describe("expense wizard: quarterly and yearly (hypothesis: expense form persist
     expect(preview).toEqual(["2026-01-05", "2026-04-05"].map(d.label));
   });
 
-  knownDefect(
-    "UI-RULE-27",
-    "quarterly expense: engine bills on the 1st of the quarter month, not on the day the user scheduled",
+  it(
+    "UI-RULE-27 — quarterly expense: engine bills on the 1st of the quarter month, not on the day the user scheduled",
     async () => {
       // start Mon 2026-01-05 -> correct: Jan 5, Apr 5. observed engine: only Apr 1 (Jan 1 < start is dropped)
       const { preview, engine } = await run({ frequency: "Quarterly", start: "2026-01-05", weekend: "none" });
@@ -458,5 +457,19 @@ describe("expense wizard: frequency choices and validation", () => {
     }
   );
 
-  it.todo("DECISION: weekend adjustment at a rule boundary (first payment on a Saturday with 'before'; last payment on a Sunday with 'after' past the end date): drop vs clamp");
+  it("D4 (weekend adjustment at a rule boundary): a 'before' first payment may land ahead of the start date and is kept", async () => {
+    // RESOLVED from a DECISION todo (docs/audit/fixes/engine-dates.md, D4): drop vs clamp vs keep -> KEEP.
+    // Monthly on the 1st starting Sun 2026-03-01 with 'before': the March payment is due Sunday Mar 1, so it is
+    // paid Fri Feb 27 - two days BEFORE the rule's start date - and April's (Wed Apr 1) is untouched. Dropping the
+    // Feb 27 payment would delete the first payment merely because the user chose to pay early.
+    const { engine } = await run({
+      name: "Rent",
+      amount: "1200",
+      frequency: "Monthly",
+      start: "2026-03-01",
+      dayOfMonth: "1",
+      weekend: "before",
+    });
+    expect(engine).toEqual(["2026-02-27", "2026-04-01"]);
+  });
 });

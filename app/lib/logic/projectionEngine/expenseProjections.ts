@@ -3,9 +3,7 @@
  */
 
 import { ExpenseRule, Transaction } from "@/lib/types";
-import { calculateOccurrences } from "./occurrenceCalculator";
-import { generateOccurrenceId } from "./occurrenceIdGenerator";
-import { createProjectedTransaction } from "./transactionFactory";
+import { generateRecurringProjections } from "./recurringProjections";
 import { generateLoanProjections } from "./loanProjections";
 import { generateCreditProjections } from "./creditProjections";
 import { generateInstallmentProjections } from "./installmentProjections";
@@ -40,39 +38,5 @@ export const generateExpenseProjections = (
   }
 
   // Standard recurring expenses
-  const occurrences = calculateOccurrences(
-    {
-      frequency: rule.frequency,
-      startDate: rule.startDate,
-      endDate: rule.endDate,
-      scheduleConfig: rule.scheduleConfig,
-      weekendAdjustment: rule.weekendAdjustment,
-    },
-    viewStartDate,
-    viewEndDate
-  );
-
-  return occurrences
-    .map((date) => {
-      const occurrenceId = generateOccurrenceId(
-        rule.id,
-        rule.frequency,
-        date,
-        rule.startDate,
-        rule.scheduleConfig
-      );
-      const override = rule.occurrenceOverrides?.[occurrenceId];
-
-      return createProjectedTransaction(
-        rule,
-        date,
-        "expense",
-        "expense_rule",
-        undefined,
-        occurrenceId,
-        override
-      );
-    })
-    .filter((t): t is NonNullable<typeof t> => t !== null);
+  return generateRecurringProjections(rule, "expense", "expense_rule", viewStartDate, viewEndDate);
 };
-

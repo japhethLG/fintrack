@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import type { IncomeFrequency } from "@/lib/types";
 import { calculateOccurrences } from "@/lib/logic/projectionEngine/occurrenceCalculator";
 import { makeOccurrenceParams } from "../../helpers/builders";
@@ -173,30 +173,57 @@ describe("calculateOccurrences: the semi-monthly inner ceiling guard", () => {
 // ============================================================================
 
 describe("calculateOccurrences: unrecognised frequency", () => {
-  it("returns an empty array rather than throwing", () => {
-    const occurrences = calculateOccurrences(
-      makeOccurrenceParams({
-        frequency: "fortnightly" as unknown as IncomeFrequency,
-        startDate: "2026-01-01",
-      }),
-      d("2026-01-01"),
-      d("2026-12-31")
-    );
-
-    expect(occurrences).toEqual([]);
+  // REWRITTEN: these two used to assert that an unrecognised / undefined frequency "returns an
+  // empty array rather than throwing". That pinned the silent-swallow defect (OG-13): the rule
+  // vanishes from every projection. The decided behaviour is: throw outside production (naming
+  // the bad value), warn and return [] in production so one corrupt document cannot take the
+  // whole app down.
+  it("throws on an unrecognised frequency outside production", () => {
+    expect(() =>
+      calculateOccurrences(
+        makeOccurrenceParams({
+          frequency: "fortnightly" as unknown as IncomeFrequency,
+          startDate: "2026-01-01",
+        }),
+        d("2026-01-01"),
+        d("2026-12-31")
+      )
+    ).toThrow(/fortnightly/);
   });
 
-  it("returns an empty array for an undefined frequency", () => {
-    const occurrences = calculateOccurrences(
-      makeOccurrenceParams({
-        frequency: undefined as unknown as IncomeFrequency,
-        startDate: "2026-01-01",
-      }),
-      d("2026-01-01"),
-      d("2026-12-31")
-    );
+  it("throws on an undefined frequency outside production", () => {
+    expect(() =>
+      calculateOccurrences(
+        makeOccurrenceParams({
+          frequency: undefined as unknown as IncomeFrequency,
+          startDate: "2026-01-01",
+        }),
+        d("2026-01-01"),
+        d("2026-12-31")
+      )
+    ).toThrow(/Unknown frequency/);
+  });
 
-    expect(occurrences).toEqual([]);
+  it("warns and returns an empty array in production instead of throwing", () => {
+    vi.stubEnv("NODE_ENV", "production");
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    try {
+      const occurrences = calculateOccurrences(
+        makeOccurrenceParams({
+          frequency: "fortnightly" as unknown as IncomeFrequency,
+          startDate: "2026-01-01",
+        }),
+        d("2026-01-01"),
+        d("2026-12-31")
+      );
+
+      expect(occurrences).toEqual([]);
+      expect(warn).toHaveBeenCalledTimes(1);
+      expect(String(warn.mock.calls[0][0])).toContain("fortnightly");
+    } finally {
+      warn.mockRestore();
+      vi.unstubAllEnvs();
+    }
   });
 
   describe("known defects", () => {
@@ -216,7 +243,7 @@ describe("calculateOccurrences: unrecognised frequency", () => {
      * surface, not be swallowed. Throwing is the minimum; the value should
      * appear in the message so the bad data can be found.
      */
-    it.fails("KNOWN DEFECT: swallows an unrecognised frequency instead of surfacing it", () => {
+    it("swallows an unrecognised frequency instead of surfacing it", () => {
       expect(() =>
         calculateOccurrences(
           makeOccurrenceParams({

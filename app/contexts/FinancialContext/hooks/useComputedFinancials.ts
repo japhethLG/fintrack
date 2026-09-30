@@ -1,6 +1,7 @@
 import { useMemo } from "react";
 import { UserProfile, Transaction, DayBalance, BillCoverageReport, UpcomingBill } from "@/lib/types";
 import { calculateDailyBalances, getBillCoverageReport } from "@/lib/logic/balanceCalculator";
+import { parseDate } from "@/lib/utils/dateUtils";
 
 /**
  * Hook to compute daily balances from transactions
@@ -18,8 +19,8 @@ export function useDailyBalances(
     return calculateDailyBalances(
       userProfile.currentBalance,
       transactions,
-      new Date(viewDateRange.start),
-      new Date(viewDateRange.end),
+      parseDate(viewDateRange.start),
+      parseDate(viewDateRange.end),
       userProfile.preferences.defaultWarningThreshold
     );
   }, [userProfile, transactions, viewDateRange]);

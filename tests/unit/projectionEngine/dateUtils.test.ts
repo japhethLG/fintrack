@@ -420,12 +420,14 @@ describe("clampDayToMonth", () => {
     expect(clamped).toEqual([30, 28, 30, 30, 30, 30, 30, 30, 30, 30, 30, 30]);
   });
 
-  it("only clamps downward: a day below 1 is returned as-is", () => {
-    // Characterisation test. `Math.min` has no lower bound, so 0 stays 0.
-    // Reachable only if a caller passes an invalid day; the engine guards with
-    // `scheduleConfig.dayOfMonth || start.getDate()`
-    // (app/lib/logic/projectionEngine/occurrenceCalculator.ts:131).
-    expect(clampDayToMonth(0, 2026, 0)).toBe(0);
+  it("clamps a day below 1 up to 1", () => {
+    // REWRITTEN (was: "only clamps downward: a day below 1 is returned as-is", expecting 0).
+    // Day 0 handed to `new Date(y, m, 0)` is the LAST day of the PREVIOUS month, so an
+    // unclamped 0 silently moved an occurrence into the wrong month (OG-12). Day 1 is the
+    // earliest valid day of any month, so 0 and negatives clamp to 1; NaN is treated as 1.
+    expect(clampDayToMonth(0, 2026, 0)).toBe(1);
+    expect(clampDayToMonth(-5, 2026, 0)).toBe(1);
+    expect(clampDayToMonth(Number.NaN, 2026, 0)).toBe(1);
   });
 });
 
