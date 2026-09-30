@@ -34,7 +34,7 @@ const CreditCardDetailsForm: React.FC = () => {
           inputName="creditLimit"
           type="number"
           label="Credit Limit"
-          tooltip="The maximum amount you can borrow on this card"
+          tooltip="The maximum amount you can borrow on this card. Leave blank if you do not know it."
           placeholder="0.00"
           prefix={currencySymbol}
         />
@@ -69,7 +69,7 @@ const CreditCardDetailsForm: React.FC = () => {
           inputName="creditMinPaymentPercent"
           type="number"
           label="Minimum Payment %"
-          tooltip="Percentage of balance required as minimum payment (usually 1-3%)"
+          tooltip="Percentage of balance required as minimum payment (usually 1-3%). Leave blank for 2%."
           placeholder="2"
           suffix="%"
         />
@@ -80,7 +80,7 @@ const CreditCardDetailsForm: React.FC = () => {
           inputName="creditMinPaymentFloor"
           type="number"
           label="Min Payment Floor"
-          tooltip="Minimum payment amount regardless of balance percentage"
+          tooltip="Minimum payment amount regardless of balance percentage. Leave blank for 25."
           placeholder="25"
           prefix={currencySymbol}
         />
@@ -99,7 +99,7 @@ const CreditCardDetailsForm: React.FC = () => {
           inputName="creditStatementDate"
           type="number"
           label="Statement Date"
-          tooltip="Day of month when your billing statement is generated"
+          tooltip="Day of month when your billing statement is generated. Leave blank for the 5th."
           placeholder="Day of month"
           min={1}
           max={31}
@@ -111,6 +111,7 @@ const CreditCardDetailsForm: React.FC = () => {
           inputName="creditDueDate"
           type="number"
           label="Due Date"
+          isRequired
           tooltip="Day of month when payment is due to avoid late fees"
           placeholder="Day of month"
           min={1}

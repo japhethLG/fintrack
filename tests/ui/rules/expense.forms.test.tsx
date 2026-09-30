@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { renderApp, screen, knownDefect } from "../harness";
+import { renderApp, screen, waitFor } from "../harness";
 import * as d from "./driver";
 import type { ExpenseSpec } from "./driver";
 
@@ -54,7 +54,7 @@ describe("expense wizard: fixed monthly", () => {
     expect(engine).toEqual(["2026-01-01", "2026-02-01", "2026-03-01", "2026-04-01"]);
   });
 
-  knownDefect("UI-RULE-19", "expense monthly: a typed Day of Month is persisted as a string ('1'), not a number", async () => {
+  it("UI-RULE-19 — expense monthly: a typed Day of Month is persisted as a string ('1'), not a number", async () => {
     // observed: scheduleConfig.dayOfMonth === "1"
     const { doc } = await run({ frequency: "Monthly", start: "2026-01-01", dayOfMonth: "1", weekend: "none" });
     expect(doc.scheduleConfig).toHaveProperty("dayOfMonth"); // precondition
@@ -73,24 +73,31 @@ describe("expense wizard: fixed monthly", () => {
   });
 
   it("'Pay on Friday' moves Sunday bills to Friday (Feb 13, Mar 13); 'after' moves them to Monday", async () => {
-    // Day of Month is left at its default (15 = today). Feb 15 and Mar 15 are Sundays.
-    const before = await run({ frequency: "Monthly", start: "2026-01-01", weekend: "before" });
+    // REWRITTEN (decision: the hidden Day of Month defaults to the START DATE, not today): this relied on the
+    // old default of today's date (the 15th), so the 15th is now typed explicitly.
+    // Feb 15 and Mar 15 are Sundays.
+    const before = await run({ frequency: "Monthly", start: "2026-01-01", dayOfMonth: "15", weekend: "before" });
     expect(before.doc.weekendAdjustment).toBe("before");
     expect(before.preview).toEqual(["2026-01-15", "2026-02-13", "2026-03-13"].map(d.label));
     expect(before.engine).toEqual(["2026-01-15", "2026-02-13", "2026-03-13", "2026-04-15"]);
   });
 
   it("'Pay on Monday' moves Sunday bills to Monday (Feb 16, Mar 16)", async () => {
-    const after = await run({ frequency: "Monthly", start: "2026-01-01", weekend: "after" });
+    // REWRITTEN (decision: the hidden Day of Month defaults to the START DATE, not today): this relied on the
+    // old default of today's date (the 15th), so the 15th is now typed explicitly.
+    const after = await run({ frequency: "Monthly", start: "2026-01-01", dayOfMonth: "15", weekend: "after" });
     expect(after.doc.weekendAdjustment).toBe("after");
     expect(after.preview).toEqual(["2026-01-15", "2026-02-16", "2026-03-16"].map(d.label));
     expect(after.engine).toEqual(["2026-01-15", "2026-02-16", "2026-03-16", "2026-04-15"]);
   });
 
   it("an end date stops the series inclusively (Jan 15, Feb 15, Mar 15) and is persisted", async () => {
+    // REWRITTEN (decision: the hidden Day of Month defaults to the START DATE, not today): this relied on the
+    // old default of today's date (the 15th), so the 15th is now typed explicitly.
     const { doc, engine } = await run({
       frequency: "Monthly",
       start: "2026-01-01",
+      dayOfMonth: "15",
       end: "2026-03-15",
       weekend: "none",
     });
@@ -98,9 +105,8 @@ describe("expense wizard: fixed monthly", () => {
     expect(engine).toEqual(["2026-01-15", "2026-02-15", "2026-03-15"]);
   });
 
-  knownDefect(
-    "UI-RULE-20",
-    "expense monthly: the 'First Payment Date' is not the first payment when Day of Month is left at its default (today's date)",
+  it(
+    "UI-RULE-20 — expense monthly: the 'First Payment Date' is not the first payment when Day of Month is left at its default (today's date)",
     async () => {
       // First Payment Date = Thu 2026-03-05; Day of Month untouched (defaults to today's 15).
       // observed: preview and engine both start on Mar 15, so the date the user entered is never paid.
@@ -116,9 +122,8 @@ describe("expense wizard: fixed monthly", () => {
     }
   );
 
-  knownDefect(
-    "UI-RULE-21",
-    "expense weekly: the 'First Payment Date' is not the first payment when Day of Week is left at its default (today's weekday)",
+  it(
+    "UI-RULE-21 — expense weekly: the 'First Payment Date' is not the first payment when Day of Week is left at its default (today's weekday)",
     async () => {
       // First Payment Date = Mon 2026-02-02; Day of Week untouched = Thursday (today). observed: engine starts Thu Feb 5
       // while the preview starts Mon Feb 2 - the two disagree AND the entered date is skipped.
@@ -127,7 +132,9 @@ describe("expense wizard: fixed monthly", () => {
         start: "2026-02-02",
         weekend: "none",
       });
-      expect(doc.scheduleConfig).toEqual({ dayOfWeek: 4 }); // precondition: default is today's weekday
+      // REWRITTEN precondition: it pinned the old default (today's weekday, Thursday = 4). The decision is that
+      // the default is the start date's weekday: Mon Feb 2 = 1.
+      expect(doc.scheduleConfig).toEqual({ dayOfWeek: 1 });
       expect(preview[0]).toBe(d.label("2026-02-02"));
       expect(engine[0]).toBe("2026-02-02");
     }
@@ -176,9 +183,8 @@ describe("expense wizard: variable, priority, one-time", () => {
     expect(engine).toEqual(["2026-02-14"]);
   });
 
-  knownDefect(
-    "UI-RULE-22",
-    "one-time / hidden schedule values leak into the document (scheduleConfig.dayOfMonth = today's date)",
+  it(
+    "UI-RULE-22 — one-time / hidden schedule values leak into the document (scheduleConfig.dayOfMonth = today's date)",
     async () => {
       // observed: scheduleConfig { dayOfMonth: 15 } on a one-time rule (the form still has frequency 'monthly'
       // when buildScheduleConfig runs; only the final `frequency` field is overridden to one-time)
@@ -205,9 +211,8 @@ describe("expense wizard: weekly, bi-weekly, semi-monthly", () => {
     ]); // prettier-ignore
   });
 
-  knownDefect(
-    "UI-RULE-23",
-    "expense weekly Schedule Preview shows the start-date weekday, not the chosen Day of Week",
+  it(
+    "UI-RULE-23 — expense weekly Schedule Preview shows the start-date weekday, not the chosen Day of Week",
     async () => {
       // observed: preview Mondays (Feb 2, 9, 16 ...) while the engine bills Fridays
       const { preview, engine } = await run({
@@ -221,8 +226,8 @@ describe("expense wizard: weekly, bi-weekly, semi-monthly", () => {
     }
   );
 
-  it("weekly preview honours the 3-month horizon: start Feb 6 Fri -> 13 Fridays but only 12 are previewed", async () => {
-    // Feb 6 .. horizon May 6: Fridays Feb 6,13,20,27, Mar 6,13,20,27, Apr 3,10,17,24, May 1 = 13; preview caps at 12
+  it("weekly preview honours the 3-month horizon: start Feb 6 Fri -> 13 Fridays, 8 cards and '+5 more' (REWRITTEN: it said '+4' because the old preview stopped counting at 12)", async () => {
+    // Feb 6 .. horizon May 6: Fridays Feb 6,13,20,27, Mar 6,13,20,27, Apr 3,10,17,24, May 1 = 13 dates; 13 - 8 cards = 5 more
     const { preview, more } = await run({
       frequency: "Weekly",
       start: "2026-02-06",
@@ -230,7 +235,7 @@ describe("expense wizard: weekly, bi-weekly, semi-monthly", () => {
       weekend: "none",
     });
     expect(preview).toHaveLength(8);
-    expect(more).toBe(4); // 12 - 8
+    expect(more).toBe(5); // 13 - 8
     expect(preview[7]).toBe(d.label("2026-03-27"));
   });
 
@@ -265,7 +270,7 @@ describe("expense wizard: weekly, bi-weekly, semi-monthly", () => {
     ]); // prettier-ignore
   });
 
-  knownDefect("UI-RULE-24", "expense semi-monthly chip for the default day reads '1th'", async () => {
+  it("UI-RULE-24 — expense semi-monthly chip for the default day reads '1th'", async () => {
     // observed: "1th" (default specificDays is [1])
     const app = await renderApp({ route: "/expenses", today: TODAY });
     await d.fillExpenseToSchedule(app, { frequency: "Semi-monthly" });
@@ -274,9 +279,8 @@ describe("expense wizard: weekly, bi-weekly, semi-monthly", () => {
     expect(chips[0]).toBe("1st");
   });
 
-  knownDefect(
-    "UI-RULE-25",
-    "expense semi-monthly with every date removed can be saved and never generates a bill",
+  it(
+    "UI-RULE-25 — expense semi-monthly with every date removed can be saved and never generates a bill",
     async () => {
       // observed: rule saved with scheduleConfig { specificDays: [] }
       const app = await renderApp({ route: "/expenses", today: TODAY });
@@ -291,9 +295,8 @@ describe("expense wizard: weekly, bi-weekly, semi-monthly", () => {
     }
   );
 
-  knownDefect(
-    "UI-RULE-26",
-    "semi-monthly expense Schedule Preview does not clamp day 30 in February",
+  it(
+    "UI-RULE-26 — semi-monthly expense Schedule Preview does not clamp day 30 in February",
     async () => {
       // days [15, 30]: engine Feb 15 & Feb 28; observed preview shows Mar 2 for the second February date
       const { preview, engine } = await run({
@@ -311,10 +314,11 @@ describe("expense wizard: weekly, bi-weekly, semi-monthly", () => {
 });
 
 describe("expense wizard: quarterly and yearly (hypothesis: expense form persists scheduleConfig {})", () => {
-  it("quarterly: the form persists an empty scheduleConfig", async () => {
+  it("quarterly: the form persists the start date's day and month (REWRITTEN: one shared buildScheduleConfig; it used to persist {})", async () => {
+    // Start Mon Jan 5 2026 -> dayOfMonth 5, monthOfYear 0 (January, zero-based), exactly like the income form
     const { doc } = await run({ frequency: "Quarterly", start: "2026-01-05", weekend: "none" });
     expect(doc.frequency).toBe("quarterly");
-    expect(doc.scheduleConfig).toEqual({});
+    expect(doc.scheduleConfig).toEqual({ dayOfMonth: 5, monthOfYear: 0 });
   });
 
   it("quarterly: the Schedule Preview shows the user's schedule (Jan 5, Apr 5)", async () => {
@@ -332,9 +336,8 @@ describe("expense wizard: quarterly and yearly (hypothesis: expense form persist
     }
   );
 
-  knownDefect(
-    "UI-RULE-28",
-    "quarterly expense from Jan 31: the Schedule Preview omits Apr 30 (Jan 31 + 3 months overflows to May 1)",
+  it(
+    "UI-RULE-28 — quarterly expense from Jan 31: the Schedule Preview omits Apr 30 (Jan 31 + 3 months overflows to May 1)",
     async () => {
       // observed preview: [Jan 31] only. Correct (clamped) quarterly dates inside the horizon: Jan 31, Apr 30
       const { preview } = await run(
@@ -346,9 +349,10 @@ describe("expense wizard: quarterly and yearly (hypothesis: expense form persist
     }
   );
 
-  it("yearly: hypothesis REFUTED - {} config is harmless because the engine falls back to the start month and day", async () => {
+  it("yearly: the config names the start month and day explicitly (REWRITTEN: it used to be {} and relied on the engine's fallback)", async () => {
+    // Thu Mar 5 2026 -> dayOfMonth 5, monthOfYear 2 (March, zero-based)
     const { doc, app, preview } = await run({ frequency: "Yearly", start: "2026-03-05", weekend: "none" });
-    expect(doc.scheduleConfig).toEqual({});
+    expect(doc.scheduleConfig).toEqual({ dayOfMonth: 5, monthOfYear: 2 });
     expect(preview).toEqual([d.label("2026-03-05")]);
     expect(d.engineDates(app, doc.id, { from: "2025-11-02", to: "2026-04-28" })).toEqual(["2026-03-05"]);
   });
@@ -361,8 +365,8 @@ describe("expense wizard: quarterly and yearly (hypothesis: expense form persist
     expect(d.engineDates(app, doc.id, { from: "2025-11-02", to: "2026-04-28" })).toEqual(["2026-01-20"]);
   });
 
-  it("yearly expense created in America/New_York on the 1st of a month is not shifted (config is {})", async () => {
-    // the income wizard corrupts monthOfYear here (UI-RULE-10); the expense wizard writes no month at all
+  it("yearly expense created in America/New_York on the 1st of a month is not shifted (monthOfYear 2)", async () => {
+    // the shared builder reads the month from the LOCAL start date, so New York does not move it to February (UI-RULE-10)
     const { app, doc } = await run(
       { frequency: "Yearly", start: "2026-03-01", weekend: "none" },
       { today: "2026-03-01", timeZone: "America/New_York" }
@@ -419,9 +423,8 @@ describe("expense wizard: frequency choices and validation", () => {
     expect(doc.amount).toBe(1234567890.12);
   });
 
-  knownDefect(
-    "UI-RULE-29",
-    "an expense whose end date is before its first payment date is accepted and never generates a bill",
+  it(
+    "UI-RULE-29 — an expense whose end date is before its first payment date is accepted and never generates a bill",
     async () => {
       // observed: rule saved with startDate 2026-03-01 / endDate 2026-02-01 and zero projections
       const app = await renderApp({ route: "/expenses", today: TODAY });
@@ -441,9 +444,8 @@ describe("expense wizard: frequency choices and validation", () => {
     }
   );
 
-  knownDefect(
-    "UI-RULE-30",
-    "expense form: Date/First Payment Date defaults to yesterday between 00:00 and 08:00 local in Asia/Manila",
+  it(
+    "UI-RULE-30 — expense form: Date/First Payment Date defaults to yesterday between 00:00 and 08:00 local in Asia/Manila",
     async () => {
       // 2026-01-15 00:30 Manila = 2026-01-14T16:30Z; observed default "01/14/2026"
       const app = await renderApp({
@@ -471,5 +473,161 @@ describe("expense wizard: frequency choices and validation", () => {
       weekend: "before",
     });
     expect(engine).toEqual(["2026-02-27", "2026-04-01"]);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// RESOLVED from the DECISION todo "hidden defaults": Day of Week / Day of Month default to the ENTERED START
+// DATE, never today; a separate day picker follows the start date until the user changes it.
+describe("expense wizard: hidden schedule values default from the start date (decision)", () => {
+  it("monthly with Day of Month untouched: start Fri Mar 6 -> persisted dayOfMonth 6 (a number), first bill Mar 6", async () => {
+    const { doc, preview, engine } = await run({ frequency: "Monthly", start: "2026-03-06", weekend: "none" });
+    expect(doc.scheduleConfig).toEqual({ dayOfMonth: 6 });
+    expect(preview).toEqual(["2026-03-06", "2026-04-06", "2026-05-06", "2026-06-06"].map(d.label));
+    expect(engine).toEqual(["2026-03-06", "2026-04-06"]); // the TZ-safe clip ends Apr 28
+  });
+
+  it("bi-weekly with Day of Week untouched follows the start date (Sat Feb 7: 02-07, 02-21, 03-07)", async () => {
+    const { doc, engine } = await run({ frequency: "Bi-weekly", start: "2026-02-07", weekend: "none" });
+    expect(doc.scheduleConfig).toEqual({ dayOfWeek: 6, intervalWeeks: 2 });
+    expect(engine.slice(0, 3)).toEqual(["2026-02-07", "2026-02-21", "2026-03-07"]);
+  });
+
+  it("the Day of Month field shows the start date's day and follows it until the user types one", async () => {
+    const app = await renderApp({ route: "/expenses", today: TODAY });
+    await d.fillExpenseToSchedule(app, { frequency: "Monthly", start: "2026-03-06", weekend: "none" });
+    expect((screen.getByLabelText(/^Day of Month/) as HTMLInputElement).value).toBe("6");
+    await d.setDate(app, /^First Payment Date/, "2026-03-20");
+    await waitFor(() => expect((screen.getByLabelText(/^Day of Month/) as HTMLInputElement).value).toBe("20"));
+    await d.fill(app, /^Day of Month/, "25");
+    await d.setDate(app, /^First Payment Date/, "2026-03-10");
+    await app.settle();
+    expect((screen.getByLabelText(/^Day of Month/) as HTMLInputElement).value).toBe("25");
+  });
+
+  it("a one-time expense persists no stray schedule values (UI-RULE-22 regression: no dayOfMonth)", async () => {
+    const { doc } = await run({ kind: "One-time", name: "Fee", amount: "20", start: "2026-02-14" });
+    expect(doc.scheduleConfig).toEqual({});
+    expect(doc.frequency).toBe("one-time");
+  });
+});
+
+// ---------------------------------------------------------------------------
+describe("expense wizard: preview == persisted rule's projections == hand-listed dates, for every frequency", () => {
+  // 2026 calendar: Jan 1 Thu, Feb 1 Sun, Mar 1 Sun, Apr 1 Wed. Preview horizon = start + 3 months (inclusive).
+  // The engine list is clipped to the TZ-safe window (Nov 2 .. Apr 28), the preview is not.
+
+  it("weekly Friday from Mon Feb 2, no adjustment", async () => {
+    const { preview, more, engine } = await run({ frequency: "Weekly", start: "2026-02-02", dayOfWeek: "Friday", weekend: "none" });
+    // Fridays Feb 6 .. May 1 (horizon May 2): 13 dates; 8 cards + 5 more
+    const fridays = ["2026-02-06", "2026-02-13", "2026-02-20", "2026-02-27", "2026-03-06", "2026-03-13", "2026-03-20", "2026-03-27"];
+    expect(preview).toEqual(fridays.map(d.label));
+    expect(more).toBe(5);
+    expect(engine.slice(0, 8)).toEqual(fridays);
+  });
+
+  it("bi-weekly Friday from Fri Jan 16, no adjustment", async () => {
+    const { preview, engine } = await run({ frequency: "Bi-weekly", start: "2026-01-16", dayOfWeek: "Friday", weekend: "none" });
+    const expected = ["2026-01-16", "2026-01-30", "2026-02-13", "2026-02-27", "2026-03-13", "2026-03-27", "2026-04-10"]; // horizon Apr 16
+    expect(preview).toEqual(expected.map(d.label));
+    expect(engine.slice(0, 7)).toEqual(expected);
+  });
+
+  it("semi-monthly 1st and 15th from Jan 1, pay before the weekend: Sun Feb 1 -> Fri Jan 30, Sun Feb 15 -> Fri Feb 13, Sun Mar 1 -> Fri Feb 27, Sun Mar 15 -> Fri Mar 13", async () => {
+    const { preview, engine } = await run({
+      frequency: "Semi-monthly",
+      start: "2026-01-01",
+      specificDays: [1, 15],
+      weekend: "before",
+    });
+    // Jan 1 Thu, Jan 15 Thu, Feb 1 Sun->Fri Jan 30, Feb 15 Sun->Fri Feb 13, Mar 1 Sun->Fri Feb 27, Mar 15 Sun->Fri Mar 13, Apr 1 Wed
+    const expected = ["2026-01-01", "2026-01-15", "2026-01-30", "2026-02-13", "2026-02-27", "2026-03-13", "2026-04-01"];
+    expect(preview).toEqual(expected.map(d.label));
+    expect(engine.slice(0, 7)).toEqual(expected);
+  });
+
+  it("monthly on the 31st from Jan 31: Jan 31, Feb 28, Mar 31, Apr 30", async () => {
+    const { preview, engine } = await run({ frequency: "Monthly", start: "2026-01-31", dayOfMonth: "31", weekend: "none" });
+    expect(preview).toEqual(["2026-01-31", "2026-02-28", "2026-03-31", "2026-04-30"].map(d.label));
+    expect(engine).toEqual(["2026-01-31", "2026-02-28", "2026-03-31"]);
+  });
+
+  it("quarterly from Mon Jan 5: Jan 5, Apr 5 (horizon Apr 5 inclusive)", async () => {
+    const { preview, engine } = await run({ frequency: "Quarterly", start: "2026-01-05", weekend: "none" });
+    expect(preview).toEqual(["2026-01-05", "2026-04-05"].map(d.label));
+    expect(engine).toEqual(["2026-01-05", "2026-04-05"]);
+  });
+
+  it("yearly from Thu Mar 5 2026: Mar 5 only (the preview's horizon is 3 months)", async () => {
+    const { preview, app, doc } = await run({ frequency: "Yearly", start: "2026-03-05", weekend: "none" });
+    expect(preview).toEqual([d.label("2026-03-05")]);
+    expect(d.engineDates(app, doc.id, { from: "2026-01-01", to: "2026-07-25" })).toEqual(["2026-03-05"]);
+  });
+
+  it("one-time on Sat Feb 14 pays that Saturday (no weekend control for a one-time expense)", async () => {
+    const { doc, engine } = await run({ kind: "One-time", name: "Fee", amount: "20", start: "2026-02-14" });
+    expect(doc.scheduleConfig).toEqual({});
+    expect(engine).toEqual(["2026-02-14"]);
+  });
+
+  it("weekly Saturday with 'pay after' and an end date: the last Saturday's Monday payment is previewed and generated (Feb 9, 16, 23)", async () => {
+    // Sat Feb 7, 14, 21 (end Sat Feb 21) -> Mon Feb 9, 16, 23; the Feb 23 payment lies past the end date (D4: kept)
+    const { preview, engine } = await run({
+      frequency: "Weekly",
+      start: "2026-02-07",
+      end: "2026-02-21",
+      dayOfWeek: "Saturday",
+      weekend: "after",
+    });
+    const expected = ["2026-02-09", "2026-02-16", "2026-02-23"];
+    expect(preview).toEqual(expected.map(d.label));
+    expect(engine).toEqual(expected);
+  });
+
+  it("monthly on the 1st from Sun Mar 1 with 'before': the first payment is Fri Feb 27, ahead of the start date, and the preview shows it", async () => {
+    const { preview, engine } = await run({
+      frequency: "Monthly",
+      start: "2026-03-01",
+      dayOfMonth: "1",
+      weekend: "before",
+    });
+    // Mar 1 Sun -> Fri Feb 27; Apr 1 Wed; May 1 Fri; Jun 1 Mon; horizon Jun 1 inclusive
+    expect(preview).toEqual(["2026-02-27", "2026-04-01", "2026-05-01", "2026-06-01"].map(d.label));
+    expect(engine).toEqual(["2026-02-27", "2026-04-01"]);
+  });
+});
+
+// ---------------------------------------------------------------------------
+describe("expense wizard: schedule validation blocks the step with a message", () => {
+  it("an end date before the start date shows why and blocks Create", async () => {
+    const app = await renderApp({ route: "/expenses", today: TODAY });
+    await d.fillExpenseToSchedule(app, { frequency: "Monthly", start: "2026-03-01", end: "2026-02-01", weekend: "none" });
+    expect(await screen.findByText("The end date must be on or after the start date.")).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Create Expense" })).toBeDisabled();
+  });
+
+  it("a semi-monthly schedule with no days shows why and blocks Create", async () => {
+    const app = await renderApp({ route: "/expenses", today: TODAY });
+    await d.fillExpenseToSchedule(app, { frequency: "Semi-monthly", specificDays: [] });
+    expect(
+      await screen.findByText("Add at least one day of the month for a semi-monthly schedule.")
+    ).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Create Expense" })).toBeDisabled();
+  });
+
+  it("'Set End Date' ticked with no date saves no end date (the field is absent, not an empty string)", async () => {
+    const app = await renderApp({ route: "/expenses", today: TODAY });
+    await d.fillExpenseToSchedule(app, { frequency: "Monthly", start: "2026-02-10" });
+    await d.check(app, /Set End Date/);
+    const doc = await d.finishExpense(app);
+    expect(doc.frequency).toBe("monthly");
+    expect(doc.endDate ?? undefined).toBeUndefined();
+  });
+
+  it("ordinal chips: 1st, 2nd, 3rd, 11th, 22nd", async () => {
+    const app = await renderApp({ route: "/expenses", today: TODAY });
+    await d.fillExpenseToSchedule(app, { frequency: "Semi-monthly", specificDays: [1, 2, 3, 11, 22] });
+    const chips = screen.getAllByText(/^\d+(st|nd|rd|th)$/).map((e) => e.textContent);
+    expect(chips).toEqual(["1st", "2nd", "3rd", "11th", "22nd"]);
   });
 });

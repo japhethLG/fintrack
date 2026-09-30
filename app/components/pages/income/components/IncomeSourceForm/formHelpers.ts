@@ -1,6 +1,18 @@
 import * as yup from "yup";
-import { IncomeSourceType, IncomeFrequency, ScheduleConfig } from "@/lib/types";
-import { getTodayKey, parseDate } from "@/lib/utils/dateUtils";
+import {
+  IncomeSource,
+  IncomeSourceFormData,
+  IncomeSourceType,
+  IncomeFrequency,
+  ScheduleConfig,
+} from "@/lib/types";
+import { getTodayKey } from "@/lib/utils/dateUtils";
+import {
+  buildScheduleConfig as buildSharedScheduleConfig,
+  startDateParts,
+  validateSchedule,
+  type RuleIssue,
+} from "@/lib/logic/ruleSchedule";
 
 // ============================================================================
 // FORM SCHEMA TYPES
@@ -17,8 +29,14 @@ export interface IncomeSourceFormValues {
   hasEndDate: boolean;
   weekendAdjustment: "before" | "after" | "none";
   specificDays: number[];
-  dayOfWeek: number;
-  dayOfMonth: number;
+  /** Number, or the string a form input hands back. Follows the start date until the user changes it. */
+  dayOfWeek: number | string;
+  dayOfMonth: number | string;
+  /** Carried through an edit untouched (no input): month of a yearly rule, weeks between bi-weekly payments. */
+  monthOfYear?: number;
+  intervalWeeks?: number;
+  /** Carried through an edit untouched: editing must not reactivate a deactivated source. */
+  isActive: boolean;
   category: string;
   notes: string;
   color: string;
@@ -30,23 +48,31 @@ export interface IncomeSourceFormValues {
 
 export const getDefaultValues = (
   initialData?: Partial<IncomeSourceFormValues>
-): IncomeSourceFormValues => ({
-  sourceType: initialData?.sourceType || "salary",
-  name: initialData?.name || "",
-  amount: initialData?.amount || "",
-  isVariableAmount: initialData?.isVariableAmount || false,
-  frequency: initialData?.frequency || "monthly",
-  startDate: initialData?.startDate || getTodayKey(),
-  endDate: initialData?.endDate || "",
-  hasEndDate: !!initialData?.endDate,
-  weekendAdjustment: initialData?.weekendAdjustment || "before",
-  specificDays: initialData?.specificDays || [15, 30],
-  dayOfWeek: initialData?.dayOfWeek ?? new Date().getDay(),
-  dayOfMonth: initialData?.dayOfMonth ?? new Date().getDate(),
-  category: initialData?.category || "Salary",
-  notes: initialData?.notes || "",
-  color: initialData?.color || "#22c55e",
-});
+): IncomeSourceFormValues => {
+  // The start date is a LOCAL calendar day; the hidden schedule values default FROM IT, never from today.
+  const startDate = initialData?.startDate || getTodayKey();
+  const start = startDateParts(startDate);
+  return {
+    sourceType: initialData?.sourceType || "salary",
+    name: initialData?.name || "",
+    amount: initialData?.amount || "",
+    isVariableAmount: initialData?.isVariableAmount || false,
+    frequency: initialData?.frequency || "monthly",
+    startDate,
+    endDate: initialData?.endDate || "",
+    hasEndDate: !!initialData?.endDate,
+    weekendAdjustment: initialData?.weekendAdjustment || "before",
+    specificDays: initialData?.specificDays || [15, 30],
+    dayOfWeek: initialData?.dayOfWeek ?? start?.dayOfWeek ?? 0,
+    dayOfMonth: initialData?.dayOfMonth ?? start?.dayOfMonth ?? 1,
+    monthOfYear: initialData?.monthOfYear,
+    intervalWeeks: initialData?.intervalWeeks,
+    isActive: initialData?.isActive ?? true,
+    category: initialData?.category || "Salary",
+    notes: initialData?.notes || "",
+    color: initialData?.color || "#22c55e",
+  };
+};
 
 // ============================================================================
 // VALIDATION SCHEMA
@@ -57,18 +83,16 @@ export const incomeSourceSchema = yup.object({
   name: yup.string().required("Name is required").min(1, "Name is required"),
   amount: yup.string().required("Amount is required"),
   isVariableAmount: yup.boolean(),
+  // Frequency, start date, end date, day of month and the semi-monthly days are checked together by
+  // `validateSchedule` (see `collectIncomeIssues`); here they only need to exist.
   frequency: yup.string().required("Frequency is required"),
-  startDate: yup.string().required("Start date is required"),
-  endDate: yup.string().optional(),
+  startDate: yup.string().nullable().required("Start date is required"),
+  endDate: yup.string().nullable().optional(),
   hasEndDate: yup.boolean(),
   weekendAdjustment: yup.string().oneOf(["before", "after", "none"]),
   specificDays: yup.array().of(yup.number()),
-  dayOfWeek: yup.number().min(0).max(6),
-  dayOfMonth: yup
-    .number()
-    .transform((value) => (isNaN(value) ? undefined : Math.min(31, Math.max(1, value))))
-    .min(1)
-    .max(31),
+  dayOfWeek: yup.mixed().optional(),
+  dayOfMonth: yup.mixed().optional(),
   category: yup.string().required("Category is required"),
   notes: yup.string().optional(),
   color: yup.string().optional(),
@@ -78,31 +102,87 @@ export const incomeSourceSchema = yup.object({
 // UTILITIES
 // ============================================================================
 
-export const buildScheduleConfig = (values: IncomeSourceFormValues): ScheduleConfig => {
-  const config: ScheduleConfig = {};
+/** The `scheduleConfig` this form persists AND the Schedule Preview previews (the shared builder). */
+export const buildScheduleConfig = (values: IncomeSourceFormValues): ScheduleConfig =>
+  buildSharedScheduleConfig({
+    frequency: values.frequency,
+    startDate: values.startDate,
+    specificDays: values.specificDays,
+    dayOfWeek: values.dayOfWeek,
+    dayOfMonth: values.dayOfMonth,
+    monthOfYear: values.monthOfYear,
+    intervalWeeks: values.intervalWeeks,
+  });
 
-  switch (values.frequency) {
-    case "semi-monthly":
-      config.specificDays = values.specificDays;
-      break;
-    case "weekly":
-    case "bi-weekly":
-      // Parse to number since FormSelect returns strings
-      config.dayOfWeek = typeof values.dayOfWeek === "string" ? parseInt(values.dayOfWeek) : values.dayOfWeek;
-      if (values.frequency === "bi-weekly") {
-        config.intervalWeeks = 2;
-      }
-      break;
-    case "monthly":
-      config.dayOfMonth = values.dayOfMonth;
-      break;
-    case "quarterly":
-    case "yearly":
-      config.dayOfMonth = values.dayOfMonth;
-      // Local month of the start date (a UTC parse would persist the wrong month west of UTC).
-      config.monthOfYear = parseDate(values.startDate).getMonth();
-      break;
+/** Everything that must stop this source from being saved. Empty means saveable. */
+export const collectIncomeIssues = (values: IncomeSourceFormValues): RuleIssue[] => {
+  const issues: RuleIssue[] = validateSchedule({
+    frequency: values.frequency,
+    startDate: values.startDate,
+    endDate: values.endDate,
+    hasEndDate: values.hasEndDate,
+    specificDays: values.specificDays,
+    dayOfMonth: values.dayOfMonth,
+  });
+  const amount = Number(values.amount);
+  if (!(values.amount?.trim() && Number.isFinite(amount) && amount > 0)) {
+    issues.push({ field: "amount", message: "Enter an amount greater than 0." });
   }
-
-  return config;
+  try {
+    incomeSourceSchema.validateSync(values, { abortEarly: false });
+  } catch (error) {
+    if (!(error instanceof yup.ValidationError)) throw error;
+    for (const inner of error.inner) {
+      const field = inner.path ?? "";
+      if (!issues.some((i) => i.field === field)) issues.push({ field, message: inner.message });
+    }
+  }
+  return issues;
 };
+
+/**
+ * The document the wizard saves. `endDate` and `notes` are present-but-undefined when cleared, so an edit
+ * removes them (see `editIncomeSourceAction`), and a ticked "Set End Date" with no date saves no end date.
+ */
+export const buildIncomePayload = (values: IncomeSourceFormValues): IncomeSourceFormData => ({
+  name: values.name.trim(),
+  sourceType: values.sourceType,
+  amount: parseFloat(values.amount),
+  isVariableAmount: values.isVariableAmount,
+  frequency: values.frequency,
+  startDate: values.startDate,
+  endDate: values.hasEndDate && values.endDate ? values.endDate : undefined,
+  scheduleConfig: buildScheduleConfig(values),
+  weekendAdjustment: values.weekendAdjustment,
+  category: values.category,
+  notes: values.notes?.trim() || undefined,
+  color: values.color,
+  isActive: values.isActive,
+});
+
+/**
+ * A stored source as the wizard's initial values. A schedule value the source does not store stays
+ * undefined, so the form derives it from the start date, which is how the engine reads a rule without it.
+ */
+export const incomeSourceToFormValues = (
+  source: IncomeSource
+): Partial<IncomeSourceFormValues> => ({
+  name: source.name,
+  sourceType: source.sourceType,
+  amount: source.amount.toString(),
+  isVariableAmount: source.isVariableAmount,
+  frequency: source.frequency,
+  startDate: source.startDate,
+  endDate: source.endDate || "",
+  hasEndDate: !!source.endDate,
+  weekendAdjustment: source.weekendAdjustment,
+  specificDays: source.scheduleConfig?.specificDays || [15, 30],
+  dayOfWeek: source.scheduleConfig?.dayOfWeek,
+  dayOfMonth: source.scheduleConfig?.dayOfMonth,
+  monthOfYear: source.scheduleConfig?.monthOfYear,
+  intervalWeeks: source.scheduleConfig?.intervalWeeks,
+  isActive: source.isActive,
+  category: source.category,
+  notes: source.notes || "",
+  color: source.color || "#22c55e",
+});

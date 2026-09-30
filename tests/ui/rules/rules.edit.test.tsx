@@ -4,7 +4,6 @@ import {
   screen,
   act,
   waitFor,
-  knownDefect,
   makeIncomeSource,
   makeExpenseRule,
   makeLoanRule,
@@ -85,9 +84,8 @@ describe("editing a loan that already has payments made", () => {
     expect(doc.expenseType).toBe("cash_loan");
   });
 
-  knownDefect(
-    "UI-RULE-56",
-    "renaming a loan resets loanConfig.paymentsMade from 5 to 0",
+  it(
+    "UI-RULE-56 — renaming a loan resets loanConfig.paymentsMade from 5 to 0",
     async () => {
       // observed: paymentsMade 0 (the edit wizard rebuilds loanConfig with a hard-coded paymentsMade: 0)
       const app = await renderApp({ route: "/expenses", today: TODAY, seed: seed() });
@@ -102,9 +100,8 @@ describe("editing a loan that already has payments made", () => {
     }
   );
 
-  knownDefect(
-    "UI-RULE-57",
-    "renaming a loan re-projects all 24 payments instead of the 19 that remain",
+  it(
+    "UI-RULE-57 — renaming a loan re-projects all 24 payments instead of the 19 that remain",
     async () => {
       // observed: 19 rows before the rename, 24 after (5 already-paid payments come back)
       const { app, before, doc } = await rename();
@@ -114,6 +111,40 @@ describe("editing a loan that already has payments made", () => {
       expect(d.engineRows(app, "loan-1")).toHaveLength(19);
     }
   );
+});
+
+// ===========================================================================
+describe("editing a loan in progress keeps its money state", () => {
+  const EMI = d.pmt(12_000, 12, 24);
+  const BAL5 = d.cents(balanceAfter(12_000, 12, 24, 5));
+
+  it("renaming a loan keeps the payment (EMI), the progress and the schedule's day: nothing but the name changes", async () => {
+    // amortizing the balance after 5 payments over the 19 REMAINING months gives the same EMI back
+    const app = await renderApp({
+      route: "/expenses",
+      today: TODAY,
+      seed: {
+        expenseRules: [
+          makeLoanRule(
+            { id: "loan-1", name: "Car Loan", amount: EMI, startDate: "2026-02-10", scheduleConfig: { dayOfMonth: 10 } },
+            { principalAmount: 12_000, currentBalance: BAL5, interestRate: 12, termMonths: 24, monthlyPayment: EMI, firstPaymentDate: "2026-02-10", paymentsMade: 5 }
+          ),
+        ],
+      },
+    });
+    await d.openEdit(app, "Car Loan");
+    await d.next(app);
+    await d.fill(app, /^Loan Name/, "Car Loan (renamed)");
+    await d.saveEdit(app);
+    const doc = d.ruleDocs(app)[0];
+    expect(doc.name).toBe("Car Loan (renamed)");
+    expect(doc.amount).toBeCloseTo(EMI, 2);
+    expect(doc.loanConfig.monthlyPayment).toBeCloseTo(EMI, 2);
+    expect(doc.loanConfig.paymentsMade).toBe(5);
+    expect(doc.loanConfig.currentBalance).toBeCloseTo(BAL5, 2);
+    expect(doc.scheduleConfig).toEqual({ dayOfMonth: 10 });
+    expect(doc.isActive).toBe(true);
+  });
 });
 
 // ===========================================================================
@@ -145,9 +176,8 @@ describe("editing an installment plan that already has payments made", () => {
     expect(doc.isActive).toBe(true);
   });
 
-  knownDefect(
-    "UI-RULE-58",
-    "renaming an installment plan resets installmentsPaid from 3 to 0",
+  it(
+    "UI-RULE-58 — renaming an installment plan resets installmentsPaid from 3 to 0",
     async () => {
       // observed: installmentsPaid 0
       const { doc } = await rename();
@@ -156,9 +186,8 @@ describe("editing an installment plan that already has payments made", () => {
     }
   );
 
-  knownDefect(
-    "UI-RULE-59",
-    "renaming an installment plan re-bills the 3 instalments already paid (3 -> 6 remaining bills)",
+  it(
+    "UI-RULE-59 — renaming an installment plan re-bills the 3 instalments already paid (3 -> 6 remaining bills)",
     async () => {
       const { app, before, doc } = await rename();
       expect(before).toBe(3); // precondition: 6 - 3 paid
@@ -171,9 +200,8 @@ describe("editing an installment plan that already has payments made", () => {
 
 // ===========================================================================
 describe("editing a deactivated rule", () => {
-  knownDefect(
-    "UI-RULE-60",
-    "editing a deactivated income source (rename only) silently re-activates it",
+  it(
+    "UI-RULE-60 — editing a deactivated income source (rename only) silently re-activates it",
     async () => {
       // observed: isActive true after saving; the source starts generating income again
       const app = await renderApp({
@@ -192,9 +220,8 @@ describe("editing a deactivated rule", () => {
     }
   );
 
-  knownDefect(
-    "UI-RULE-61",
-    "editing a deactivated expense rule (rename only) silently re-activates it",
+  it(
+    "UI-RULE-61 — editing a deactivated expense rule (rename only) silently re-activates it",
     async () => {
       const app = await renderApp({
         route: "/expenses",
@@ -347,9 +374,8 @@ describe("editing only the amount", () => {
     }
   );
 
-  knownDefect(
-    "UI-RULE-63",
-    "editing only the amount of a weekly rule that has no stored dayOfWeek silently moves it to Sundays",
+  it(
+    "UI-RULE-63 — editing only the amount of a weekly rule that has no stored dayOfWeek silently moves it to Sundays",
     async () => {
       // rule created by an older version without a dayOfWeek: start Mon 2026-02-02 -> bills Mondays.
       // the edit wizard defaults the missing dayOfWeek to 0 (Sunday) and saves it: observed first bill Sun Feb 8
@@ -379,6 +405,80 @@ describe("editing only the amount", () => {
     }
   );
 
+  it("a bi-weekly rule every 3 weeks keeps its interval (the wizard has no input for it)", async () => {
+    // Fri Jan 2, then every 3 weeks: Jan 2, Jan 23, Feb 13, Mar 6, Mar 27, Apr 17
+    const app = await renderApp({
+      route: "/income",
+      today: TODAY,
+      seed: {
+        incomeSources: [
+          makeIncomeSource({
+            id: "inc-1",
+            name: "Odd Cycle",
+            amount: 100,
+            frequency: "bi-weekly",
+            startDate: "2026-01-02",
+            scheduleConfig: { dayOfWeek: 5, intervalWeeks: 3 },
+            weekendAdjustment: "none",
+          }),
+        ],
+      },
+    });
+    const before = d.engineDates(app, "inc-1");
+    expect(before.slice(0, 4)).toEqual(["2026-01-02", "2026-01-23", "2026-02-13", "2026-03-06"]); // precondition
+    await d.openEdit(app, "Odd Cycle");
+    await d.next(app);
+    await d.fill(app, /^Amount/, "110");
+    await d.saveEdit(app);
+    expect(d.incomeDocs(app)[0].scheduleConfig).toEqual({ dayOfWeek: 5, intervalWeeks: 3 });
+    expect(d.engineDates(app, "inc-1")).toEqual(before);
+  });
+
+  it("a monthly rule with no stored dayOfMonth keeps paying on its start date's day (the 20th) after an amount-only edit", async () => {
+    const app = await renderApp({
+      route: "/expenses",
+      today: TODAY,
+      seed: {
+        expenseRules: [
+          makeExpenseRule({ id: "exp-1", name: "Legacy Monthly", amount: 50, startDate: "2026-01-20", scheduleConfig: {}, weekendAdjustment: "none" }),
+        ],
+      },
+    });
+    expect(d.engineDates(app, "exp-1")).toEqual(["2026-01-20", "2026-02-20", "2026-03-20", "2026-04-20"]); // precondition
+    await d.openEdit(app, "Legacy Monthly");
+    await d.next(app);
+    await d.fill(app, /^Amount/, "55");
+    await d.saveEdit(app);
+    expect(d.ruleDocs(app)[0].scheduleConfig).toEqual({ dayOfMonth: 20 }); // today's date (15) must not leak in
+    expect(d.engineDates(app, "exp-1")).toEqual(["2026-01-20", "2026-02-20", "2026-03-20", "2026-04-20"]);
+  });
+
+  it("an edit that ONLY changes the frequency's weekday does not touch the stored weekend adjustment or notes", async () => {
+    const app = await renderApp({
+      route: "/expenses",
+      today: TODAY,
+      seed: {
+        expenseRules: [
+          makeExpenseRule({
+            id: "exp-1",
+            name: "Sub",
+            frequency: "weekly",
+            startDate: "2026-02-02",
+            scheduleConfig: { dayOfWeek: 1 },
+            weekendAdjustment: "after",
+            notes: "keep this",
+          }),
+        ],
+      },
+    });
+    await d.openEdit(app, "Sub");
+    await d.next(app);
+    await d.next(app); // schedule step
+    await d.pick(app, /^Day of Week/, "Tuesday");
+    await d.saveEdit(app);
+    expect(d.ruleDocs(app)[0]).toMatchObject({ scheduleConfig: { dayOfWeek: 2 }, weekendAdjustment: "after", notes: "keep this" });
+  });
+
   it("the edit wizard is pre-filled with the saved values (loan balance, name, amount, start date)", async () => {
     const app = await renderApp({
       route: "/expenses",
@@ -403,9 +503,8 @@ describe("editing only the amount", () => {
 
 // ===========================================================================
 describe("editing clears optional values", () => {
-  knownDefect(
-    "UI-RULE-64",
-    "un-ticking 'Set End Date' on an income source does not remove the stored end date",
+  it(
+    "UI-RULE-64 — un-ticking 'Set End Date' on an income source does not remove the stored end date",
     async () => {
       // observed: endDate stays 2026-03-01 and the income still stops there
       const app = await renderApp({
@@ -436,9 +535,8 @@ describe("editing clears optional values", () => {
     }
   );
 
-  knownDefect(
-    "UI-RULE-65",
-    "un-ticking 'Set End Date' on an expense rule does not remove the stored end date",
+  it(
+    "UI-RULE-65 — un-ticking 'Set End Date' on an expense rule does not remove the stored end date",
     async () => {
       const app = await renderApp({
         route: "/expenses",
@@ -467,9 +565,8 @@ describe("editing clears optional values", () => {
     }
   );
 
-  knownDefect(
-    "UI-RULE-66",
-    "clearing the Notes field of an income source keeps the old note",
+  it(
+    "UI-RULE-66 — clearing the Notes field of an income source keeps the old note",
     async () => {
       const app = await renderApp({
         route: "/income",

@@ -189,8 +189,9 @@ export interface IncomeWizardInput {
 }
 
 export const removeSpecificDay = async (page: Page, day: number): Promise<void> => {
-  const chip = page.locator("div", { hasText: new RegExp(`^${day}th$`) }).last();
-  await chip.getByText("close").click();
+  // the chip is <div><span>15th</span><icon>close</icon></div>: find the ordinal's own element, then its chip
+  const ordinalEl = page.getByText(new RegExp(`^${day}(st|nd|rd|th)$`)).last();
+  await ordinalEl.locator("xpath=..").getByText("close").click();
 };
 
 export const addIncomeViaWizardFull = async (page: Page, o: IncomeWizardInput): Promise<void> => {

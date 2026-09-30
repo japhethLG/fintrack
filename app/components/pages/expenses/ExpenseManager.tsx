@@ -14,6 +14,7 @@ import {
 } from "@/components/common";
 import { useCurrency } from "@/lib/hooks/useCurrency";
 import ExpenseRuleForm from "./components/ExpenseRuleForm";
+import { expenseRuleToFormValues } from "./components/ExpenseRuleForm/formHelpers";
 import ExpenseRuleCard from "./components/ExpenseRuleCard";
 import ExpenseRuleDetail from "./components/ExpenseRuleDetail";
 import { EXPENSE_FILTER_OPTIONS, getMonthlyExpenseMultiplier } from "./constants";
@@ -194,53 +195,7 @@ const ExpenseManager: React.FC = () => {
       {showForm ? (
         <Card padding="lg">
           <ExpenseRuleForm
-            initialData={
-              editingRule
-                ? {
-                    name: editingRule.name,
-                    expenseType: editingRule.expenseType,
-                    category: editingRule.category,
-                    amount: editingRule.amount.toString(),
-                    isVariableAmount: editingRule.isVariableAmount,
-                    frequency: editingRule.frequency,
-                    startDate: editingRule.startDate,
-                    endDate: editingRule.endDate || "",
-                    hasEndDate: !!editingRule.endDate,
-                    weekendAdjustment: editingRule.weekendAdjustment,
-                    specificDays: editingRule.scheduleConfig.specificDays || [1],
-                    dayOfWeek: editingRule.scheduleConfig.dayOfWeek ?? 0,
-                    dayOfMonth: editingRule.scheduleConfig.dayOfMonth ?? 1,
-                    loanPrincipal: editingRule.loanConfig?.principalAmount?.toString() || "",
-                    loanCurrentBalance: editingRule.loanConfig?.currentBalance?.toString() || "",
-                    loanInterestRate: editingRule.loanConfig?.interestRate?.toString() || "",
-                    loanTermMonths: editingRule.loanConfig?.termMonths?.toString() || "",
-                    loanCalculationType: editingRule.loanConfig?.calculationType || "amortized",
-                    loanStartDate: editingRule.loanConfig?.loanStartDate || "",
-                    creditLimit: editingRule.creditConfig?.creditLimit?.toString() || "",
-                    creditBalance: editingRule.creditConfig?.currentBalance?.toString() || "",
-                    creditApr: editingRule.creditConfig?.apr?.toString() || "",
-                    creditMinPaymentPercent:
-                      editingRule.creditConfig?.minimumPaymentPercent?.toString() || "2",
-                    creditMinPaymentFloor:
-                      editingRule.creditConfig?.minimumPaymentFloor?.toString() || "25",
-                    creditStatementDate: editingRule.creditConfig?.statementDate?.toString() || "5",
-                    creditDueDate: editingRule.creditConfig?.dueDate?.toString() || "25",
-                    creditPaymentStrategy: editingRule.creditConfig?.paymentStrategy || "minimum",
-                    creditMinPaymentMethod:
-                      editingRule.creditConfig?.minimumPaymentMethod || "percent_only",
-                    creditFixedPayment:
-                      editingRule.creditConfig?.fixedPaymentAmount?.toString() || "",
-                    installmentTotal: editingRule.installmentConfig?.totalAmount?.toString() || "",
-                    installmentCount:
-                      editingRule.installmentConfig?.installmentCount?.toString() || "12",
-                    installmentHasInterest: editingRule.installmentConfig?.hasInterest || false,
-                    installmentInterestRate:
-                      editingRule.installmentConfig?.interestRate?.toString() || "",
-                    notes: editingRule.notes || "",
-                    isPriority: editingRule.isPriority,
-                  }
-                : undefined
-            }
+            initialData={editingRule ? expenseRuleToFormValues(editingRule) : undefined}
             onSubmit={editingRule ? handleEditRule : handleCreateRule}
             onCancel={() => {
               setShowForm(false);

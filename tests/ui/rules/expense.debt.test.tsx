@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { renderApp, screen, act, knownDefect, moneyNear, moneyIn, type AppHandle } from "../harness";
+import { renderApp, screen, act, moneyNear, moneyIn, type AppHandle } from "../harness";
 import * as d from "./driver";
 import type { ExpenseSpec } from "./driver";
 
@@ -357,9 +357,8 @@ describe("cash loan wizard: schedule behaviour", () => {
     }
   );
 
-  knownDefect(
-    "UI-RULE-35",
-    "a loan's 'Day of Month' input is ignored by the engine, so the Schedule Preview shows different dates than are projected",
+  it(
+    "UI-RULE-35 — a loan's 'Day of Month' input is ignored by the engine, so the Schedule Preview shows different dates than are projected",
     async () => {
       // First Payment Date Feb 10 + Day of Month 20: preview shows the 20th, engine pays the 10th
       const { app, doc, preview } = await loanFlow({
@@ -377,9 +376,8 @@ describe("cash loan wizard: schedule behaviour", () => {
     }
   );
 
-  knownDefect(
-    "UI-RULE-36",
-    "a loan's detail card says 'On the 15th of each month' (today's date) while payments fall on the first payment date's day",
+  it(
+    "UI-RULE-36 — a loan's detail card says 'On the 15th of each month' (today's date) while payments fall on the first payment date's day",
     async () => {
       // First Payment Date Feb 10, Day of Month untouched -> stored scheduleConfig.dayOfMonth = 15 (today)
       const { app, doc } = await loanFlow({
@@ -461,9 +459,8 @@ describe("cash loan wizard: validation", () => {
     expect(d.nextButton()).toBeDisabled();
   });
 
-  knownDefect(
-    "UI-RULE-39",
-    "a loan term of 0 months is accepted and saved with an Infinity payment",
+  it(
+    "UI-RULE-39 — a loan term of 0 months is accepted and saved with an Infinity payment",
     async () => {
       // observed: amount = Infinity, loanConfig.monthlyPayment = Infinity, termMonths = 0
       const app = await renderApp({ route: "/expenses", today: TODAY });
@@ -475,9 +472,8 @@ describe("cash loan wizard: validation", () => {
     }
   );
 
-  knownDefect(
-    "UI-RULE-40",
-    "a negative interest rate is accepted for a loan",
+  it(
+    "UI-RULE-40 — a negative interest rate is accepted for a loan",
     async () => {
       // observed: saved with interestRate -5 (payment below principal/term)
       const app = await renderApp({ route: "/expenses", today: TODAY });
@@ -487,6 +483,50 @@ describe("cash loan wizard: validation", () => {
       expect(d.ruleDocs(app)).toHaveLength(0);
     }
   );
+});
+
+describe("cash loan wizard: validation messages", () => {
+  it("a term of 0 is reported inline on the details step and again, with Continue disabled, on the schedule step", async () => {
+    const app = await renderApp({ route: "/expenses", today: TODAY });
+    await d.fillExpenseToSchedule(app, { kind: "Loan", principal: "1000", rate: "5", term: "0", start: "2026-02-10" });
+    expect(await screen.findByText("Term must be a whole number of months, at least 1")).toBeInTheDocument();
+    expect(screen.getByRole("alert")).toHaveTextContent("Fix these before saving");
+    expect(d.nextButton()).toBeDisabled();
+  });
+
+  it("a negative rate is reported and blocks the schedule step", async () => {
+    const app = await renderApp({ route: "/expenses", today: TODAY });
+    await d.fillExpenseToSchedule(app, { kind: "Loan", principal: "1000", rate: "-5", term: "12", start: "2026-02-10" });
+    expect(await screen.findByText("Interest rate cannot be negative")).toBeInTheDocument();
+    expect(d.nextButton()).toBeDisabled();
+  });
+
+  it("fixing the value (Back, a valid term) lets the wizard continue and save", async () => {
+    const app = await renderApp({ route: "/expenses", today: TODAY });
+    await d.fillExpenseToSchedule(app, { kind: "Loan", principal: "1000", rate: "0", term: "0", start: "2026-02-10" });
+    expect(d.nextButton()).toBeDisabled();
+    await app.user.click(screen.getByRole("button", { name: "Back" }));
+    await d.fill(app, /^Term \(Months\)/, "10");
+    await d.next(app);
+    await d.next(app);
+    await screen.findByText("Review & Confirm");
+    const doc = await d.finishExpense(app, {});
+    expect(doc.loanConfig).toMatchObject({ termMonths: 10, monthlyPayment: 100 });
+  });
+
+  it("the loan's Day of Month defaults to the first payment date's day (UI-RULE-36: 'On the 10th', never today's 15th)", async () => {
+    const app = await renderApp({ route: "/expenses", today: TODAY });
+    await d.fillExpenseToSchedule(app, { kind: "Loan", principal: "4000", rate: "0", term: "4", start: "2026-02-10", weekend: "none" });
+    expect((screen.getByLabelText(/^Day of Month/) as HTMLInputElement).value).toBe("10");
+    const doc = await d.finishExpense(app, {});
+    expect(doc.scheduleConfig).toEqual({ dayOfMonth: 10 });
+  });
+
+  it("the loan preview shows only as many dates as the loan has payments (a 2-month loan: 2 cards)", async () => {
+    const app = await renderApp({ route: "/expenses", today: TODAY });
+    await d.fillExpenseToSchedule(app, { kind: "Loan", principal: "2000", rate: "0", term: "2", start: "2026-02-10", weekend: "none" });
+    expect(d.previewCards()).toEqual(["2026-02-10", "2026-03-10"].map(d.label));
+  });
 });
 
 // ===========================================================================
@@ -583,9 +623,8 @@ describe("credit card wizard", () => {
     }
   );
 
-  knownDefect(
-    "UI-RULE-42",
-    "an empty Credit Limit is saved as NaN",
+  it(
+    "UI-RULE-42 — an empty Credit Limit is saved as NaN",
     async () => {
       // observed: creditConfig.creditLimit is NaN
       const { doc } = await cardFlow({ ...base, limit: "" });
@@ -603,9 +642,8 @@ describe("credit card wizard", () => {
     }
   );
 
-  knownDefect(
-    "UI-RULE-44",
-    "clearing Minimum Payment % and Floor saves NaN as the rule amount and projects NaN bills",
+  it(
+    "UI-RULE-44 — clearing Minimum Payment % and Floor saves NaN as the rule amount and projects NaN bills",
     async () => {
       // observed: amount NaN, minimumPaymentPercent NaN, minimumPaymentFloor NaN, first projected bill NaN
       const { doc, app } = await cardFlow({ ...base, minPercent: "", minFloor: "" });
@@ -662,6 +700,28 @@ describe("credit card wizard", () => {
     }
   );
 
+  it("blank optional card fields (limit, %, floor, statement date) save their documented defaults: 0 (none), 2, 25, 5", async () => {
+    const { doc } = await cardFlow({ ...base, limit: "", minPercent: "", minFloor: "", statementDate: "" });
+    expect(doc.creditConfig).toMatchObject({
+      creditLimit: 0,
+      minimumPaymentPercent: 2,
+      minimumPaymentFloor: 25,
+      statementDate: 5,
+      dueDate: 25,
+    });
+    expect(d.nonFinitePaths(doc)).toEqual([]);
+    expect(doc.amount).toBeCloseTo(100, 6); // max(25, 2% of 5,000)
+  });
+
+  it("a blank due date blocks Continue on the details step (the payment day depends on it)", async () => {
+    const app = await renderApp({ route: "/expenses", today: TODAY });
+    await d.openExpenseForm(app);
+    await app.user.click(screen.getByRole("heading", { name: "Credit Card" }));
+    await d.next(app);
+    await d.fillExpenseDetails(app, { kind: "Credit Card", balance: "5000", apr: "12", dueDate: "" });
+    expect(d.nextButton()).toBeDisabled();
+  });
+
   it("a minimum-payment percentage above 100 shows the validation message", async () => {
     const app = await renderApp({ route: "/expenses", today: TODAY });
     await d.openExpenseForm(app);
@@ -671,9 +731,8 @@ describe("credit card wizard", () => {
     expect(await screen.findByText("Percentage cannot exceed 100%")).toBeInTheDocument();
   });
 
-  knownDefect(
-    "UI-RULE-49",
-    "the '> 100%' minimum-payment error is shown but does not stop the wizard: a 150% card is saved",
+  it(
+    "UI-RULE-49 — the '> 100%' minimum-payment error is shown but does not stop the wizard: a 150% card is saved",
     async () => {
       // observed: Continue stays enabled, rule saved with minimumPaymentPercent 150 (amount = 7,500 on a 5,000 balance)
       const app = await renderApp({ route: "/expenses", today: TODAY });
@@ -687,9 +746,8 @@ describe("credit card wizard", () => {
     }
   );
 
-  knownDefect(
-    "UI-RULE-50",
-    "a due date of 32 is rejected by the field's error text but the wizard still saves it",
+  it(
+    "UI-RULE-50 — a due date of 32 is rejected by the field's error text but the wizard still saves it",
     async () => {
       const app = await renderApp({ route: "/expenses", today: TODAY });
       await d.openExpenseForm(app);
@@ -807,9 +865,8 @@ describe("installment wizard", () => {
     expect(d.engineDates(app, doc.id)).toEqual(["2026-02-09", "2026-03-09", "2026-04-07"]);
   });
 
-  knownDefect(
-    "UI-RULE-53",
-    "an installment plan's 'Day of Month' input is ignored by the engine (preview and projections disagree)",
+  it(
+    "UI-RULE-53 — an installment plan's 'Day of Month' input is ignored by the engine (preview and projections disagree)",
     async () => {
       // First Payment Date Feb 10, Day of Month 20: preview shows the 20th, engine bills the 10th
       const app = await renderApp({ route: "/expenses", today: TODAY });
@@ -828,6 +885,17 @@ describe("installment wizard", () => {
       expect(preview[0]).toBe(d.label(dates[0]));
     }
   );
+
+  it("0 installments is reported and blocks the schedule step; the Day of Month defaults to the first payment's day", async () => {
+    const app = await renderApp({ route: "/expenses", today: TODAY });
+    await d.fillExpenseToSchedule(app, { kind: "Installment", total: "1000", count: "0", start: "2026-02-10" });
+    expect(await screen.findByText("Number of installments must be a whole number, at least 1")).toBeInTheDocument();
+    expect(d.nextButton()).toBeDisabled();
+    await app.user.click(screen.getByRole("button", { name: "Back" }));
+    await d.fill(app, /^Number of Installments/, "4");
+    await d.next(app);
+    expect((screen.getByLabelText(/^Day of Month/) as HTMLInputElement).value).toBe("10");
+  });
 
   it("more than 120 installments shows the validation message and blocks Continue", async () => {
     const app = await renderApp({ route: "/expenses", today: TODAY });
@@ -850,9 +918,8 @@ describe("installment wizard", () => {
     expect(d.nextButton()).toBeDisabled();
   });
 
-  knownDefect(
-    "UI-RULE-54",
-    "0 installments is accepted and saved with an Infinity instalment amount",
+  it(
+    "UI-RULE-54 — 0 installments is accepted and saved with an Infinity instalment amount",
     async () => {
       // observed: installmentAmount = Infinity (1000 / 0)
       const app = await renderApp({ route: "/expenses", today: TODAY });
@@ -864,9 +931,8 @@ describe("installment wizard", () => {
     }
   );
 
-  knownDefect(
-    "UI-RULE-55",
-    "a negative installment count is accepted and saved as a negative instalment amount",
+  it(
+    "UI-RULE-55 — a negative installment count is accepted and saved as a negative instalment amount",
     async () => {
       // observed: 1000 / -3 = -333.33 per 'installment', installmentCount -3
       const app = await renderApp({ route: "/expenses", today: TODAY });

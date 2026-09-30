@@ -15,6 +15,7 @@ import {
   type PayoffScenario,
 } from "@/lib/logic/creditCardCalculator";
 import { parseDate } from "@/lib/utils/dateUtils";
+import { describeSchedule, ordinal } from "@/lib/logic/ruleSchedule";
 
 interface IProps {
   rule: ExpenseRule;
@@ -22,16 +23,6 @@ interface IProps {
   onDelete: () => void;
   onToggleActive: (isActive: boolean) => void;
 }
-
-const getOrdinalSuffix = (n: number) => {
-  const s = ["th", "st", "nd", "rd"];
-  const v = n % 100;
-  return s[(v - 20) % 10] || s[v] || s[0];
-};
-
-const getDayName = (day: number) => {
-  return ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"][day];
-};
 
 const ExpenseRuleDetail: React.FC<IProps> = ({ rule, onEdit, onDelete, onToggleActive }) => {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
@@ -70,22 +61,8 @@ const ExpenseRuleDetail: React.FC<IProps> = ({ rule, onEdit, onDelete, onToggleA
 
   const displayAmount = getDisplayAmount();
 
-  const getScheduleDescription = () => {
-    switch (rule.frequency) {
-      case "semi-monthly":
-        const days = rule.scheduleConfig.specificDays || [];
-        return `On the ${days.map((d) => `${d}${getOrdinalSuffix(d)}`).join(" and ")} of each month`;
-      case "weekly":
-        return `Every ${getDayName(rule.scheduleConfig.dayOfWeek || 0)}`;
-      case "bi-weekly":
-        return `Every 2 weeks on ${getDayName(rule.scheduleConfig.dayOfWeek || 0)}`;
-      case "monthly":
-        const dayOfMonth = rule.scheduleConfig.dayOfMonth || 1;
-        return `On the ${dayOfMonth}${getOrdinalSuffix(dayOfMonth)} of each month`;
-      default:
-        return FREQUENCY_LABELS[rule.frequency];
-    }
-  };
+  const getScheduleDescription = () =>
+    describeSchedule(rule.frequency, rule.scheduleConfig, rule.startDate, FREQUENCY_LABELS[rule.frequency]);
 
   return (
     <Card padding="lg">
@@ -409,15 +386,13 @@ const ExpenseRuleDetail: React.FC<IProps> = ({ rule, onEdit, onDelete, onToggleA
               <div>
                 <p className="text-xs text-gray-400">Due Date</p>
                 <p className="text-white font-medium">
-                  {rule.creditConfig.dueDate}
-                  {getOrdinalSuffix(rule.creditConfig.dueDate)} of month
+                  {ordinal(rule.creditConfig.dueDate)} of month
                 </p>
               </div>
               <div>
                 <p className="text-xs text-gray-400">Statement Date</p>
                 <p className="text-white font-medium">
-                  {rule.creditConfig.statementDate}
-                  {getOrdinalSuffix(rule.creditConfig.statementDate)} of month
+                  {ordinal(rule.creditConfig.statementDate)} of month
                 </p>
               </div>
               <div>

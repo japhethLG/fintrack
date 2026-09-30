@@ -8,8 +8,9 @@ import { EXPENSE_CATEGORY_LABELS } from "@/lib/constants";
 import { useCurrency } from "@/lib/hooks/useCurrency";
 import {
   calculateLoanPlan,
-  calculateInstallmentAmount,
-  calculateCreditCardPayment,
+  calculateRuleAmount,
+  getEffectiveFrequency,
+  resolveCreditInputs,
   type ExpenseRuleFormValues,
 } from "../formHelpers";
 
@@ -21,103 +22,30 @@ const ReviewStep: React.FC<IProps> = ({ error }) => {
   const { formatCurrency } = useCurrency();
   const { control } = useFormContext<ExpenseRuleFormValues>();
 
-  const expenseType = useWatch({ control, name: "expenseType" });
-  const name = useWatch({ control, name: "name" });
-  const amount = useWatch({ control, name: "amount" });
-  const category = useWatch({ control, name: "category" });
-  const frequency = useWatch({ control, name: "frequency" });
-  const isPriority = useWatch({ control, name: "isPriority" });
+  // The same values, resolved the same way, as the document the wizard saves
+  const values = useWatch({ control }) as ExpenseRuleFormValues;
+  const { expenseType, name, category, isPriority } = values;
+  const { loanPrincipal, loanInterestRate, loanTermMonths } = values;
+  const { creditMinPaymentMethod } = values;
+  const frequency = getEffectiveFrequency(values);
 
-  // Loan
-  const loanPrincipal = useWatch({ control, name: "loanPrincipal" });
-  const loanInterestRate = useWatch({ control, name: "loanInterestRate" });
-  const loanTermMonths = useWatch({ control, name: "loanTermMonths" });
-  const loanCurrentBalance = useWatch({ control, name: "loanCurrentBalance" });
-  const loanCalculationType = useWatch({ control, name: "loanCalculationType" });
-  const loanStartDate = useWatch({ control, name: "loanStartDate" });
-
-  // Credit
-  const creditBalance = useWatch({ control, name: "creditBalance" });
-  const creditApr = useWatch({ control, name: "creditApr" });
-  const creditMinPaymentPercent = useWatch({ control, name: "creditMinPaymentPercent" });
-  const creditMinPaymentFloor = useWatch({ control, name: "creditMinPaymentFloor" });
-  const creditMinPaymentMethod = useWatch({ control, name: "creditMinPaymentMethod" });
-  const creditDueDate = useWatch({ control, name: "creditDueDate" });
-
-  // Installment
-  const installmentTotal = useWatch({ control, name: "installmentTotal" });
-  const installmentCount = useWatch({ control, name: "installmentCount" });
-  const installmentHasInterest = useWatch({ control, name: "installmentHasInterest" });
-  const installmentInterestRate = useWatch({ control, name: "installmentInterestRate" });
-
-  // Same plan (balance, term, type) as the Details step and the saved rule
-  const loanPlan = useMemo(() => {
-    if (expenseType !== "cash_loan" || !loanPrincipal || !loanInterestRate || !loanTermMonths) {
-      return null;
-    }
-    return calculateLoanPlan({
-      loanPrincipal,
-      loanCurrentBalance,
-      loanInterestRate,
-      loanTermMonths,
-      loanCalculationType,
-      loanStartDate,
-    });
-  }, [
-    expenseType,
-    loanPrincipal,
-    loanCurrentBalance,
-    loanInterestRate,
-    loanTermMonths,
-    loanCalculationType,
-    loanStartDate,
-  ]);
+  const loanPlan = useMemo(
+    () => (expenseType === "cash_loan" ? calculateLoanPlan(values) : null),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [
+      expenseType,
+      values.loanPrincipal,
+      values.loanCurrentBalance,
+      values.loanInterestRate,
+      values.loanTermMonths,
+      values.loanCalculationType,
+      values.loanStartDate,
+      values.loanPaymentsMade,
+    ]
+  );
   const calculatedLoanPayment = loanPlan?.payment ?? null;
-
-  const calculatedCreditPayment = useMemo(() => {
-    if (expenseType !== "credit_card" || !creditBalance || !creditApr || !creditMinPaymentPercent) {
-      return null;
-    }
-    return calculateCreditCardPayment(
-      parseFloat(creditBalance),
-      parseFloat(creditApr),
-      parseFloat(creditMinPaymentPercent),
-      parseFloat(creditMinPaymentFloor) || 0,
-      creditMinPaymentMethod
-    );
-  }, [
-    expenseType,
-    creditBalance,
-    creditApr,
-    creditMinPaymentPercent,
-    creditMinPaymentFloor,
-    creditMinPaymentMethod,
-  ]);
-
-  const calculatedInstallmentAmount = useMemo(() => {
-    if (expenseType !== "installment" || !installmentTotal || !installmentCount) {
-      return null;
-    }
-    return calculateInstallmentAmount(
-      parseFloat(installmentTotal),
-      parseInt(installmentCount),
-      installmentHasInterest,
-      installmentInterestRate ? parseFloat(installmentInterestRate) : undefined
-    );
-  }, [
-    expenseType,
-    installmentTotal,
-    installmentCount,
-    installmentHasInterest,
-    installmentInterestRate,
-  ]);
-
-  const displayAmount = useMemo(() => {
-    if (calculatedLoanPayment) return calculatedLoanPayment;
-    if (calculatedCreditPayment) return calculatedCreditPayment;
-    if (calculatedInstallmentAmount) return calculatedInstallmentAmount;
-    return parseFloat(amount || "0");
-  }, [calculatedLoanPayment, calculatedCreditPayment, calculatedInstallmentAmount, amount]);
+  const card = resolveCreditInputs(values);
+  const displayAmount = calculateRuleAmount(values);
 
   return (
     <div className="space-y-6">
@@ -194,22 +122,22 @@ const ReviewStep: React.FC<IProps> = ({ error }) => {
           <div className="mt-4 pt-4 border-t border-gray-700 grid grid-cols-2 gap-4">
             <div>
               <p className="text-xs text-gray-400">Current Balance</p>
-              <p className="text-white font-medium">{formatCurrency(parseFloat(creditBalance))}</p>
+              <p className="text-white font-medium">{formatCurrency(card.currentBalance)}</p>
             </div>
             <div>
               <p className="text-xs text-gray-400">APR</p>
-              <p className="text-white font-medium">{creditApr}%</p>
+              <p className="text-white font-medium">{card.apr}%</p>
             </div>
             <div>
               <p className="text-xs text-gray-400">Min Payment Rule</p>
               <p className="text-white font-medium">
-                {creditMinPaymentPercent}%
+                {card.minimumPaymentPercent}%
                 {creditMinPaymentMethod === "percent_plus_interest" ? " + Interest" : ""}
               </p>
             </div>
             <div>
               <p className="text-xs text-gray-400">Due Date</p>
-              <p className="text-white font-medium">Day {creditDueDate}</p>
+              <p className="text-white font-medium">Day {card.dueDate}</p>
             </div>
           </div>
         )}

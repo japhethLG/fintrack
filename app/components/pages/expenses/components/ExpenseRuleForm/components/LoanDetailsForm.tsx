@@ -18,6 +18,7 @@ const LoanDetailsForm: React.FC = () => {
   const loanTermMonths = useWatch({ control, name: "loanTermMonths" });
   const loanStartDate = useWatch({ control, name: "loanStartDate" });
   const loanCalculationType = useWatch({ control, name: "loanCalculationType" });
+  const loanPaymentsMade = useWatch({ control, name: "loanPaymentsMade" });
 
   const categoryOptions = Object.entries(EXPENSE_CATEGORY_LABELS).map(([value, label]) => ({
     value,
@@ -35,6 +36,7 @@ const LoanDetailsForm: React.FC = () => {
       loanTermMonths,
       loanCalculationType,
       loanStartDate,
+      loanPaymentsMade,
     });
   }, [
     loanPrincipal,
@@ -43,6 +45,7 @@ const LoanDetailsForm: React.FC = () => {
     loanTermMonths,
     loanCalculationType,
     loanStartDate,
+    loanPaymentsMade,
   ]);
   const calculatedPayment = plan?.payment ?? null;
   const amortizationPreview = useMemo(() => (plan ? plan.schedule.slice(0, 6) : []), [plan]);
