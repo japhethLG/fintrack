@@ -8,6 +8,13 @@ import {
   CreditPaymentStrategy,
   MinimumPaymentMethod,
 } from "@/lib/types";
+import {
+  calculateAmortizationSchedule,
+  calculateLoanPaymentAmount,
+  sumScheduleInterest,
+  type AmortizationStep,
+} from "@/lib/logic/amortization";
+import { parseDate } from "@/lib/utils/dateUtils";
 
 // ============================================================================
 // FORM SCHEMA TYPES
@@ -259,32 +266,84 @@ export const buildScheduleConfig = (values: ExpenseRuleFormValues): ScheduleConf
   return config;
 };
 
+/** A finite number, or `fallback` for blank / NaN input (`parseFloat("")`). */
+const finiteOr = (value: number, fallback: number): number =>
+  Number.isFinite(value) ? value : fallback;
+
+/**
+ * The regular payment of a loan for its calculation type. 0 (never Infinity /
+ * NaN) when the principal or term cannot describe a loan, e.g. a term of 0.
+ * `interestBasis` is the original principal a flat-rate loan charges interest on.
+ */
 export const calculateLoanPayment = (
   principal: number,
   annualRate: number,
-  termMonths: number
-): number => {
-  const rate = annualRate / 100 / 12;
-  if (rate === 0) {
-    return principal / termMonths;
-  }
-  return (
-    (principal * (rate * Math.pow(1 + rate, termMonths))) / (Math.pow(1 + rate, termMonths) - 1)
-  );
+  termMonths: number,
+  calculationType: LoanCalculationType = "amortized",
+  interestBasis?: number
+): number =>
+  calculateLoanPaymentAmount({ principal, annualRate, termMonths, calculationType, interestBasis });
+
+export interface LoanPlan {
+  /** The balance the plan amortizes: the current balance if given, else the principal. */
+  balance: number;
+  /** The headline payment: the first payment of `schedule`. */
+  payment: number;
+  schedule: AmortizationStep[];
+  /** Sum of the schedule's interest column. */
+  totalInterest: number;
+}
+
+export type LoanPlanInput = Pick<
+  ExpenseRuleFormValues,
+  | "loanPrincipal"
+  | "loanCurrentBalance"
+  | "loanInterestRate"
+  | "loanTermMonths"
+  | "loanCalculationType"
+  | "loanStartDate"
+>;
+
+/**
+ * One loan plan for the whole form: the headline payment, the schedule preview
+ * and the total interest are all read off the SAME balance, term and type, so
+ * they can never contradict each other. Null when the inputs describe no loan.
+ */
+export const calculateLoanPlan = (values: LoanPlanInput): LoanPlan | null => {
+  const principal = parseFloat(values.loanPrincipal);
+  const balance = values.loanCurrentBalance?.trim()
+    ? parseFloat(values.loanCurrentBalance)
+    : principal;
+  const annualRate = parseFloat(values.loanInterestRate);
+  const termMonths = parseInt(values.loanTermMonths, 10);
+  const calculationType = values.loanCalculationType || "amortized";
+
+  const payment = calculateLoanPayment(balance, annualRate, termMonths, calculationType, principal);
+  if (!payment) return null;
+
+  const start = values.loanStartDate ? parseDate(values.loanStartDate) : new Date();
+  const schedule = calculateAmortizationSchedule({
+    principal: balance,
+    annualRate,
+    termMonths,
+    startDate: Number.isNaN(start.getTime()) ? new Date() : start,
+    calculationType,
+    interestBasis: principal,
+  });
+  return { balance, payment, schedule, totalInterest: sumScheduleInterest(schedule) };
 };
 
+/** Whole-cent installment amount; 0 when the count is not a whole number >= 1. */
 export const calculateInstallmentAmount = (
   total: number,
   count: number,
   hasInterest: boolean,
   interestRate?: number
 ): number => {
-  if (hasInterest && interestRate) {
-    const rate = interestRate / 100;
-    const totalWithInterest = total * (1 + rate);
-    return totalWithInterest / count;
-  }
-  return total / count;
+  if (!Number.isFinite(total) || !Number.isFinite(count) || count < 1) return 0;
+  const rate = hasInterest && interestRate ? finiteOr(interestRate, 0) / 100 : 0;
+  const payable = total * (1 + rate);
+  return Math.round((payable / Math.floor(count)) * 100) / 100;
 };
 
 export const calculateCreditCardPayment = (
@@ -294,11 +353,15 @@ export const calculateCreditCardPayment = (
   floor: number,
   method: MinimumPaymentMethod
 ): number => {
-  const monthlyInterest = balance * (apr / 100 / 12);
+  // Blank optional fields arrive as NaN; read them as 0 rather than propagating NaN
+  const safeBalance = Math.max(0, finiteOr(balance, 0));
+  const monthlyInterest = safeBalance * (finiteOr(apr, 0) / 100 / 12);
+  const percent = finiteOr(minPercent, 0);
+  const safeFloor = finiteOr(floor, 0);
 
   if (method === "percent_plus_interest") {
-    const percentPortion = balance * (minPercent / 100);
-    return Math.max(floor, percentPortion + monthlyInterest);
+    const percentPortion = safeBalance * (percent / 100);
+    return Math.max(safeFloor, percentPortion + monthlyInterest);
   }
-  return Math.max(floor, balance * (minPercent / 100));
+  return Math.max(safeFloor, safeBalance * (percent / 100));
 };

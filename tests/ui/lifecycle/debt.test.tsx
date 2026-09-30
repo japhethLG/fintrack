@@ -129,9 +129,7 @@ describe("cash loan: completing a payment", () => {
     T
   );
 
-  knownDefect(
-    "UI-LIFE-11",
-    "after paying #1 the remaining EMIs INFLATE (1,360.09 instead of the unchanged 1,025.12)",
+  it("UI-LIFE-11 — after paying #1 the remaining EMIs INFLATE (1,360.09 instead of the unchanged 1,025.12)",
     async () => {
       // observed: schedule is rebuilt from the UNREDUCED 4,000 over 3 remaining payments:
       //   PMT(4000, 3) = 41.21204 / 0.030301 = 1,360.09 for Feb and Mar.
@@ -145,9 +143,7 @@ describe("cash loan: completing a payment", () => {
     T
   );
 
-  knownDefect(
-    "UI-LIFE-12",
-    "after paying #1 a scheduled payment VANISHES: the 4-month loan shows only 2 future payments instead of 3",
+  it("UI-LIFE-12 — after paying #1 a scheduled payment VANISHES: the 4-month loan shows only 2 future payments instead of 3",
     async () => {
       // observed: Jan(completed) + Feb + Mar; the April payment is gone (term shrinks by one
       // while the schedule restarts from the start date). Correct: Feb, Mar, Apr still projected.
@@ -215,9 +211,7 @@ describe("cash loan: payment number depends on the viewport", () => {
       { termMonths: 6, principalAmount: 4_000, currentBalance: 4_000, loanStartDate: "2025-10-10", firstPaymentDate: "2025-10-10" }
     );
 
-  knownDefect(
-    "UI-LIFE-16",
-    "the first visible payment is numbered #1 even though an earlier scheduled payment (Oct 10) precedes the window",
+  it("UI-LIFE-16 — the first visible payment is numbered #1 even though an earlier scheduled payment (Oct 10) precedes the window",
     async () => {
       // Payments: Oct 10 = #1, Nov 10 = #2, Dec 10 = #3 ... The window starts 2025-11-01 so the
       // first row shown is Nov 10. observed: it prints (#1) because numbering restarts inside the window.
@@ -230,9 +224,7 @@ describe("cash loan: payment number depends on the viewport", () => {
     T
   );
 
-  knownDefect(
-    "UI-LIFE-17",
-    "a payment's number changes when the user pages the Calendar back a few months (viewport-dependent)",
+  it("UI-LIFE-17 — a payment's number changes when the user pages the Calendar back a few months (viewport-dependent)",
     async () => {
       // observed: Nov 10 prints (#1) at first and (#2) after the calendar widens the window to Oct.
       const app = await mountAll({ expenseRules: [oldLoan()] });

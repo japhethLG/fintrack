@@ -223,9 +223,14 @@ describe("cash loan wizard: a fresh loan (12,000 at 12% over 24 months)", () => 
     expect(d.engineRows(app, doc.id).map((r) => r.projectedAmount)).toEqual([100, 100, 100]); // Feb, Mar, Apr
   });
 
-  it("selecting 'Flat Rate' is persisted but the EMI is still the amortised PMT (doc claim F20/defect 8: CONFIRMED)", async () => {
-    // flat rate on 12,000 at 12% for 24 months would be 12000/24 + 12000*1% = 600.00 a month.
-    const { doc, review } = await loanFlow({
+  // D2 DECIDED: the three calculation types are implemented (definitions and worked examples in
+  // docs/audit/fixes/debt.md). REWRITTEN from "selecting 'Flat Rate' is persisted but the EMI is
+  // still the amortised PMT (F20 CONFIRMED)", which asserted the bug; the it.todo("DECISION: ...")
+  // that followed it is replaced by the two tests below.
+  it("'Flat Rate' charges interest on the original principal: 12,000 at 12% over 24 months is 620.00 a month and 2,880.00 of interest", async () => {
+    // principal 12000 / 24 = 500.00; interest 12000 x 12% / 12 = 120.00 every month
+    //   -> payment 620.00; total interest 120 x 24 = 2,880.00 = 12,000 x 12% x 2 years
+    const { app, doc, review, details } = await loanFlow({
       principal: "12000",
       rate: "12",
       term: "24",
@@ -234,11 +239,49 @@ describe("cash loan wizard: a fresh loan (12,000 at 12% over 24 months)", () => 
       weekend: "none",
     });
     expect(doc.loanConfig.calculationType).toBe("flat_rate");
-    expect(review.amount).toBeCloseTo(EMI, 2);
-    expect(review.amount).not.toBeCloseTo(600, 0);
+    expect(details.emi).toBeCloseTo(620, 2);
+    expect(review.amount).toBeCloseTo(620, 2);
+    expect(doc.amount).toBeCloseTo(620, 2);
+    expect(details.totalInterest).toBeCloseTo(2_880, 2);
+    expect(review.totalInterest).toBeCloseTo(2_880, 2);
+    details.rows.forEach((row) => {
+      expect(row.interest).toBeCloseTo(120, 2);
+      expect(row.principal).toBeCloseTo(500, 2);
+    });
+    await widenWindow(app);
+    const rows = d.engineRows(app, doc.id);
+    expect(rows).toHaveLength(24);
+    rows.forEach((r) => expect(r.projectedAmount).toBeCloseTo(620, 6));
+    expect(d.sum(rows.map((r) => r.paymentBreakdown!.interestPaid))).toBeCloseTo(2_880, 4);
+    expect(rows[23].paymentBreakdown?.remainingBalance).toBeCloseTo(0, 6);
   });
 
-  it.todo("DECISION: loan calculationType (amortized / flat_rate / reducing_balance) - implement the three formulas or drop the field");
+  it("'Reducing Balance' is equal principal plus interest on the balance: 620.00 falling to 505.00, 1,500.00 of interest", async () => {
+    // principal 500.00 a month; interest 120.00, 115.00, 110.00 ... 5.00 (1% of 12,000, 11,500, ...)
+    //   total interest = 1% x 500 x (24 + 23 + ... + 1 = 300) = 1,500.00
+    const { app, doc, review, details } = await loanFlow({
+      principal: "12000",
+      rate: "12",
+      term: "24",
+      calcType: "Reducing Balance",
+      start: "2026-02-10",
+      weekend: "none",
+    });
+    expect(doc.loanConfig.calculationType).toBe("reducing_balance");
+    expect(details.emi).toBeCloseTo(620, 2); // the first (largest) payment
+    expect(review.amount).toBeCloseTo(620, 2);
+    expect(details.totalInterest).toBeCloseTo(1_500, 2);
+    expect(details.rows[0].interest).toBeCloseTo(120, 2);
+    expect(details.rows[1].interest).toBeCloseTo(115, 2);
+    expect(details.rows[1].principal).toBeCloseTo(500, 2);
+    await widenWindow(app);
+    const rows = d.engineRows(app, doc.id);
+    expect(rows).toHaveLength(24);
+    expect(rows[0].projectedAmount).toBeCloseTo(620, 6);
+    expect(rows[1].projectedAmount).toBeCloseTo(615, 6);
+    expect(rows[23].projectedAmount).toBeCloseTo(505, 6);
+    expect(d.sum(rows.map((r) => r.paymentBreakdown!.interestPaid))).toBeCloseTo(1_500, 4);
+  });
 });
 
 // ===========================================================================
@@ -262,9 +305,7 @@ describe("cash loan wizard: a partially paid loan (principal 10,000, balance 5,0
     });
   });
 
-  knownDefect(
-    "UI-RULE-31",
-    "partially-paid loan: the saved rule amount and the amount actually projected each month differ (2x)",
+  it("UI-RULE-31 — partially-paid loan: the saved rule amount and the amount actually projected each month differ (2x)",
     async () => {
       // observed: rule amount 860.66 (PMT on the ORIGINAL 10,000) vs projected payments 430.33 (PMT on the 5,000 balance)
       const { app, doc } = await loanFlow(spec);
@@ -275,9 +316,7 @@ describe("cash loan wizard: a partially paid loan (principal 10,000, balance 5,0
     }
   );
 
-  knownDefect(
-    "UI-RULE-32",
-    "partially-paid loan: the wizard's headline monthly payment contradicts its own amortisation preview",
+  it("UI-RULE-32 — partially-paid loan: the wizard's headline monthly payment contradicts its own amortisation preview",
     async () => {
       // observed: headline 860.66; first preview row principal 405.33 + interest 25.00 = 430.33
       const { details } = await loanFlow(spec);
@@ -287,9 +326,7 @@ describe("cash loan wizard: a partially paid loan (principal 10,000, balance 5,0
     }
   );
 
-  knownDefect(
-    "UI-RULE-33",
-    "partially-paid loan: 'Total Interest' is computed from the original principal and overstates the interest that will be charged",
+  it("UI-RULE-33 — partially-paid loan: 'Total Interest' is computed from the original principal and overstates the interest that will be charged",
     async () => {
       // observed: shown 327.97 (12 x 860.66 - 10,000); the projected schedule (5,000 balance) charges 163.99
       const { app, doc, review } = await loanFlow(spec);
@@ -304,9 +341,7 @@ describe("cash loan wizard: a partially paid loan (principal 10,000, balance 5,0
 
 // ===========================================================================
 describe("cash loan wizard: schedule behaviour", () => {
-  knownDefect(
-    "UI-RULE-34",
-    "a loan whose first payment is on the 31st skips February and drifts to the 3rd (Jan 31, Mar 3, Apr 3)",
+  it("UI-RULE-34 — a loan whose first payment is on the 31st skips February and drifts to the 3rd (Jan 31, Mar 3, Apr 3)",
     async () => {
       // correct: Jan 31, Feb 28, Mar 31
       const { app, doc } = await loanFlow({
@@ -360,9 +395,7 @@ describe("cash loan wizard: schedule behaviour", () => {
     }
   );
 
-  knownDefect(
-    "UI-RULE-37",
-    "a loan ignores the Weekend Adjustment the wizard offers (installments honour it)",
+  it("UI-RULE-37 — a loan ignores the Weekend Adjustment the wizard offers (installments honour it)",
     async () => {
       // first payment Sat 2026-02-07 with 'Pay on Monday' -> Mon 02-09. observed: 02-07 (Saturday)
       const { app, doc } = await loanFlow({
@@ -387,9 +420,7 @@ describe("cash loan wizard: schedule behaviour", () => {
     expect(screen.queryByRole("checkbox", { name: /Set End Date/ })).toBeNull();
   });
 
-  knownDefect(
-    "UI-RULE-38",
-    "loan amortisation preview date is parsed as UTC: in America/New_York the first row shows the day BEFORE the Loan Start Date",
+  it("UI-RULE-38 — loan amortisation preview date is parsed as UTC: in America/New_York the first row shows the day BEFORE the Loan Start Date",
     async () => {
       // Loan Start Date field = 01/15/2026; observed first row "1/14/2026"
       const app = await renderApp({ route: "/expenses", today: TODAY, timeZone: "America/New_York" });
@@ -542,9 +573,7 @@ describe("credit card wizard", () => {
     rows.forEach((r) => expect(r.projectedAmount).toBeCloseTo(300, 6));
   });
 
-  knownDefect(
-    "UI-RULE-41",
-    "'Pay Full Balance' does not clear the card in one payment (a second, interest-only bill appears)",
+  it("UI-RULE-41 — 'Pay Full Balance' does not clear the card in one payment (a second, interest-only bill appears)",
     async () => {
       // 5,000 at 24%: paying the full 5,000 on the due date leaves interest 100 that is billed again next month
       const { doc, app } = await cardFlow({ ...base, apr: "24", strategy: "Pay Full Balance" });
@@ -565,9 +594,7 @@ describe("credit card wizard", () => {
     }
   );
 
-  knownDefect(
-    "UI-RULE-43",
-    "a card saved without a Credit Limit renders 'NaN%' utilisation and '$NaN' available credit on its detail card",
+  it("UI-RULE-43 — a card saved without a Credit Limit renders 'NaN%' utilisation and '$NaN' available credit on its detail card",
     async () => {
       const { doc } = await cardFlow({ ...base, limit: "" });
       expect(screen.getByText("Credit Card Overview")).toBeInTheDocument(); // precondition: the detail card is showing
@@ -587,9 +614,7 @@ describe("credit card wizard", () => {
     }
   );
 
-  knownDefect(
-    "UI-RULE-45",
-    "an empty minimum-payment % gives a NaN projected bill",
+  it("UI-RULE-45 — an empty minimum-payment % gives a NaN projected bill",
     async () => {
       const { doc, app } = await cardFlow({ ...base, minPercent: "" });
       const rows = d.engineRows(app, doc.id);
@@ -608,9 +633,7 @@ describe("credit card wizard", () => {
     expect((await screen.findAllByRole("option")).map((o) => o.textContent)).toEqual(["Monthly"]);
   });
 
-  knownDefect(
-    "UI-RULE-46",
-    "credit card due on the 31st, tracking from Feb 10: the Feb 28 bill is skipped (first bill is Mar 31)",
+  it("UI-RULE-46 — credit card due on the 31st, tracking from Feb 10: the Feb 28 bill is skipped (first bill is Mar 31)",
     async () => {
       // correct: Feb 28, Mar 31 (then Apr 30)
       const { doc, app } = await cardFlow({ ...base, dueDate: "31" });
@@ -620,9 +643,7 @@ describe("credit card wizard", () => {
     }
   );
 
-  knownDefect(
-    "UI-RULE-47",
-    "credit card due on the 31st, tracking from Jan 5: February is missing (Jan 31, Mar 31)",
+  it("UI-RULE-47 — credit card due on the 31st, tracking from Jan 5: February is missing (Jan 31, Mar 31)",
     async () => {
       // correct: Jan 31, Feb 28, Mar 31
       const { doc, app } = await cardFlow({ ...base, dueDate: "31", start: "2026-01-05" });
@@ -632,9 +653,7 @@ describe("credit card wizard", () => {
     }
   );
 
-  knownDefect(
-    "UI-RULE-48",
-    "a credit card ignores the Weekend Adjustment (a due date on Saturday Feb 7 stays on Saturday)",
+  it("UI-RULE-48 — a credit card ignores the Weekend Adjustment (a due date on Saturday Feb 7 stays on Saturday)",
     async () => {
       // due day 7, tracking from Feb 1, 'Pay on Monday' -> Mon Feb 9
       const { doc, app } = await cardFlow({ ...base, dueDate: "7", start: "2026-02-01", weekend: "after" });
@@ -744,9 +763,7 @@ describe("installment wizard", () => {
 
   it.todo("DECISION: installment 'Interest Rate' - a flat surcharge on the total (10% on a 6-month plan = +120, same as on 24 months) or an annual rate amortised over the count");
 
-  knownDefect(
-    "UI-RULE-51",
-    "1,000 over 7 installments is projected as seven bills of 142.857142857... (fractions of a cent)",
+  it("UI-RULE-51 — 1,000 over 7 installments is projected as seven bills of 142.857142857... (fractions of a cent)",
     async () => {
       // correct: whole-cent bills within a few cents of the 142.857 share that sum to exactly 1,000.00
       // (e.g. 142.86 x 6 + 142.84). observed: 142.85714285714286 x 7
@@ -770,9 +787,7 @@ describe("installment wizard", () => {
     expect(rows[6].paymentBreakdown?.remainingBalance).toBeCloseTo(0, 6);
   });
 
-  knownDefect(
-    "UI-RULE-52",
-    "installments starting on the 31st drift to the 28th after February (Jan 31, Feb 28, Mar 28)",
+  it("UI-RULE-52 — installments starting on the 31st drift to the 28th after February (Jan 31, Feb 28, Mar 28)",
     async () => {
       // correct: Jan 31, Feb 28, Mar 31. observed: month arithmetic is applied to the previous (clamped) date
       const { app, doc } = await instFlow({ total: "400", count: "4", start: "2026-01-31", weekend: "none" });

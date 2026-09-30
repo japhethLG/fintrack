@@ -57,9 +57,7 @@ describe("Expense / Income manager totals vs the calendar's occurrence counts", 
     expect(within(page("income")).getByText("Inactive")).toBeInTheDocument();
   });
 
-  knownDefect(
-    "UI-DISP-44",
-    "a settled credit card (balance $0) is shown as 'Never (payment too low)' with infinite payments remaining",
+  it("UI-DISP-44 — a settled credit card (balance $0) is shown as 'Never (payment too low)' with infinite payments remaining",
     async () => {
       // observed: Time to Pay Off 'Never (payment too low)', Payments Remaining '∞', Total Interest 'Accumulating'.
       const { app, page } = await renderPages(["expenses"], {

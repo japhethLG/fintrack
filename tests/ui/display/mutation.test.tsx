@@ -234,9 +234,7 @@ describe("mutation: pay the first Car Loan instalment (Mar 20, 564.88)", () => {
     expect(within(kpi(m)).getByText("4 completed, 6 projected")).toBeInTheDocument();
   });
 
-  knownDefect(
-    "UI-DISP-38",
-    "after paying an instalment the NEXT month's instalment jumps from 564.88 to 586.63",
+  it("UI-DISP-38 — after paying an instalment the NEXT month's instalment jumps from 564.88 to 586.63",
     async () => {
       // observed: April Car Loan projected 586.63 (PMT recomputed over 23 months on the unchanged 12,000 balance)
       // April hand expenses: Rent 1,200 + Groceries 4 x 150 + Electricity 90 + Loan 564.8817 + Visa 25 + Laptop 200 = 2,679.8817

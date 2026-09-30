@@ -5,9 +5,8 @@ import { useFormContext, useWatch } from "react-hook-form";
 import { FormInput, FormSelect, FormDatePicker } from "@/components/formElements";
 import { EXPENSE_CATEGORY_LABELS } from "@/lib/constants";
 import { useCurrency } from "@/lib/hooks/useCurrency";
-import { calculateAmortizationSchedule } from "@/lib/logic/amortization";
 import { LOAN_CALCULATION_TYPES } from "../constants";
-import { calculateLoanPayment, type ExpenseRuleFormValues } from "../formHelpers";
+import { calculateLoanPlan, type ExpenseRuleFormValues } from "../formHelpers";
 
 const LoanDetailsForm: React.FC = () => {
   const { formatCurrency, currencySymbol } = useCurrency();
@@ -18,40 +17,35 @@ const LoanDetailsForm: React.FC = () => {
   const loanInterestRate = useWatch({ control, name: "loanInterestRate" });
   const loanTermMonths = useWatch({ control, name: "loanTermMonths" });
   const loanStartDate = useWatch({ control, name: "loanStartDate" });
+  const loanCalculationType = useWatch({ control, name: "loanCalculationType" });
 
   const categoryOptions = Object.entries(EXPENSE_CATEGORY_LABELS).map(([value, label]) => ({
     value,
     label,
   }));
 
-  const calculatedPayment = useMemo(() => {
+  // ONE plan drives the headline payment, the preview and the total interest, so they
+  // always describe the same balance and term (the current balance when given).
+  const plan = useMemo(() => {
     if (!loanPrincipal || !loanInterestRate || !loanTermMonths) return null;
-    return calculateLoanPayment(
-      parseFloat(loanPrincipal),
-      parseFloat(loanInterestRate),
-      parseInt(loanTermMonths)
-    );
-  }, [loanPrincipal, loanInterestRate, loanTermMonths]);
-
-  const amortizationPreview = useMemo(() => {
-    if (!calculatedPayment || !loanPrincipal || !loanInterestRate) return [];
-
-    const schedule = calculateAmortizationSchedule({
-      principal: parseFloat(loanCurrentBalance || loanPrincipal),
-      annualRate: parseFloat(loanInterestRate),
-      termMonths: parseInt(loanTermMonths),
-      startDate: new Date(loanStartDate),
+    return calculateLoanPlan({
+      loanPrincipal,
+      loanCurrentBalance,
+      loanInterestRate,
+      loanTermMonths,
+      loanCalculationType,
+      loanStartDate,
     });
-
-    return schedule.slice(0, 6);
   }, [
-    calculatedPayment,
     loanPrincipal,
     loanCurrentBalance,
     loanInterestRate,
     loanTermMonths,
+    loanCalculationType,
     loanStartDate,
   ]);
+  const calculatedPayment = plan?.payment ?? null;
+  const amortizationPreview = useMemo(() => (plan ? plan.schedule.slice(0, 6) : []), [plan]);
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -116,6 +110,9 @@ const LoanDetailsForm: React.FC = () => {
           label="Calculation Type"
           options={LOAN_CALCULATION_TYPES.map((t) => ({ value: t.value, label: t.label }))}
         />
+        <p className="text-xs text-gray-400 mt-1">
+          {LOAN_CALCULATION_TYPES.find((t) => t.value === loanCalculationType)?.description}
+        </p>
       </div>
 
       <div>
@@ -136,12 +133,17 @@ const LoanDetailsForm: React.FC = () => {
               maximumFractionDigits: 2,
             })}
           </p>
+          {loanCalculationType === "reducing_balance" && (
+            <p className="text-xs text-gray-400 mt-1">
+              First month&apos;s payment. It falls every month as the balance is repaid.
+            </p>
+          )}
           <p className="text-sm text-gray-400 mt-2">
             Total Interest:{" "}
-            {formatCurrency(
-              calculatedPayment * parseInt(loanTermMonths) - parseFloat(loanPrincipal),
-              { minimumFractionDigits: 2, maximumFractionDigits: 2 }
-            )}
+            {formatCurrency(plan?.totalInterest ?? 0, {
+              minimumFractionDigits: 2,
+              maximumFractionDigits: 2,
+            })}
           </p>
         </div>
       )}
