@@ -65,8 +65,7 @@ throws outside production and warns + returns `[]` in production.
 Regression guard: `tests/unit/dateConvention.test.ts` scans `app/**/*.{ts,tsx}` (TypeScript AST) and fails on
 `new Date(<string literal | template | date-string-named variable>)`, `.toISOString().split/slice/substring`, and `.setMonth(`.
 Justified exceptions are in an explicit `ALLOWED` list, each with a reason; **a stale entry fails the test**, so the list can only
-shrink. All 14 current exceptions belong to other streams (debt calculators, `ExpenseRuleForm`); **when the debt stream lands its
-`setMonth`/clone removals, drop the matching entries**.
+shrink. After merging the debt stream, 7 entries remain: 6 in `ExpenseRuleForm` (later stream: `SchedulePreview` stepping and the UTC "today" defaults) and one harmless `new Date(startDate)` Date clone in `payoffCalculator`. Drop the `ExpenseRuleForm` entries as that form is fixed.
 
 ---
 
@@ -233,7 +232,7 @@ greppable; the titles describe the old defect, not the current behaviour.
 | Item | Why |
 | --- | --- |
 | Bi-weekly id is anchored to `startDate` (known-defect `occurrenceIdGenerator` "keeps its id when the rule's startDate is edited") | Not in R2's list. The test demands `BW2` for both anchors, which no absolute-epoch numbering can satisfy; changing the numbering would orphan every stored `BWn` override. Editing `startDate` also moves the phase, so the dates change too. Needs a product call. |
-| `installmentProjections.ts` passes the weekend-ADJUSTED date to `generateOccurrenceId` | Owned by the debt stream. Installment ids still drift across month boundaries under weekend adjustment. It should use the unadjusted `currentDate`. |
+| `installmentProjections.ts` passed the weekend-ADJUSTED date to `generateOccurrenceId` | Resolved by the debt stream (it now passes the logical date); verified after merging: the merge compiles and all suites are green. |
 | `transactionActions.ts` / `migrations.ts` id fallbacks from `scheduledDate`, `getExpectedDateFromOccurrenceId` (ID-9) | Mutation stream. |
 | UI-RULE-13 (duplicate cards in the Schedule Preview) and UI-RULE-19..26, 28 | The preview and hidden-default logic live in `ExpenseRuleForm/**` (and the income form imports that preview). The preview should call `calculateOccurrencesDetailed`. |
 | UI-RULE-63/64, 61/62 legacy weekly edit | Form edit path. (UI-RULE-62, the quarterly half, is fixed by the engine fallback.) |
@@ -243,7 +242,8 @@ greppable; the titles describe the old defect, not the current behaviour.
 | `SchedulePreview`, `LoanDetailsForm`, `ExpenseRuleForm/formHelpers`, amortization, credit payoff, `creditProjections`: `new Date(str)`, `setMonth`, UTC "today" | Owned by other streams; on the convention test's allow-list. |
 | `DF-6` memos not keyed to "today" | Out of this stream. |
 
-## 8. Suite state at the end of this stream
+## 8. Suite state (after merging the debt stream)
 
-See the commit messages and the final report. `npm test`, `npm run test:tz`, `tsc`, and the full UI suite were green
-before the last commit; UI also run under `America/New_York` and `Asia/Manila` for the affected folders.
+`npm test` 1,762 pass; `npm run test:tz` 74 pass; `tsc` clean for app/tests/e2e; full UI suite 640 pass, 27 todo; affected UI folders
+also green under `America/New_York` and `Asia/Manila` (593 pass, 27 todo). Known-defect markers against the merged base:
+`it.fails` unit 42 -> 18, integration 43 -> 39, timezone 12 -> 0; UI `knownDefect` 202 -> 178; E2E 53 -> 29.

@@ -119,83 +119,46 @@ interface Allowed {
   reason: string;
 }
 
-const DEBT_STREAM =
-  "owned by the debt-calculator work stream (amortization / credit-card payoff iterate with setMonth and clone Dates); remove when that stream switches to day-index/month-index stepping";
 const FORM_STREAM =
   "owned by a later expense-form work stream (ExpenseRuleForm is out of scope for the engine-dates stream); remove when the form uses getTodayKey()/parseDate and the engine for its preview";
+const FORM = "components/pages/expenses/components/ExpenseRuleForm";
 
 const ALLOWED: Allowed[] = [
-  // --- ExpenseRuleForm (later stream) ---
   {
-    file: "components/pages/expenses/components/ExpenseRuleForm/components/LoanDetailsForm.tsx",
-    text: "startDate: new Date(loanStartDate),",
-    reason: FORM_STREAM + " (a REAL UTC parse of a YYYY-MM-DD string)",
-  },
-  {
-    file: "components/pages/expenses/components/ExpenseRuleForm/components/SchedulePreview.tsx",
+    file: `${FORM}/components/SchedulePreview.tsx`,
     text: "dates.push(new Date(date));",
     reason: FORM_STREAM + " (clones a Date)",
   },
   {
-    file: "components/pages/expenses/components/ExpenseRuleForm/components/SchedulePreview.tsx",
+    file: `${FORM}/components/SchedulePreview.tsx`,
     text: "addOccurrence(new Date(date));",
     reason: FORM_STREAM + " (clones a Date)",
   },
   {
-    file: "components/pages/expenses/components/ExpenseRuleForm/components/SchedulePreview.tsx",
+    file: `${FORM}/components/SchedulePreview.tsx`,
     text: "monthCursor.setMonth(monthCursor.getMonth() + 1);",
     reason: FORM_STREAM + " (the preview re-implements stepping; it should call the engine)",
   },
   {
-    file: "components/pages/expenses/components/ExpenseRuleForm/components/SchedulePreview.tsx",
+    file: `${FORM}/components/SchedulePreview.tsx`,
     text: "current.setMonth(current.getMonth() + 3);",
     reason: FORM_STREAM + " (the preview re-implements stepping; it should call the engine)",
   },
   {
-    file: "components/pages/expenses/components/ExpenseRuleForm/formHelpers.ts",
+    file: `${FORM}/formHelpers.ts`,
     text: 'startDate: initialData?.startDate || new Date().toISOString().split("T")[0],',
     reason: FORM_STREAM + " (UTC 'today' default, UI-RULE-30)",
   },
   {
-    file: "components/pages/expenses/components/ExpenseRuleForm/formHelpers.ts",
+    file: `${FORM}/formHelpers.ts`,
     text: 'loanStartDate: initialData?.loanStartDate || new Date().toISOString().split("T")[0],',
     reason: FORM_STREAM + " (UTC 'today' default)",
   },
-  // --- amortization / credit-card payoff / credit projections (debt stream) ---
-  {
-    file: "lib/logic/amortization/loanAmortization.ts",
-    text: "const currentDate = new Date(config.startDate);",
-    reason: DEBT_STREAM + " (config.startDate is a Date: a clone)",
-  },
-  {
-    file: "lib/logic/amortization/loanAmortization.ts",
-    text: "date: new Date(currentDate),",
-    reason: DEBT_STREAM + " (clones a Date)",
-  },
-  {
-    file: "lib/logic/amortization/loanAmortization.ts",
-    text: "currentDate.setMonth(currentDate.getMonth() + 1);",
-    reason: DEBT_STREAM,
-  },
   {
     file: "lib/logic/creditCardCalculator/payoffCalculator.ts",
-    text: "const currentDate = new Date(startDate);",
-    reason: DEBT_STREAM + " (startDate is a Date: a clone)",
-  },
-  {
-    file: "lib/logic/creditCardCalculator/payoffCalculator.ts",
-    text: "date: new Date(currentDate),",
-    reason: DEBT_STREAM + " (clones a Date)",
-  },
-  {
-    file: "lib/logic/creditCardCalculator/payoffCalculator.ts",
-    text: "currentDate.setMonth(currentDate.getMonth() + 1);",
-    reason: DEBT_STREAM,
-  },
-  {
-    file: "lib/logic/projectionEngine/creditProjections.ts",
-    text: "const paymentDate = new Date(step.date);",
-    reason: DEBT_STREAM + " (step.date is a Date: a clone)",
+    text: "date: new Date(startDate),",
+    reason:
+      "startDate is a Date parameter, so this only clones a Date (the name heuristic cannot tell); the debt stream already moved this module off setMonth stepping",
   },
 ];
 
