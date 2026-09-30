@@ -987,53 +987,50 @@ describe("loan lifecycle: paying the first of six amortized payments", () => {
     expect(config.currentBalance).toBe(6_000);
   });
 
-  it("drops the final payment from the remaining schedule", async () => {
+  it("keeps the final payment in the remaining schedule", async () => {
     await completeOccurrence("proj_loan-1::2026-01-01::loan-1_2026-01", ORIGINAL_PMT);
 
     const view = loanView();
-    // OBSERVED DRIFT: one payment made out of six, but only four remain
-    // projected — the schedule ends on 2026-05-01 and 2026-06-01 vanishes.
-    // loanProjections.ts:36-41 re-amortizes over `termMonths - paymentsMade`
-    // months but still starts the schedule at `rule.startDate`, so the whole
-    // remaining schedule slides one month earlier and loses its tail.
-    expect(dates(view.transactions)).toEqual([
-      "2026-01-01",
-      "2026-02-01",
-      "2026-03-01",
-      "2026-04-01",
-      "2026-05-01",
-    ]);
-    expect(projectedRows(view)).toHaveLength(4);
+    // REWRITTEN (was "drops the final payment", which asserted the OBSERVED DRIFT:
+    // five rows ending 2026-05-01). One payment made out of six leaves FIVE projected,
+    // the schedule is re-anchored by paymentsMade, and 2026-06-01 is still there.
+    expect(dates(view.transactions)).toEqual(LOAN_DATES);
+    expect(projectedRows(view)).toHaveLength(5);
+    expect(dates(projectedRows(view))[4]).toBe("2026-06-01");
   });
 
-  it("inflates every remaining payment by re-amortizing the unreduced principal", async () => {
+  it("does not inflate the remaining payments after paying on time", async () => {
     await completeOccurrence("proj_loan-1::2026-01-01::loan-1_2026-01", ORIGINAL_PMT);
 
     const view = loanView();
-    // OBSERVED DRIFT: the full 6000 is re-amortized over 5 months
-    // (6000·0.01·1.01^5 / (1.01^5 − 1) = 1236.24) because currentBalance was
-    // never reduced. The user's projected payment jumps 19% after paying on time.
-    projectedRows(view).forEach((t) => expect(t.projectedAmount).toBeCloseTo(REDERIVED_PMT, 2));
+    // REWRITTEN (was "inflates every remaining payment ... 1236.24", the OBSERVED DRIFT of
+    // re-amortizing the unreduced 6000 over 5 months). The loan's level payment is the
+    // stored 1035.29. Only the first four are asserted: currentBalance is still the
+    // unreduced 6000 here (the write path never reduces it, see the known defect below),
+    // so the LAST payment honestly absorbs that unreduced principal until the write-path fix.
+    projectedRows(view)
+      .slice(0, 4)
+      .forEach((t) => expect(t.projectedAmount).toBeCloseTo(ORIGINAL_PMT, 2));
   });
 
-  it("skips a payment number in the remaining schedule", async () => {
+  it("numbers the remaining payments 2 through 6 without skipping", async () => {
     await completeOccurrence("proj_loan-1::2026-01-01::loan-1_2026-01", ORIGINAL_PMT);
 
     const view = loanView();
-    // OBSERVED DRIFT: paymentNumber = paymentsMade + index + 1
-    // (loanProjections.ts:43), and index restarts at the schedule's head — which
-    // is still 2026-01-01 — so the displaced first row absorbs number 2 and the
-    // next visible payment is numbered 3. Payment 2 is never shown.
-    expect(projectedRows(view).map((t) => t.paymentBreakdown!.paymentNumber)).toEqual([3, 4, 5, 6]);
+    // REWRITTEN (was "skips a payment number", the OBSERVED DRIFT [3,4,5,6]): the number is
+    // the absolute position, paymentsMade + index + 1 over the schedule that starts AFTER
+    // the paid month, and every remaining row reports the same total.
+    expect(projectedRows(view).map((t) => t.paymentBreakdown!.paymentNumber)).toEqual([2, 3, 4, 5, 6]);
+    projectedRows(view).forEach((t) => expect(t.paymentBreakdown!.totalPayments).toBe(6));
   });
 
-  it("keeps the derived view internally consistent despite the drift", async () => {
+  it("shows all six owed payments in the derived view (1 completed + 5 projected)", async () => {
     await completeOccurrence("proj_loan-1::2026-01-01::loan-1_2026-01", ORIGINAL_PMT);
 
     // snapshot() already asserts the double-count guard; this pins the visible
-    // consequence: five rows where six payments are owed
+    // consequence. REWRITTEN (was "five rows where six payments are owed").
     const view = loanView();
-    expect(view.transactions).toHaveLength(5);
+    expect(view.transactions).toHaveLength(6);
     expect(view.transactions.filter((t) => t.occurrenceId === "loan-1_2026-01")).toHaveLength(1);
   });
 
@@ -1067,6 +1064,10 @@ describe("loan lifecycle: paying the first of six amortized payments", () => {
      * CORRECT: a level-payment loan has level payments — the remaining
      * projections must keep the original PMT.
      */
+    // STILL OPEN after the projection fix: every row except the last is level (asserted above),
+    // but the LAST payment absorbs the unreduced currentBalance (6000 instead of 5024.71),
+    // so "all remaining payments keep the original amount" needs the write path to reduce
+    // currentBalance on completion. When that lands this test turns red: remove `.fails`.
     it.fails("KNOWN DEFECT: the remaining payments keep their original amount", async () => {
       await completeOccurrence("proj_loan-1::2026-01-01::loan-1_2026-01", ORIGINAL_PMT);
 
@@ -1083,7 +1084,7 @@ describe("loan lifecycle: paying the first of six amortized payments", () => {
      * forecast, and the head of the schedule collides with an already-paid date.
      * CORRECT: the five remaining payments fall on 2026-02-01 .. 2026-06-01.
      */
-    it.fails("KNOWN DEFECT: the remaining payments keep their original dates", async () => {
+    it("the remaining payments keep their original dates (FIXED: anchor advanced by paymentsMade)", async () => {
       await completeOccurrence("proj_loan-1::2026-01-01::loan-1_2026-01", ORIGINAL_PMT);
 
       expect(dates(projectedRows(loanView()))).toEqual([
@@ -1102,7 +1103,7 @@ describe("loan lifecycle: paying the first of six amortized payments", () => {
      * displaced row and the user's next payment is labelled 3 of 6.
      * CORRECT: the remaining payments are 2 through 6.
      */
-    it.fails("KNOWN DEFECT: the remaining payments are numbered 2 through 6", async () => {
+    it("the remaining payments are numbered 2 through 6 (FIXED: absolute numbering)", async () => {
       await completeOccurrence("proj_loan-1::2026-01-01::loan-1_2026-01", ORIGINAL_PMT);
 
       expect(projectedRows(loanView()).map((t) => t.paymentBreakdown!.paymentNumber)).toEqual([
@@ -1120,8 +1121,8 @@ describe("loan lifecycle: paying the first of six amortized payments", () => {
      * CORRECT: the realized row's projectedAmount must equal the projection's
      * projectedAmount it replaced.
      */
-    it.fails(
-      "KNOWN DEFECT: the realized row records the amount that was actually projected",
+    it(
+      "the realized row records the amount that was actually projected (passes here only because rule.amount == monthlyPayment; UI-LIFE-14 covers the divergent case)",
       async () => {
         const projectedAmount = loanView().transactions[0].projectedAmount;
 

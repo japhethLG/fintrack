@@ -2,11 +2,92 @@
  * Loan payment projection generation
  */
 
-import { ExpenseRule, Transaction } from "@/lib/types";
-import { parseDate } from "@/lib/utils/dateUtils";
-import { calculateAmortizationSchedule } from "../amortization";
+import { ExpenseRule, LoanConfig, Transaction } from "@/lib/types";
+import { addMonths, parseDate } from "@/lib/utils/dateUtils";
+import { AmortizationStep, calculateAmortizationSchedule } from "../amortization";
+import { adjustForWeekend } from "./dateUtils";
 import { generateOccurrenceId } from "./occurrenceIdGenerator";
 import { createProjectedTransaction } from "./transactionFactory";
+
+type ProjectedTransaction = Omit<Transaction, "id" | "userId" | "createdAt" | "updatedAt">;
+
+/** Below this a balance is treated as repaid (half a cent). */
+const PAID_OFF_EPSILON = 0.005;
+
+const finiteOr = (value: number, fallback: number): number =>
+  Number.isFinite(value) ? value : fallback;
+
+/**
+ * Where a loan stands, judged from its stored progress.
+ * - `paid_off`: nothing is owed (balance <= 0), whatever the payment counter says.
+ * - `past_term_balance_owed`: every scheduled payment is counted but money is
+ *   still owed. The loan must not vanish from the calendar while that is true.
+ * - `active`: scheduled payments remain.
+ * - `invalid`: the term is not a whole number of months >= 1; nothing can be scheduled.
+ */
+export type LoanStatus = "active" | "paid_off" | "past_term_balance_owed" | "invalid";
+
+export const getLoanStatus = (loanConfig: LoanConfig): LoanStatus => {
+  const balance = finiteOr(loanConfig.currentBalance, 0);
+  if (balance <= PAID_OFF_EPSILON) return "paid_off";
+  const made = Math.max(0, Math.floor(finiteOr(loanConfig.paymentsMade, 0)));
+  const term = Math.floor(finiteOr(loanConfig.termMonths, 0));
+  if (term < 1) return "invalid"; // a loan with no term cannot be scheduled
+  return made >= term ? "past_term_balance_owed" : "active";
+};
+
+/**
+ * The remaining payment schedule of a loan, with absolute payment numbers.
+ *
+ * - The schedule starts from `currentBalance` over the remaining term
+ *   (`termMonths - paymentsMade`), dated from the ORIGINAL anchor
+ *   (`rule.startDate`) advanced by `paymentsMade` months.
+ * - An amortized loan pays its stored `monthlyPayment` (the contract); flat and
+ *   reducing-balance loans pay what their formula says.
+ * - Past the term with a balance still owed, one payment for the outstanding
+ *   balance plus a month of interest is reported instead of nothing.
+ */
+const buildRemainingSchedule = (
+  rule: ExpenseRule,
+  loanConfig: LoanConfig
+): { steps: AmortizationStep[]; made: number } | null => {
+  const status = getLoanStatus(loanConfig);
+  if (status === "paid_off" || status === "invalid") return null;
+
+  const balance = finiteOr(loanConfig.currentBalance, 0);
+  const made = Math.max(0, Math.floor(finiteOr(loanConfig.paymentsMade, 0)));
+  const term = Math.floor(finiteOr(loanConfig.termMonths, 0));
+  const annualRate = finiteOr(loanConfig.interestRate, 0);
+  const anchor = parseDate(rule.startDate);
+
+  if (status === "past_term_balance_owed") {
+    const interest = balance * (annualRate / 100 / 12);
+    return {
+      made,
+      steps: [
+        {
+          date: addMonths(anchor, made),
+          payment: balance + interest,
+          principal: balance,
+          interest,
+          remainingBalance: 0,
+        },
+      ],
+    };
+  }
+
+  const steps = calculateAmortizationSchedule({
+    principal: balance,
+    annualRate,
+    termMonths: term - made,
+    monthlyPayment: loanConfig.monthlyPayment,
+    startDate: anchor,
+    monthOffset: made,
+    calculationType: loanConfig.calculationType,
+    interestBasis: loanConfig.principalAmount,
+  });
+  return { steps, made };
+};
 
 /**
  * Generate projected loan payment transactions with amortization
@@ -19,40 +100,37 @@ export const generateLoanProjections = (
   rule: ExpenseRule,
   viewStartDate: Date,
   viewEndDate: Date
-): Omit<Transaction, "id" | "userId" | "createdAt" | "updatedAt">[] => {
+): ProjectedTransaction[] => {
   if (!rule.loanConfig) return [];
 
   const { loanConfig } = rule;
+  const plan = buildRemainingSchedule(rule, loanConfig);
+  if (!plan) return [];
 
-  // Calculate remaining payments from current state
-  const remainingPayments = loanConfig.termMonths - loanConfig.paymentsMade;
-  if (remainingPayments <= 0) return [];
+  const { steps, made } = plan;
+  const totalPayments = made + steps.length;
+  const adjustment = rule.weekendAdjustment === "none" ? undefined : rule.weekendAdjustment;
 
-  // Generate amortization schedule starting from current balance
-  const schedule = calculateAmortizationSchedule({
-    principal: loanConfig.currentBalance,
-    annualRate: loanConfig.interestRate,
-    termMonths: remainingPayments,
-    startDate: parseDate(rule.startDate),
-  });
-
-  // Filter to view period and map to transactions
-  return schedule
-    .filter((step) => step.date >= viewStartDate && step.date <= viewEndDate)
-    .map((step, index) => {
-      const paymentNumber = loanConfig.paymentsMade + index + 1;
+  // Number EVERY step first, then filter: a payment's number is its absolute
+  // position in the loan and must not depend on what the viewport shows.
+  return steps
+    .map((step, index) => ({ step, paymentNumber: made + index + 1 }))
+    .flatMap(({ step, paymentNumber }) => {
+      // The occurrence id names the logical month; the weekend shift only moves the date.
       const occurrenceId = generateOccurrenceId(
         rule.id,
-        rule.frequency,
+        rule.frequency === "one-time" ? "monthly" : rule.frequency,
         step.date,
         rule.startDate,
         rule.scheduleConfig
       );
-      const override = rule.occurrenceOverrides?.[occurrenceId];
+      const emittedDate = adjustment ? adjustForWeekend(step.date, adjustment) : step.date;
+      if (emittedDate < viewStartDate || emittedDate > viewEndDate) return [];
 
-      return createProjectedTransaction(
+      const override = rule.occurrenceOverrides?.[occurrenceId];
+      const transaction = createProjectedTransaction(
         { ...rule, amount: step.payment },
-        step.date,
+        emittedDate,
         "expense",
         "expense_rule",
         {
@@ -60,12 +138,11 @@ export const generateLoanProjections = (
           interestPaid: step.interest,
           remainingBalance: step.remainingBalance,
           paymentNumber,
-          totalPayments: loanConfig.termMonths,
+          totalPayments,
         },
         occurrenceId,
         override
       );
-    })
-    .filter((t): t is NonNullable<typeof t> => t !== null);
+      return transaction ? [transaction] : [];
+    });
 };
-

@@ -566,7 +566,7 @@ describe("generateLoanProjections", () => {
     });
   });
 
-  describe("known defects", () => {
+  describe("previously known defects (fixed) and the ones still open", () => {
     /**
      * DEFECT 1: the projected payment inflates after every completed payment.
      * loanProjections.ts:28-37 shortens the term (`remainingPayments =
@@ -577,7 +577,8 @@ describe("generateLoanProjections", () => {
      * CORRECT: the contractual payment is fixed for the life of the loan, so the
      * projected amount must not change as payments are recorded.
      */
-    it.fails("KNOWN DEFECT: keeps the projected payment constant as payments are made", () => {
+    it(
+      "keeps the projected payment constant as payments are made", () => {
       const amountAt = (paymentsMade: number) => {
         const rule = makeLoanRule({ startDate: "2026-01-01" }, { paymentsMade });
         return generateLoanProjections(rule, VIEW_START, VIEW_END)[0].projectedAmount;
@@ -596,8 +597,8 @@ describe("generateLoanProjections", () => {
      * CORRECT: payment N+1 falls one month after payment N, i.e. the first remaining
      * payment is `paymentsMade` months after the rule start date.
      */
-    it.fails(
-      "KNOWN DEFECT: dates the first remaining payment after the payments already made",
+    it(
+      "dates the first remaining payment after the payments already made",
       () => {
         const rule = makeLoanRule({ startDate: "2026-01-01" }, { paymentsMade: 3 });
         const projections = generateLoanProjections(rule, VIEW_START, VIEW_END);
@@ -607,22 +608,35 @@ describe("generateLoanProjections", () => {
     );
 
     /**
-     * DEFECT 3: paymentNumber is double-counted.
-     * loanProjections.ts:43 computes `paymentsMade + index + 1`, but `index` already
-     * restarts from the schedule's own first step - which (defect 2) is dated at
-     * `rule.startDate`. With paymentsMade 3 the payment sitting on the rule start
-     * date is labelled payment 4 of 24 even though it is the first step of the
-     * generated schedule.
-     * CORRECT: the number must agree with the payment's position - the step at the
-     * rule start date is payment 1. Note this defect and defect 2 have to be fixed
-     * together: once the schedule no longer slides, the first projection is
-     * legitimately payment 4 AND dated 2026-04-01.
+     * FIXED (and REWRITTEN) - DEFECT 3: paymentNumber is the ABSOLUTE position in the loan.
+     *
+     * The original test asserted "the payment sitting on the rule start date is payment 1"
+     * while, in the same file, the next test asserted that paymentNumber is the absolute
+     * position in the loan regardless of the window. Those cannot both hold once payments
+     * have been made: with paymentsMade 3 the start-date payment is one of the three
+     * ALREADY PAID and is no longer projected at all. The absolute convention is the
+     * correct one because the old number changed with the viewport (June 2026 printed
+     * #6 in a year view and #1 in a June view, see the next test); a number that changes
+     * when the user scrolls cannot be right under any convention.
+     *
+     * Rewritten to the absolute convention, in both halves that the old test mixed up:
+     *  - nothing paid: the payment on the rule start date (2026-01-01) IS payment 1;
+     *  - 3 paid: the first PROJECTED payment is the 4th (2026-04-01), not 7 (3 added to
+     *    an index that already counted them) and not 1 (restarting from the window).
      */
-    it.fails("KNOWN DEFECT: does not add paymentsMade on top of the schedule's own index", () => {
-      const rule = makeLoanRule({ startDate: "2026-01-01" }, { paymentsMade: 3 });
-      const projections = generateLoanProjections(rule, VIEW_START, VIEW_END);
-      const atStartDate = projections.find((t) => t.scheduledDate === "2026-01-01");
+    it("numbers the payment on the rule start date 1, and the first projected payment after 3 made number 4", () => {
+      const fresh = generateLoanProjections(makeLoanRule({ startDate: "2026-01-01" }), VIEW_START, VIEW_END);
+      const atStartDate = fresh.find((t) => t.scheduledDate === "2026-01-01");
       expect(atStartDate?.paymentBreakdown?.paymentNumber).toBe(1);
+
+      const resumed = generateLoanProjections(
+        makeLoanRule({ startDate: "2026-01-01" }, { paymentsMade: 3 }),
+        VIEW_START,
+        VIEW_END
+      );
+      expect(resumed[0].scheduledDate).toBe("2026-04-01"); // months 1-3 are already paid
+      expect(resumed[0].paymentBreakdown?.paymentNumber).toBe(4);
+      expect(resumed.find((t) => t.scheduledDate === "2026-01-01")).toBeUndefined();
     });
 
     /**
@@ -635,8 +649,8 @@ describe("generateLoanProjections", () => {
      * CORRECT: paymentNumber is a property of the loan, not of the viewport - the
      * June payment of a loan starting 2026-01-01 is payment 6 of 24.
      */
-    it.fails(
-      "KNOWN DEFECT: numbers payments by position in the loan, not in the view window",
+    it(
+      "numbers payments by position in the loan, not in the view window",
       () => {
         const rule = makeLoanRule({ startDate: "2026-01-01" });
         const projections = generateLoanProjections(rule, d("2026-06-01"), d("2026-07-31"));
@@ -655,8 +669,8 @@ describe("generateLoanProjections", () => {
      * CORRECT: the user-entered payment drives the projections (and, with 800 a
      * month, the loan is retired in 17 payments instead of 24).
      */
-    it.fails(
-      "KNOWN DEFECT: projects the user-entered monthlyPayment instead of a recomputed PMT",
+    it(
+      "projects the user-entered monthlyPayment instead of a recomputed PMT",
       () => {
         const rule = makeLoanRule({ startDate: "2026-01-01" }, { monthlyPayment: 800 });
         const projections = generateLoanProjections(rule, VIEW_START, VIEW_END);
@@ -697,7 +711,7 @@ describe("generateLoanProjections", () => {
      * splits. Under flat rate at 12% on 12,000 over 24 months, every period charges
      * 12,000 * 1% = 120.00 of interest, not a declining amount.
      */
-    it.fails("KNOWN DEFECT: honours a flat_rate calculationType", () => {
+    it("honours a flat_rate calculationType", () => {
       const flat = generateLoanProjections(
         makeLoanRule({ startDate: "2026-01-01" }, { calculationType: "flat_rate" }),
         VIEW_START,
@@ -713,7 +727,7 @@ describe("generateLoanProjections", () => {
       expect(flat[1].paymentBreakdown!.interestPaid).toBeCloseTo(120, 2);
     });
 
-    it.fails("KNOWN DEFECT: honours a reducing_balance calculationType", () => {
+    it("honours a reducing_balance calculationType", () => {
       const reducing = generateLoanProjections(
         makeLoanRule({ startDate: "2026-01-01" }, { calculationType: "reducing_balance" }),
         VIEW_START,
