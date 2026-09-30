@@ -3,8 +3,8 @@
  */
 
 import { ExpenseRule, InstallmentConfig, Transaction } from "@/lib/types";
-import { addMonths, parseDate } from "@/lib/utils/dateUtils";
-import { adjustForWeekend } from "./dateUtils";
+import { parseDate } from "@/lib/utils/dateUtils";
+import { adjustForWeekend, monthlyPaymentDate } from "./dateUtils";
 import { generateOccurrenceId } from "./occurrenceIdGenerator";
 import { createProjectedTransaction } from "./transactionFactory";
 
@@ -53,7 +53,8 @@ export const buildInstallmentAmounts = (config: InstallmentConfig): number[] => 
  *
  * Installment `i` (0-based) is due `startDate + i` months, always computed from
  * the original anchor, so a Jan 31 plan bills Jan 31, Feb 28, Mar 31 ... and
- * never drifts to the 28th. The occurrence id names the logical month (the
+ * never drifts to the 28th. When the rule has a `scheduleConfig.dayOfMonth` the
+ * installments fall on that day instead (see `monthlyPaymentDate`). The occurrence id names the logical month (the
  * weekend shift only moves the date) and a `one-time` frequency is treated as
  * monthly for identity, so no two installments ever share an id.
  *
@@ -83,7 +84,7 @@ export const generateInstallmentProjections = (
   const projections: ProjectedTransaction[] = [];
 
   for (let i = paid; i < count; i++) {
-    const logicalDate = addMonths(anchor, i);
+    const logicalDate = monthlyPaymentDate(anchor, rule.scheduleConfig?.dayOfMonth, i);
     const emittedDate = adjustment ? adjustForWeekend(logicalDate, adjustment) : logicalDate;
     if (emittedDate < viewStartDate || emittedDate > viewEndDate) continue;
 

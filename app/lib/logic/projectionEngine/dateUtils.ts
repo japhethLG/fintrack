@@ -7,7 +7,7 @@
  * have no wall-clock, DST or time-zone component.
  */
 
-import { addDays, weekdayOfDayNumber } from "@/lib/utils/dateUtils";
+import { addDays, addMonths, weekdayOfDayNumber } from "@/lib/utils/dateUtils";
 import type { ScheduleConfig } from "@/lib/types";
 
 export {
@@ -92,6 +92,29 @@ export const clampDayToMonth = (day: number, year: number, month: number): numbe
   if (!Number.isFinite(day)) return 1;
   const maxDay = getLastDayOfMonth(year, month);
   return Math.max(1, Math.min(day, maxDay));
+};
+
+/**
+ * Due date of the `index`-th (0-based) payment of a MONTHLY debt schedule (loan, installment plan).
+ *
+ * With a usable `dayOfMonth` (an integer 1..31) the payments fall on that day of each month, clamped to
+ * short months from the fixed day rather than from the previous result (a 31st is Jan 31, Feb 28, Mar 31).
+ * The first payment is that day in the start date's month, or the next month's when it has already
+ * passed (start Feb 10, day 5: Mar 5), the same rule as a monthly recurring rule and as the credit card
+ * generator. Without one the payments follow the start date's own day (`addMonths` from the anchor).
+ */
+export const monthlyPaymentDate = (anchor: Date, dayOfMonth: unknown, index: number): Date => {
+  const day = toInteger(dayOfMonth);
+  if (day === null || day < 1 || day > 31) return addMonths(anchor, index);
+  const year = anchor.getFullYear();
+  const month = anchor.getMonth();
+  const startMonthIndex = year * 12 + month;
+  const firstMonthIndex =
+    clampDayToMonth(day, year, month) >= anchor.getDate() ? startMonthIndex : startMonthIndex + 1;
+  const monthIndex = firstMonthIndex + index;
+  const y = Math.floor(monthIndex / 12);
+  const m = monthIndex % 12;
+  return new Date(y, m, clampDayToMonth(day, y, m));
 };
 
 // ============================================================================
