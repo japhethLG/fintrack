@@ -21,7 +21,7 @@ import {
   setIncomeSourceOverride,
   setExpenseRuleOverride,
 } from "./index";
-import { parseDate } from "@/lib/utils/dateUtils";
+import { getTodayKey, parseDate } from "@/lib/utils/dateUtils";
 import { generateOccurrenceId } from "@/lib/logic/projectionEngine/occurrenceIdGenerator";
 
 /**
@@ -93,7 +93,7 @@ export const deleteAllUserData = async (userId: string): Promise<void> => {
   // Reset user balance to 0
   await updateUserProfile(userId, {
     currentBalance: 0,
-    balanceLastUpdatedAt: new Date().toISOString().split("T")[0],
+    balanceLastUpdatedAt: getTodayKey(),
   });
 };
 
@@ -202,7 +202,7 @@ export const deleteSelectiveUserData = async (
   if (shouldResetBalance) {
     await updateUserProfile(userId, {
       currentBalance: 0,
-      balanceLastUpdatedAt: new Date().toISOString().split("T")[0],
+      balanceLastUpdatedAt: getTodayKey(),
     });
   }
 };

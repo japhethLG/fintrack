@@ -115,7 +115,7 @@ const CalendarView: React.FC = () => {
     const days: CalendarDay[] = [];
 
     // Get the start of the week (Sunday) containing currentDate
-    const current = new Date(currentDate);
+    const current = new Date(currentDate.getTime());
     const dayOfWeek = current.getDay();
     const weekStart = new Date(current);
     weekStart.setDate(current.getDate() - dayOfWeek);
@@ -170,7 +170,7 @@ const CalendarView: React.FC = () => {
         end = calendarWeekDays[6].date;
       } else {
         const dayOfWeek = currentDate.getDay();
-        start = new Date(currentDate);
+        start = new Date(currentDate.getTime());
         start.setDate(currentDate.getDate() - dayOfWeek);
         end = new Date(start);
         end.setDate(start.getDate() + 6);
@@ -231,11 +231,11 @@ const CalendarView: React.FC = () => {
 
   // Week navigation
   const goToPrevWeek = () => {
-    const newDate = new Date(currentDate);
+    const newDate = new Date(currentDate.getTime());
     newDate.setDate(currentDate.getDate() - 7);
     // Update view date range to include the new week (expands if needed)
     const dayOfWeek = newDate.getDay();
-    const weekStart = new Date(newDate);
+    const weekStart = new Date(newDate.getTime());
     weekStart.setDate(newDate.getDate() - dayOfWeek);
     const weekEnd = new Date(weekStart);
     weekEnd.setDate(weekStart.getDate() + 6);
@@ -244,11 +244,11 @@ const CalendarView: React.FC = () => {
   };
 
   const goToNextWeek = () => {
-    const newDate = new Date(currentDate);
+    const newDate = new Date(currentDate.getTime());
     newDate.setDate(currentDate.getDate() + 7);
     // Update view date range to include the new week (expands if needed)
     const dayOfWeek = newDate.getDay();
-    const weekStart = new Date(newDate);
+    const weekStart = new Date(newDate.getTime());
     weekStart.setDate(newDate.getDate() - dayOfWeek);
     const weekEnd = new Date(weekStart);
     weekEnd.setDate(weekStart.getDate() + 6);

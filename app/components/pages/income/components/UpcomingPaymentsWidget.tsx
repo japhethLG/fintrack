@@ -4,7 +4,7 @@ import React, { useState, useMemo } from "react";
 import { useFinancial } from "@/contexts/FinancialContext";
 import { Transaction } from "@/lib/types";
 import { Card, Icon, Select, Badge } from "@/components/common";
-import { formatDate, addDays } from "@/lib/utils/dateUtils";
+import { addDays, formatDate, parseDate } from "@/lib/utils/dateUtils";
 import { useCurrency } from "@/lib/hooks/useCurrency";
 import { useModal } from "@/components/modals";
 
@@ -93,7 +93,7 @@ const UpcomingPaymentsWidget: React.FC = () => {
             .map((date) => (
               <div key={date}>
                 <h4 className="text-gray-400 text-xs font-bold uppercase tracking-wider mb-3">
-                  {new Date(date).toLocaleDateString(undefined, {
+                  {parseDate(date).toLocaleDateString(undefined, {
                     weekday: "long",
                     month: "short",
                     day: "numeric",

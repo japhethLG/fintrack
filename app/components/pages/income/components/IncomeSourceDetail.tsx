@@ -6,6 +6,7 @@ import { Button, Card, Icon, Badge } from "@/components/common";
 import { cn } from "@/lib/utils/cn";
 import { useCurrency } from "@/lib/hooks/useCurrency";
 import { SOURCE_TYPE_ICONS, FREQUENCY_LABELS } from "../constants";
+import { parseDate } from "@/lib/utils/dateUtils";
 
 interface IProps {
   source: IncomeSource;
@@ -93,13 +94,13 @@ const IncomeSourceDetail: React.FC<IProps> = ({ source, onEdit, onDelete, onTogg
         <div>
           <p className="text-gray-400 text-sm mb-1">Start Date</p>
           <p className="text-white font-medium">
-            {new Date(source.startDate).toLocaleDateString()}
+            {parseDate(source.startDate).toLocaleDateString()}
           </p>
         </div>
         <div>
           <p className="text-gray-400 text-sm mb-1">End Date</p>
           <p className="text-white font-medium">
-            {source.endDate ? new Date(source.endDate).toLocaleDateString() : "Ongoing"}
+            {source.endDate ? parseDate(source.endDate).toLocaleDateString() : "Ongoing"}
           </p>
         </div>
         <div>

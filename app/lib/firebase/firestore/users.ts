@@ -14,6 +14,7 @@ import {
 import { db } from "../config";
 import { UserProfile } from "@/lib/types";
 import { removeUndefined } from "./utils";
+import { getTodayKey } from "@/lib/utils/dateUtils";
 
 export const createUserProfile = async (
   uid: string,
@@ -31,7 +32,7 @@ export const createUserProfile = async (
       displayName,
       currentBalance: 0,
       initialBalance: 0,
-      balanceLastUpdatedAt: new Date().toISOString().split("T")[0],
+      balanceLastUpdatedAt: getTodayKey(),
       preferences: {
         currency: "PHP",
         dateFormat: "MM/DD/YYYY",
@@ -90,7 +91,7 @@ export const updateUserBalance = async (uid: string, newBalance: number): Promis
   // Remove undefined values before updating
   const cleanedUpdates = removeUndefined({
     currentBalance: newBalance,
-    balanceLastUpdatedAt: new Date().toISOString().split("T")[0],
+    balanceLastUpdatedAt: getTodayKey(),
     updatedAt: Timestamp.now(),
   });
 

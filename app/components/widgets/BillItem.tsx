@@ -5,6 +5,7 @@ import { UpcomingBill } from "@/lib/types";
 import { Button, Icon } from "@/components/common";
 import { cn } from "@/lib/utils/cn";
 import { useCurrency } from "@/lib/hooks/useCurrency";
+import { parseDate } from "@/lib/utils/dateUtils";
 
 export interface BillItemProps {
   bill: UpcomingBill;
@@ -14,7 +15,7 @@ export interface BillItemProps {
 export const BillItem: React.FC<BillItemProps> = ({ bill, onPay }) => {
   const { formatCurrency } = useCurrency();
   const { transaction, canCover, shortfall } = bill;
-  const date = new Date(transaction.scheduledDate);
+  const date = parseDate(transaction.scheduledDate);
 
   return (
     <div

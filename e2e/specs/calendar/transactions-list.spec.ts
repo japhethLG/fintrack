@@ -11,7 +11,7 @@
  * Hand counts: total 310 | completed 40 | pending(projected) 250 | overdue 10 | skipped 20
  *   income (i mod 3 == 0, i<=310) = 103, expense = 207.
  */
-import { test, expect, seedAndLogin, userProfile, transaction, completedTransaction, knownDefect } from "../../index";
+import { test, expect, seedAndLogin, userProfile, transaction, completedTransaction } from "../../index";
 import { addDaysISO } from "./_support";
 
 const pad = (i: number) => String(i).padStart(3, "0");
@@ -118,9 +118,6 @@ test.describe("310 rows", () => {
   });
 
   test("rows show the stored scheduled date (3/12/2026 for scheduledDate 2026-03-12), in every timezone", async ({ page }, testInfo) => {
-    if (testInfo.project.name === "America/New_York") {
-      knownDefect("E2E-TXN-01", "America/New_York: the row date is rendered from new Date('2026-03-12') (UTC midnight) and shows 3/11/2026, a day early");
-    }
     await boot(page);
     await pick(page, "Sort By", "Date");
     await pick(page, "Order By", "Descending");
@@ -137,10 +134,6 @@ for (const c of [
     test.use({ now: c.now });
 
     test(`overdue tile uses the user's local date: a bill dated 3/10 is overdue only when local today > 3/10`, async ({ page }, testInfo) => {
-      const localToday = c.project === testInfo.project.name ? c.local : undefined;
-      if (localToday !== undefined) {
-        knownDefect("E2E-TXN-02", `${c.project}: overdue/'today' is computed from toISOString() (UTC date) so it disagrees with the local date (local ${c.local})`);
-      }
       await seedAndLogin(
         page,
         { user: userProfile(), transactions: [transaction({ id: "bill", name: "Bill", scheduledDate: "2026-03-10", projectedAmount: 50 })] },
@@ -152,9 +145,6 @@ for (const c of [
     });
 
     test(`'Add Transaction' pre-fills today's LOCAL date`, async ({ page }, testInfo) => {
-      if (c.project === testInfo.project.name) {
-        knownDefect("E2E-TXN-03", `${c.project}: default date comes from toISOString() and is the UTC day, not the local day`);
-      }
       await seedAndLogin(page, { user: userProfile() }, { path: "/transactions" });
       await page.getByRole("button", { name: /Add Transaction/ }).click();
       const local = await page.evaluate(() => new Date().toLocaleDateString("en-CA"));

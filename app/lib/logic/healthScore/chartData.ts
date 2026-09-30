@@ -3,7 +3,7 @@
  */
 
 import { Transaction } from "@/lib/types";
-import { formatDate } from "@/lib/utils/dateUtils";
+import { dayNumberOfDate, formatDate, parseDate } from "@/lib/utils/dateUtils";
 
 export type BucketType = "daily" | "weekly" | "monthly";
 
@@ -39,14 +39,14 @@ export const getIncomeExpenseChartData = (
 
   // Group by bucket
   filteredTransactions.forEach((t) => {
-    const date = new Date(t.actualDate || t.scheduledDate);
+    const date = parseDate(t.actualDate || t.scheduledDate);
     let bucketKey: string;
 
     if (bucketType === "daily") {
       bucketKey = formatDate(date);
     } else if (bucketType === "weekly") {
       // Get week start (Sunday)
-      const weekStart = new Date(date);
+      const weekStart = new Date(date.getTime());
       weekStart.setDate(date.getDate() - date.getDay());
       bucketKey = formatDate(weekStart);
     } else {
@@ -70,7 +70,8 @@ export const getIncomeExpenseChartData = (
   // Convert to array and sort by date
   const result = Array.from(buckets.entries())
     .map(([date, data]) => {
-      const d = new Date(date);
+      // `date` is a bucket key (YYYY-MM-DD, or YYYY-MM for monthly): parse it as LOCAL time.
+      const d = parseDate(date);
       let label: string;
 
       if (bucketType === "daily") {
@@ -101,9 +102,8 @@ export const getIncomeExpenseChartData = (
  * @returns Recommended bucket type
  */
 export const getBestBucketType = (startDate: string, endDate: string): BucketType => {
-  const start = new Date(startDate);
-  const end = new Date(endDate);
-  const daysDiff = Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
+  // Whole calendar days between the two local days (no wall-clock arithmetic, so DST cannot skew it).
+  const daysDiff = dayNumberOfDate(parseDate(endDate)) - dayNumberOfDate(parseDate(startDate));
 
   if (daysDiff <= 14) return "daily";
   if (daysDiff <= 90) return "weekly";

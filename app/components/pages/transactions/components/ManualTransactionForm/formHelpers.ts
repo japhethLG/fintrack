@@ -1,5 +1,6 @@
 import * as yup from "yup";
 import { Transaction, TransactionType, TransactionStatus } from "@/lib/types";
+import { getTodayKey } from "@/lib/utils/dateUtils";
 
 // ============================================================================
 // FORM SCHEMA TYPES
@@ -23,7 +24,7 @@ export const getDefaultValues = (
   editData?: Transaction,
   defaultDate?: string
 ): ManualTransactionFormValues => {
-  const today = defaultDate || new Date().toISOString().split("T")[0];
+  const today = defaultDate || getTodayKey();
 
   if (editData) {
     return {
@@ -97,6 +98,6 @@ export const transformToTransactionData = (
  * Get smart default status based on selected date
  */
 export const getSmartStatus = (date: string): TransactionStatus => {
-  const today = new Date().toISOString().split("T")[0];
+  const today = getTodayKey();
   return date <= today ? "completed" : "projected";
 };

@@ -4,7 +4,7 @@
  *
  * March 2026: 1st = Sun, 15th = Sun, 30th = Mon.  July 2026: 1st = Wed, 31st = Fri; Aug 1 = Sat.
  */
-import { test, expect, seedAndLogin, userProfile, incomeSource, knownDefect } from "../../index";
+import { test, expect, seedAndLogin, userProfile, incomeSource } from "../../index";
 import {
   completeInDialog,
   daysShowing,
@@ -63,10 +63,6 @@ test.describe("semi-monthly [15,30], weekend 'after' (Sun 3/15 -> Mon 3/16, Mon 
   });
 
   test("the two paydays keep distinct occurrence ids when completed (slot 1 and slot 2)", async ({ page }) => {
-    knownDefect(
-      "E2E-CAL-08",
-      "Sunday 15th shifted to Mon 16th is numbered slot 2 (nearest-slot fallback), so both March paydays are stored with occurrenceId semi_2026-03-2"
-    );
     await boot(page, semi());
     await openTxnFromCell(page, monthCell(page, "2026-03", "2026-03-16"), "Semi");
     await completeInDialog(page);
@@ -77,10 +73,6 @@ test.describe("semi-monthly [15,30], weekend 'after' (Sun 3/15 -> Mon 3/16, Mon 
   });
 
   test("completing both paydays shows both completed (2 / 2) and keeps the opening balance", async ({ page }) => {
-    knownDefect(
-      "E2E-CAL-09",
-      "second completion collides with the first: 3/16 vanishes, 3/30 shows a completed AND a projected copy, tile stays 1 / 2, March opening drifts to $1,100"
-    );
     await boot(page, semi());
     await openTxnFromCell(page, monthCell(page, "2026-03", "2026-03-16"), "Semi");
     await completeInDialog(page);
@@ -99,10 +91,6 @@ test.describe("semi-monthly [15,30], weekend 'after' (Sun 3/15 -> Mon 3/16, Mon 
   });
 
   test("dragging one payday moves only that payday", async ({ page }) => {
-    knownDefect(
-      "E2E-CAL-10",
-      "both paydays share occurrence id semi_2026-03-2, so one override moves 3/16 AND 3/30 to the drop day"
-    );
     await boot(page, semi());
     await dragTo(page, monthCell(page, "2026-03", "2026-03-16").getByText("Semi"), monthCell(page, "2026-03", "2026-03-18"));
     await expect(monthCell(page, "2026-03", "2026-03-18").getByText("Semi").first()).toBeVisible();
@@ -119,10 +107,6 @@ test.describe("monthly on the 1st, weekend 'before' (Sat Aug 1 is paid Fri Jul 3
   };
 
   test("July shows Aug 1's payday on Fri 7/31 the first time it is visited", async ({ page }) => {
-    knownDefect(
-      "E2E-CAL-07",
-      "weekend shift is applied AFTER the view-window filter: raw Aug 1 is outside Jul 1..Jul 31, so 7/31 is missing until August has been visited (closing 1,200 instead of 1,300)"
-    );
     await boot(page, firstBefore());
     await toJuly(page);
     expect(await daysShowing(page, "2026-07", "First")).toEqual(["2026-07-01", "2026-07-31"]);
@@ -130,10 +114,6 @@ test.describe("monthly on the 1st, weekend 'before' (Sat Aug 1 is paid Fri Jul 3
   });
 
   test("visiting August first makes 7/31 appear: July's closing figure depends on navigation history", async ({ page }) => {
-    knownDefect(
-      "E2E-CAL-07b",
-      "same root cause seen as history dependence: July closing is 1,200 on first visit and 1,300 after visiting August (the range only grows)"
-    );
     await boot(page, firstBefore());
     await toJuly(page);
     const first = await periodFigure(page, "Closing").innerText();
@@ -144,10 +124,6 @@ test.describe("monthly on the 1st, weekend 'before' (Sat Aug 1 is paid Fri Jul 3
   });
 
   test("completing the 7/31 payday completes THAT payday (7/1 stays projected) with August's identity", async ({ page }) => {
-    knownDefect(
-      "E2E-CAL-11",
-      "7/31 (August's payday) gets July's id m1_2026-07, colliding with 7/1: completing it removes 7/1 from the calendar and leaves 7/31 twice"
-    );
     await boot(page, firstBefore());
     await toJuly(page);
     await navigateToMonth(page, "2026-07", "2026-08");
@@ -162,58 +138,50 @@ test.describe("monthly on the 1st, weekend 'before' (Sat Aug 1 is paid Fri Jul 3
   });
 });
 
-test.describe("daily, weekend 'after' (Sat 3/14 and Sun 3/15 both paid Mon 3/16)", () => {
-  test("Monday carries three payments, the weekend is empty, totals add up", async ({ page }) => {
+// DECISION (docs/audit/fixes/engine-dates.md): a daily rule has an occurrence EVERY day, so weekend adjustment does not
+// apply to it. The old behaviour stacked Sat + Sun + Mon on one Monday under ONE occurrence id (E2E-CAL-05/06/12).
+test.describe("daily, weekend 'after' (daily rules ignore the weekend setting: every day keeps its own payment)", () => {
+  test("every day carries exactly one payment, weekend included, and totals add up", async ({ page }) => {
     await boot(page, dailyAfter());
-    // 3/11,12,13 | 3/16 x3 | 3/17..3/20 | 3/23 x3 | 3/24..3/27 | 3/30 x3 | 3/31  = 21 payments of 10
+    // 3/11 .. 3/31 = 21 days = 21 payments of 10, one per day (weekend days included)
     await expect(summaryTile(page, "Income")).toHaveText("+$210");
     await expect(summaryTile(page, "Transactions")).toHaveText("0 / 21");
-    expect(await monthChipNames(monthCell(page, "2026-03", "2026-03-14"))).toEqual([]);
-    expect(await monthChipNames(monthCell(page, "2026-03", "2026-03-15"))).toEqual([]);
-    await expect(monthCell(page, "2026-03", "2026-03-16")).toContainText("+1 more"); // 3 payments: 2 chips + "+1 more"
+    for (const day of ["2026-03-14", "2026-03-15", "2026-03-16"]) {
+      expect(await monthChipNames(monthCell(page, "2026-03", day)), day).toEqual(["Daily"]);
+    }
     await selectDay(monthCell(page, "2026-03", "2026-03-16"));
     await expect(page.getByText("Monday, Mar 16")).toBeVisible();
-    expect(await sidebarCount(page)).toBe(3);
-    // 3/11..3/13 = 30 already paid => opening 1030; +30 => closing 1060.
-    await expect(page.locator("div.sticky")).toContainText("$1,030");
+    expect(await sidebarCount(page)).toBe(1);
+    // 3/11..3/15 = 5 payments of 10 => Monday opens at 1050 and closes at 1060.
+    await expect(page.locator("div.sticky")).toContainText("$1,050");
     await expect(page.locator("div.sticky")).toContainText("$1,060");
   });
 
   test("the day sidebar lists exactly as many rows as its header says", async ({ page }) => {
-    knownDefect(
-      "E2E-CAL-05",
-      "three payments share the id proj_daily::2026-03-16::daily_2026-03-16; with duplicate React keys the sidebar shows stale extra rows (header says 3)"
-    );
     await boot(page, dailyAfter());
-    await selectDay(monthCell(page, "2026-03", "2026-03-16"));
-    expect(await sidebarCount(page)).toBe(3);
-    await expect(sidebarRows(page)).toHaveCount(3);
+    await selectDay(monthCell(page, "2026-03", "2026-03-14")); // a Saturday
+    expect(await sidebarCount(page)).toBe(1);
+    await expect(sidebarRows(page)).toHaveCount(1);
   });
 
-  test("dragging one of the three Monday payments moves only that one", async ({ page }) => {
-    knownDefect(
-      "E2E-CAL-06",
-      "all three payments share occurrence id daily_2026-03-16: one drag writes one override that moves all three to 3/19"
-    );
+  test("dragging one day's payment moves only that one", async ({ page }) => {
     await boot(page, dailyAfter());
-    await dragTo(page, monthCell(page, "2026-03", "2026-03-16").getByText("Daily").first(), monthCell(page, "2026-03", "2026-03-19"));
-    await expect(monthCell(page, "2026-03", "2026-03-19")).toContainText("more"); // 1 native + moved ones => at least 2
-    await selectDay(monthCell(page, "2026-03", "2026-03-19"));
-    expect(await sidebarCount(page)).toBe(2); // native 3/19 + the one moved
-    await selectDay(monthCell(page, "2026-03", "2026-03-16"));
-    expect(await sidebarCount(page)).toBe(2); // the two that stayed
+    await dragTo(page, monthCell(page, "2026-03", "2026-03-14").getByText("Daily").first(), monthCell(page, "2026-03", "2026-03-19"));
+    // 3/19 now holds its own payment plus the moved one; 3/14 is empty; 3/15 and 3/16 are untouched.
+    expect(await monthChipNames(monthCell(page, "2026-03", "2026-03-19"))).toEqual(["Daily", "Daily"]);
+    expect(await monthChipNames(monthCell(page, "2026-03", "2026-03-14"))).toEqual([]);
+    expect(await monthChipNames(monthCell(page, "2026-03", "2026-03-15"))).toEqual(["Daily"]);
+    expect(await monthChipNames(monthCell(page, "2026-03", "2026-03-16"))).toEqual(["Daily"]);
   });
 
-  test("completing one of the three Monday payments leaves three items on Monday", async ({ page }) => {
-    knownDefect(
-      "E2E-CAL-12",
-      "after completing one, Monday's cell draws 3 chips + '+1 more' (4 items) for 3 payments"
-    );
+  test("completing one day's payment leaves one item on that day, stored under that day's own id", async ({ page }) => {
     await boot(page, dailyAfter());
     await openTxnFromCell(page, monthCell(page, "2026-03", "2026-03-16"), "Daily");
     await completeInDialog(page);
-    await expect(summaryTile(page, "Transactions")).toHaveText("1 / 21"); // works today
-    expect((await monthChipNames(monthCell(page, "2026-03", "2026-03-16"))).length).toBe(2); // 3 items => 2 chips + "+1 more"
-    await expect(monthCell(page, "2026-03", "2026-03-16")).toContainText("+1 more");
+    await expect(summaryTile(page, "Transactions")).toHaveText("1 / 21");
+    expect(await monthChipNames(monthCell(page, "2026-03", "2026-03-16"))).toEqual(["Daily"]);
+    await expect(monthCell(page, "2026-03", "2026-03-16")).not.toContainText("more");
+    const [done] = await storedTxns(page);
+    expect(done.occurrenceId).toBe("daily_2026-03-16");
   });
 });

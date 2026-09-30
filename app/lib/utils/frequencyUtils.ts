@@ -6,6 +6,7 @@
  */
 
 import { IncomeFrequency } from "@/lib/types";
+import { dayNumberOfDate, parseDate } from "@/lib/utils/dateUtils";
 
 /**
  * Get the multiplier to convert a frequency amount to monthly equivalent
@@ -46,9 +47,8 @@ export const prorateToDateRange = (
   startDate: string,
   endDate: string
 ): number => {
-  const start = new Date(startDate);
-  const end = new Date(endDate);
-  const daysDiff = Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+  // Inclusive whole calendar days between two local days (day numbers: no UTC parsing, no DST skew).
+  const daysDiff = dayNumberOfDate(parseDate(endDate)) - dayNumberOfDate(parseDate(startDate)) + 1;
   const daysInMonth = 30; // Use 30-day month for consistency
   return (monthlyAmount / daysInMonth) * daysDiff;
 };

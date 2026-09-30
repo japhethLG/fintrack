@@ -6,6 +6,7 @@ import { Button, Icon, Badge } from "@/components/common";
 import { cn } from "@/lib/utils/cn";
 import { useCurrency } from "@/lib/hooks/useCurrency";
 import { STATUS_VARIANTS } from "../constants";
+import { parseDate } from "@/lib/utils/dateUtils";
 
 interface IProps {
   transaction: Transaction;
@@ -66,11 +67,11 @@ const TransactionRow: React.FC<IProps> = ({ transaction, onAction }) => {
           {/* Date */}
           <div className="text-right hidden md:block">
             <p className="text-sm text-gray-300">
-              {new Date(transaction.actualDate || transaction.scheduledDate).toLocaleDateString()}
+              {parseDate(transaction.actualDate || transaction.scheduledDate).toLocaleDateString()}
             </p>
             {transaction.actualDate && transaction.actualDate !== transaction.scheduledDate && (
               <p className="text-xs text-gray-500 line-through">
-                {new Date(transaction.scheduledDate).toLocaleDateString()}
+                {parseDate(transaction.scheduledDate).toLocaleDateString()}
               </p>
             )}
           </div>

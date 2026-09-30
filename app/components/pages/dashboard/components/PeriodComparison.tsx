@@ -6,7 +6,7 @@ import { Transaction } from "@/lib/types";
 import { getPeriodStats } from "@/lib/logic/healthScore";
 import { cn } from "@/lib/utils/cn";
 import { useCurrency } from "@/lib/hooks/useCurrency";
-import { formatDate } from "@/lib/utils/dateUtils";
+import { dateFromDayNumber, dayNumberOfDate, formatDate, parseDate } from "@/lib/utils/dateUtils";
 
 interface IProps {
   transactions: Transaction[];
@@ -21,13 +21,15 @@ const PeriodComparison: React.FC<IProps> = ({ transactions, dateRange }) => {
 
   // Calculate previous period stats
   const comparisonData = useMemo(() => {
-    const start = new Date(dateRange.start);
-    const end = new Date(dateRange.end);
-    const duration = end.getTime() - start.getTime();
+    // Whole calendar days on local day numbers: no UTC parsing (a day early/late by zone) and no
+    // millisecond arithmetic (skewed by DST).
+    const startDay = dayNumberOfDate(parseDate(dateRange.start));
+    const endDay = dayNumberOfDate(parseDate(dateRange.end));
+    const durationDays = endDay - startDay;
 
     // Previous period is same duration immediately before start date
-    const prevEnd = new Date(start.getTime() - 24 * 60 * 60 * 1000); // 1 day before start
-    const prevStart = new Date(prevEnd.getTime() - duration);
+    const prevEnd = dateFromDayNumber(startDay - 1); // 1 day before start
+    const prevStart = dateFromDayNumber(startDay - 1 - durationDays);
 
     const prevStartStr = formatDate(prevStart);
     const prevEndStr = formatDate(prevEnd);

@@ -159,9 +159,8 @@ describe("Modals", () => {
 // zone for the test, so they run (and are pinned) in the default UTC run too.
 // ---------------------------------------------------------------------------
 describe("UTC+8 (Asia/Manila)", () => {
-  knownDefect(
-    "UI-OBS-07",
-    "the projection window ends a day early: a bill due on the last day of the 4-month lookahead never appears",
+  it(
+    "UI-OBS-07 — the projection window ends a day early: a bill due on the last day of the 4-month lookahead never appears",
     async () => {
       // observed: viewDateRange = { start: "2025-10-31", end: "2026-04-29" } (toISOString of local midnight)
       const app = await renderApp({
@@ -186,9 +185,8 @@ describe("UTC+8 (Asia/Manila)", () => {
     }
   );
 
-  knownDefect(
-    "UI-OBS-08",
-    "Add Transaction defaults the date to YESTERDAY between 00:00 and 08:00 local",
+  it(
+    "UI-OBS-08 — Add Transaction defaults the date to YESTERDAY between 00:00 and 08:00 local",
     async () => {
       // observed: Date input value "2026-01-14" at 00:30 local on 2026-01-15
       const app = await renderApp({

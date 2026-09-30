@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { screen, knownDefect, makeCompletedTransaction, makeExpenseRule } from "../harness";
+import { screen, makeCompletedTransaction, makeExpenseRule } from "../harness";
 import {
   balanceOf,
   completeTx,
@@ -37,9 +37,8 @@ describe("two occurrences in one calendar month (weekend adjustment crosses a mo
     expect(rows(app).map((t) => t.scheduledDate)).toEqual(["2026-01-01", "2026-01-30", "2026-02-27", "2026-04-01"]);
   }, T);
 
-  knownDefect(
-    "UI-LIFE-27",
-    "Jan 1 and the Feb-1-adjusted Jan 30 payment get the SAME occurrenceId (r_2026-01)",
+  it(
+    "UI-LIFE-27 — Jan 1 and the Feb-1-adjusted Jan 30 payment get the SAME occurrenceId (r_2026-01)",
     async () => {
       // observed: ids [r_2026-01, r_2026-01, r_2026-02, r_2026-04]
       const app = await mountTx({ expenseRules: [rent1st()] });
@@ -50,9 +49,8 @@ describe("two occurrences in one calendar month (weekend adjustment crosses a mo
     T
   );
 
-  knownDefect(
-    "UI-LIFE-28",
-    "paying both January-dated bills makes the first payment vanish from the list and shows Jan 30 twice",
+  it(
+    "UI-LIFE-28 — paying both January-dated bills makes the first payment vanish from the list and shows Jan 30 twice",
     async () => {
       // observed after paying Jan 1 then Jan 30: stored 2 completed docs, merged shows 1 completed
       // (Jan 30) + 1 projected Jan 30; the Jan 1 payment is gone; Settings warns 'Balance mismatch'.
@@ -68,9 +66,8 @@ describe("two occurrences in one calendar month (weekend adjustment crosses a mo
     T
   );
 
-  knownDefect(
-    "UI-LIFE-29",
-    "after that, the app's 'Recalculate Balance' button would corrupt the correct balance (8,000 -> 9,000)",
+  it(
+    "UI-LIFE-29 — after that, the app's 'Recalculate Balance' button would corrupt the correct balance (8,000 -> 9,000)",
     async () => {
       const app = await mountTx({ expenseRules: [rent1st()] });
       await completeTx(app, rows(app)[0].id);
@@ -89,9 +86,8 @@ describe("two occurrences in one calendar month (weekend adjustment crosses a mo
 });
 
 describe("legacy stored rows", () => {
-  knownDefect(
-    "UI-LIFE-30",
-    "a completed rule row stored WITHOUT occurrenceId is shown twice (completed + a fresh projection for the same day)",
+  it(
+    "UI-LIFE-30 — a completed rule row stored WITHOUT occurrenceId is shown twice (completed + a fresh projection for the same day)",
     async () => {
       // observed: 2 rows named Rent on 2026-01-12. mergeTransactionsWithProjections falls back to
       // `${sourceId}-${scheduledDate}` but projections always key on occurrenceId.
@@ -110,9 +106,8 @@ describe("legacy stored rows", () => {
 });
 
 describe("dates as the Transactions list prints them (America/New_York, UTC-5)", () => {
-  knownDefect(
-    "UI-LIFE-31",
-    "the list row shows the day BEFORE (1/9/2026) for a bill scheduled 2026-01-10, while the modal says Jan 10",
+  it(
+    "UI-LIFE-31 — the list row shows the day BEFORE (1/9/2026) for a bill scheduled 2026-01-10, while the modal says Jan 10",
     async () => {
       // observed: row date = new Date('2026-01-10').toLocaleDateString() -> UTC midnight -> 1/9/2026 in New York
       const app = await mountTx(
@@ -132,9 +127,8 @@ describe("dates as the Transactions list prints them (America/New_York, UTC-5)",
 
   const overdueStat = () => screen.getByText("Overdue").nextElementSibling!.textContent;
 
-  knownDefect(
-    "UI-LIFE-32",
-    "a bill due TODAY (Jan 15, 22:30 New York) is counted as Overdue by the summary card",
+  it(
+    "UI-LIFE-32 — a bill due TODAY (Jan 15, 22:30 New York) is counted as Overdue by the summary card",
     async () => {
       // observed: 1 (the card compares against today's UTC date, Jan 16).
       const app = await mountTx(

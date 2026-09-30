@@ -1,5 +1,6 @@
 import * as yup from "yup";
 import { IncomeSourceType, IncomeFrequency, ScheduleConfig } from "@/lib/types";
+import { getTodayKey, parseDate } from "@/lib/utils/dateUtils";
 
 // ============================================================================
 // FORM SCHEMA TYPES
@@ -35,7 +36,7 @@ export const getDefaultValues = (
   amount: initialData?.amount || "",
   isVariableAmount: initialData?.isVariableAmount || false,
   frequency: initialData?.frequency || "monthly",
-  startDate: initialData?.startDate || new Date().toISOString().split("T")[0],
+  startDate: initialData?.startDate || getTodayKey(),
   endDate: initialData?.endDate || "",
   hasEndDate: !!initialData?.endDate,
   weekendAdjustment: initialData?.weekendAdjustment || "before",
@@ -98,7 +99,8 @@ export const buildScheduleConfig = (values: IncomeSourceFormValues): ScheduleCon
     case "quarterly":
     case "yearly":
       config.dayOfMonth = values.dayOfMonth;
-      config.monthOfYear = new Date(values.startDate).getMonth();
+      // Local month of the start date (a UTC parse would persist the wrong month west of UTC).
+      config.monthOfYear = parseDate(values.startDate).getMonth();
       break;
   }
 

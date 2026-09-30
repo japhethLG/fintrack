@@ -426,9 +426,8 @@ describe("income wizard: persisted document, preview and projections per frequen
     expect(doc.scheduleConfig.monthOfYear).toBe(2); // March, zero-based
   });
 
-  knownDefect(
-    "UI-RULE-10",
-    "yearly income saved in a negative-offset zone (America/New_York) gets the previous month as monthOfYear",
+  it(
+    "UI-RULE-10 — yearly income saved in a negative-offset zone (America/New_York) gets the previous month as monthOfYear",
     async () => {
       // start 2026-03-01: new Date("2026-03-01") is Feb 28 19:00 local in New York -> getMonth() = 1.
       // observed: monthOfYear 1 (February) instead of 2 (March)
@@ -442,9 +441,8 @@ describe("income wizard: persisted document, preview and projections per frequen
     }
   );
 
-  knownDefect(
-    "UI-RULE-11",
-    "a January-start yearly income in America/New_York is projected for December instead of January",
+  it(
+    "UI-RULE-11 — a January-start yearly income in America/New_York is projected for December instead of January",
     async () => {
       // start 2026-01-01 -> monthOfYear 11 (Dec) in NY. Engine emits Dec 1 2026 (outside the window)
       // instead of Jan 1 2026, so the income is missing from the projections entirely.
@@ -457,7 +455,21 @@ describe("income wizard: persisted document, preview and projections per frequen
     }
   );
 
-  it.todo("DECISION: weekend adjustment at a rule boundary (e.g. one-time/first payment on a Saturday with 'before' lands before the start date; 'after' past the end date): drop vs clamp");
+  it("D4 (weekend adjustment at a rule boundary): start/end bound the LOGICAL date, so the last payment is kept even when 'after' moves it past the end date", async () => {
+    // RESOLVED from a DECISION todo (docs/audit/fixes/engine-dates.md, D4): drop vs clamp vs keep -> KEEP.
+    // Weekly on Saturday, Sat Feb 7 .. Sat Feb 21, pay on the following Monday. The Saturdays Feb 7, 14 and 21
+    // are all inside the rule (<= the end date), so all three payments exist: Mon Feb 9, 16 and 23. Feb 23 is
+    // past the end date on the calendar but dropping it would lose the final payment. (The first-payment mirror,
+    // 'before' landing ahead of the start date, is pinned by the one-time Saturday test above: start Feb 14 -> Feb 13.)
+    const { engine } = await run({
+      frequency: "Weekly",
+      start: "2026-02-07",
+      end: "2026-02-21",
+      dayOfWeek: "Saturday",
+      weekend: "after",
+    });
+    expect(engine).toEqual(["2026-02-09", "2026-02-16", "2026-02-23"]);
+  });
   it.todo("DECISION: hidden defaults - Day of Week / Day of Month default to TODAY's weekday/date, not the Start Date's; is the Start Date meant to fix the schedule?");
 });
 
@@ -476,9 +488,8 @@ describe("income wizard: daily and weekend interactions", () => {
     expect(engine).toHaveLength(5);
   });
 
-  knownDefect(
-    "UI-RULE-12",
-    "daily + weekend adjustment stacks three payments on the same Friday (engine)",
+  it(
+    "UI-RULE-12 — daily + weekend adjustment stacks three payments on the same Friday (engine)",
     async () => {
       // Fri 02-06, Sat 02-07 -> Fri, Sun 02-08 -> Fri. observed: ["02-06","02-06","02-06","02-09","02-10"]
       const { engine } = await run({
@@ -633,9 +644,8 @@ describe("income wizard: field mapping and validation", () => {
 
 // ---------------------------------------------------------------------------
 describe("income wizard: default start date in a UTC+ zone", () => {
-  knownDefect(
-    "UI-RULE-16",
-    "Start Date defaults to yesterday between 00:00 and 08:00 local in Asia/Manila (toISOString default)",
+  it(
+    "UI-RULE-16 — Start Date defaults to yesterday between 00:00 and 08:00 local in Asia/Manila (toISOString default)",
     async () => {
       // 2026-01-15 00:30 Manila = 2026-01-14 16:30Z -> default startDate "2026-01-14"
       const app = await renderApp({
@@ -660,9 +670,8 @@ describe("income wizard: default start date in a UTC+ zone", () => {
 
 // ---------------------------------------------------------------------------
 describe("income wizard: dates rendered on the Review step and detail card in a UTC- zone", () => {
-  knownDefect(
-    "UI-RULE-17",
-    "the Review step shows the Start Date one day early in America/New_York (new Date('YYYY-MM-DD') is UTC)",
+  it(
+    "UI-RULE-17 — the Review step shows the Start Date one day early in America/New_York (new Date('YYYY-MM-DD') is UTC)",
     async () => {
       // Start Date field 02/10/2026 -> observed Review "2/9/2026"
       const app = await renderApp({ route: "/income", today: TODAY, timeZone: "America/New_York" });
@@ -674,9 +683,8 @@ describe("income wizard: dates rendered on the Review step and detail card in a 
     }
   );
 
-  knownDefect(
-    "UI-RULE-18",
-    "an income detail card shows the Start Date one day early in America/New_York",
+  it(
+    "UI-RULE-18 — an income detail card shows the Start Date one day early in America/New_York",
     async () => {
       await renderApp({
         route: "/income",

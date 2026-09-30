@@ -29,6 +29,7 @@ import {
   type IncomeSourceFormValues,
 } from "./formHelpers";
 import { cn } from "@/lib/utils/cn";
+import { parseDate } from "@/lib/utils/dateUtils";
 
 // ============================================================================
 // STEP FIELD MAPPING
@@ -434,13 +435,13 @@ const IncomeSourceForm: React.FC<IProps> = ({
                 <div>
                   <p className="text-xs text-gray-400">Start Date</p>
                   <p className="text-white font-medium">
-                    {new Date(startDate).toLocaleDateString()}
+                    {parseDate(startDate).toLocaleDateString()}
                   </p>
                 </div>
                 <div>
                   <p className="text-xs text-gray-400">End Date</p>
                   <p className="text-white font-medium">
-                    {hasEndDate && endDate ? new Date(endDate).toLocaleDateString() : "Ongoing"}
+                    {hasEndDate && endDate ? parseDate(endDate).toLocaleDateString() : "Ongoing"}
                   </p>
                 </div>
                 <div>

@@ -62,9 +62,8 @@ describe("west of UTC (America/New_York): dates parsed with new Date('YYYY-MM-DD
   const mount = () =>
     renderPages(["dashboard", "forecast"], { today: H1_TODAY, timeZone: "America/New_York", seed: h1Seed() });
 
-  knownDefect(
-    "UI-DISP-40",
-    "Period Comparison window slides a day west of UTC: the previous period drops Feb 28 and changes every 'was' and % (direction of income flips)",
+  it(
+    "UI-DISP-40 — Period Comparison window slides a day west of UTC: the previous period drops Feb 28 and changes every 'was' and % (direction of income flips)",
     async () => {
       // observed: 'vs Jan 28 - Feb 27', was $3,950 (income arrow UP 29.6%) instead of Jan 29 - Feb 28, $5,950 (DOWN 13.9%).
       const { page } = await mount();
@@ -75,9 +74,8 @@ describe("west of UTC (America/New_York): dates parsed with new Date('YYYY-MM-DD
     }
   );
 
-  knownDefect(
-    "UI-DISP-41",
-    "Dashboard Upcoming Activity prints every due date one day early west of UTC",
+  it(
+    "UI-DISP-41 — Dashboard Upcoming Activity prints every due date one day early west of UTC",
     async () => {
       // observed: Electricity 'Mar 17' (due Mar 18), Car Loan 'Mar 19' (due Mar 20), Payroll 'Mar 29'.
       const { page } = await mount();
@@ -87,9 +85,8 @@ describe("west of UTC (America/New_York): dates parsed with new Date('YYYY-MM-DD
     }
   );
 
-  knownDefect(
-    "UI-DISP-42",
-    "Forecast 'Crunch on' date is one day early west of UTC",
+  it(
+    "UI-DISP-42 — Forecast 'Crunch on' date is one day early west of UTC",
     async () => {
       // bill pushes balance negative on Mar 25; observed 'Crunch on 3/24/2026'.
       const r = await renderPages(["forecast"], {
@@ -110,9 +107,8 @@ describe("west of UTC (America/New_York): dates parsed with new Date('YYYY-MM-DD
 });
 
 describe("projection window end (last day of the 4-month look-ahead, Jun 30)", () => {
-  knownDefect(
-    "UI-DISP-43",
-    "America/New_York: the Jun 30 payroll is missing from the calendar (window end parsed as UTC midnight)",
+  it(
+    "UI-DISP-43 — America/New_York: the Jun 30 payroll is missing from the calendar (window end parsed as UTC midnight)",
     async () => {
       // observed: Jun 15 shows Payroll, Jun 30 shows nothing. (UTC shows both.)
       const { app, page } = await renderPages(["calendar"], { today: H1_TODAY, timeZone: "America/New_York", seed: h1Seed() });

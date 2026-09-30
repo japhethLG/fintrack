@@ -115,10 +115,6 @@ test.describe("performance with old data", () => {
 
 test.describe("known defects in hostile data", () => {
   test("a negative bi-weekly intervalWeeks must not freeze the tab", async ({ page }) => {
-    knownDefect(
-      "E2E-ROB-08",
-      "intervalWeeks -2: occurrenceCalculator steps backwards forever without reaching the view window; the tab never renders the dashboard and never answers"
-    );
     test.setTimeout(60_000);
     // precondition: the same shape with a sane interval renders and answers
     await seedAndLogin(page, { user: BASE, incomeSources: [incomeSource({ id: "i0", name: "Ok Bi", frequency: "bi-weekly", scheduleConfig: { intervalWeeks: 2, dayOfWeek: 5 } })] });

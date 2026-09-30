@@ -4,6 +4,7 @@ import React, { useEffect, useMemo, useState, useCallback } from "react";
 import { List as VirtualizedList, type RowComponentProps } from "react-window";
 import { useFinancial } from "@/contexts/FinancialContext";
 import { Transaction } from "@/lib/types";
+import { getTodayKey } from "@/lib/utils/dateUtils";
 import {
   Button,
   Card,
@@ -87,9 +88,11 @@ const TransactionsManager: React.FC = () => {
     // Sort
     result.sort((a, b) => {
       if (sortBy === "date") {
-        const dateA = new Date(a.actualDate || a.scheduledDate).getTime();
-        const dateB = new Date(b.actualDate || b.scheduledDate).getTime();
-        return sortOrder === "asc" ? dateA - dateB : dateB - dateA;
+        // YYYY-MM-DD strings order chronologically; no Date parsing needed.
+        const dateA = a.actualDate || a.scheduledDate;
+        const dateB = b.actualDate || b.scheduledDate;
+        const cmp = dateA < dateB ? -1 : dateA > dateB ? 1 : 0;
+        return sortOrder === "asc" ? cmp : -cmp;
       } else {
         const amountA = a.actualAmount ?? a.projectedAmount;
         const amountB = b.actualAmount ?? b.projectedAmount;
@@ -102,7 +105,7 @@ const TransactionsManager: React.FC = () => {
 
   // Summary stats
   const stats = useMemo(() => {
-    const today = new Date().toISOString().split("T")[0];
+    const today = getTodayKey();
 
     return {
       total: dateFilteredTransactions.length,

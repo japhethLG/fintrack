@@ -11,7 +11,7 @@
  *   May 1440 -> 1550 | Jun 1550 -> 1660 | Jul 1660 -> 1770 | Aug 1770 -> 1880
  * (Jan opens at 1000 because the view window starts on 2026-01-01.)
  */
-import { test, expect, seedAndLogin, userProfile, incomeSource, knownDefect } from "../../index";
+import { test, expect, seedAndLogin, userProfile, incomeSource } from "../../index";
 import {
   addDaysISO,
   daysShowing,
@@ -89,12 +89,6 @@ test("month-start paydays keep appearing on months beyond the initial window (Ju
 });
 
 test("the last day of every month is drawn and closing balances chain (Jun..Aug)", async ({ page }, testInfo) => {
-  if (testInfo.project.name === "America/New_York") {
-    knownDefect(
-      "E2E-CAL-13",
-      "America/New_York: month-end items and the Closing figure vanish for any month whose end is the edge of the view window (June, and every month reached beyond it): Jun 30 'Last' missing, Closing shows a dash"
-    );
-  }
   await boot(page);
   let prev = "2026-03";
   const lastDays: Record<string, string> = { "2026-06": "2026-06-30", "2026-07": "2026-07-31", "2026-08": "2026-08-31" };

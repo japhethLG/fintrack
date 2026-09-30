@@ -113,9 +113,8 @@ describe("first login: profile creation", () => {
     );
   });
 
-  knownDefect(
-    "UI-BAL-09",
-    "balanceLastUpdatedAt is stamped with the UTC date, so a new profile created at 00:30 in Manila says 'yesterday'",
+  it(
+    "UI-BAL-09 — balanceLastUpdatedAt is stamped with the UTC date, so a new profile created at 00:30 in Manila says 'yesterday'",
     async () => {
       // observed: "Last updated: 2026-01-14" at 2026-01-15 00:30 local (UTC+8)
       await renderApp({
@@ -132,9 +131,8 @@ describe("first login: profile creation", () => {
     }
   );
 
-  knownDefect(
-    "UI-BAL-10",
-    "balanceLastUpdatedAt says TOMORROW for a profile created at 20:00 in New York",
+  it(
+    "UI-BAL-10 — balanceLastUpdatedAt says TOMORROW for a profile created at 20:00 in New York",
     async () => {
       // observed: "Last updated: 2026-01-16" at 2026-01-15 20:00 local (UTC-5)
       await renderApp({
@@ -403,9 +401,8 @@ describe("sign-out and user switching", () => {
 });
 
 describe("balance override and the calendar date it stamps", () => {
-  knownDefect(
-    "UI-BAL-13",
-    "Override Current Balance stamps 'Last updated' with the UTC date (yesterday at 00:30 in Manila)",
+  it(
+    "UI-BAL-13 — Override Current Balance stamps 'Last updated' with the UTC date (yesterday at 00:30 in Manila)",
     async () => {
       // observed: "Last updated: 2026-01-14" right after overriding at 2026-01-15 00:30 local (UTC+8)
       const app = await renderApp({

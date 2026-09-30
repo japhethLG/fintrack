@@ -5,7 +5,7 @@ import { Transaction } from "@/lib/types";
 import { Icon, Badge } from "@/components/common";
 import { cn } from "@/lib/utils/cn";
 import { useCurrency } from "@/lib/hooks/useCurrency";
-import { formatDate } from "@/lib/utils/dateUtils";
+import { formatDate, parseDate } from "@/lib/utils/dateUtils";
 import { TRANSACTION_STATUS_BADGE_VARIANT } from "@/lib/constants";
 
 interface IProps {
@@ -47,7 +47,7 @@ const QuickTransaction: React.FC<IProps> = ({ transaction, onClick }) => {
         <div>
           <p className="font-medium text-white text-sm">{transaction.name}</p>
           <p className="text-xs text-gray-400">
-            {new Date(transaction.scheduledDate).toLocaleDateString("en-US", {
+            {parseDate(transaction.scheduledDate).toLocaleDateString("en-US", {
               month: "short",
               day: "numeric",
             })}

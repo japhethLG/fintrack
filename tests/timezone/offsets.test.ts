@@ -282,7 +282,7 @@ describe("mergeTransactionsWithProjections", () => {
      * CORRECT: the occurrence on the first day of the window is included, so
      * the merge returns 2026-03-01, 2026-04-01 and 2026-05-01.
      */
-    it.fails("KNOWN DEFECT: includes an occurrence landing on the first day of the window", () => {
+    it("includes an occurrence landing on the first day of the window", () => {
       const merged = merge("2026-03-01", "2026-05-01");
 
       expect(scheduledDates(merged)).toEqual(["2026-03-01", "2026-04-01", "2026-05-01"]);
@@ -294,7 +294,7 @@ describe("mergeTransactionsWithProjections", () => {
      * entirely rather than merely mis-ordered.
      * CORRECT: "2026-03-01" appears in the merged output.
      */
-    it.fails("KNOWN DEFECT: does not drop the first day of the window", () => {
+    it("does not drop the first day of the window", () => {
       const merged = merge("2026-03-01", "2026-05-01");
 
       expect(scheduledDates(merged)).toContain("2026-03-01");
@@ -307,7 +307,7 @@ describe("mergeTransactionsWithProjections", () => {
      * viewed month is invisible.
      * CORRECT: the one-time occurrence on the window start is returned.
      */
-    it.fails("KNOWN DEFECT: keeps a one-time rule dated exactly on the window start", () => {
+    it("keeps a one-time rule dated exactly on the window start", () => {
       const oneTime = makeExpenseRule({
         id: "insurance",
         frequency: "one-time",
@@ -358,7 +358,7 @@ describe("useViewDateRange default window", () => {
      * CORRECT: "2026-01-01" — the 1st of the month two months back, in LOCAL
      * calendar terms.
      */
-    it.fails("KNOWN DEFECT: stamps the window start as the intended local calendar day", () => {
+    it("stamps the window start as the intended local calendar day", () => {
       // 05:00 local on 2026-03-15 is 21:00 UTC on 2026-03-14, so the frozen
       // "today" itself already straddles the UTC/local day boundary.
       freezeAt("2026-03-15", 5);
@@ -375,7 +375,7 @@ describe("useViewDateRange default window", () => {
      * CORRECT: "2026-06-30" — the last day of the month before the month four
      * months forward, in LOCAL calendar terms.
      */
-    it.fails("KNOWN DEFECT: stamps the window end as the intended local calendar day", () => {
+    it("stamps the window end as the intended local calendar day", () => {
       freezeAt("2026-03-15", 5);
 
       expect(readDefaultViewWindow().end).toBe("2026-06-30");
@@ -388,7 +388,7 @@ describe("useViewDateRange default window", () => {
      * whole window slides into the wrong month.
      * CORRECT: start "2025-11-01", end "2026-04-30".
      */
-    it.fails("KNOWN DEFECT: does not roll the default window back into the previous month", () => {
+    it("does not roll the default window back into the previous month", () => {
       freezeAt("2026-01-20", 5);
 
       const window = readDefaultViewWindow();
@@ -492,7 +492,7 @@ describe("calculateForecast", () => {
      * started on 2026-03-15 is labelled "2026-03-14".
      * CORRECT: the labels are the local calendar days 2026-03-15..17.
      */
-    it.fails("KNOWN DEFECT: labels forecast points with the local calendar days", () => {
+    it("labels forecast points with the local calendar days", () => {
       const forecast = calculateForecast(10_000, [sameDayExpense()], startDate(), 3);
 
       expect(forecast.map((point) => point.date)).toEqual([
@@ -510,7 +510,7 @@ describe("calculateForecast", () => {
      * opening balance, understating the day's outflow by a full day.
      * CORRECT: 10,000 - 500 = 9,500 on the first point.
      */
-    it.fails("KNOWN DEFECT: applies a start-day transaction to the first forecast point", () => {
+    it("applies a start-day transaction to the first forecast point", () => {
       const forecast = calculateForecast(10_000, [sameDayExpense()], startDate(), 3);
 
       expect(forecast[0].balance).toBe(9_500);
@@ -524,7 +524,7 @@ describe("calculateForecast", () => {
      * CORRECT: a transaction dated the day before the forecast start is excluded,
      * leaving the balance flat.
      */
-    it.fails("KNOWN DEFECT: excludes a transaction dated before the forecast start day", () => {
+    it("excludes a transaction dated before the forecast start day", () => {
       const yesterday = makeProjectedTransaction({
         id: "txn-yesterday",
         scheduledDate: "2026-03-14",
@@ -589,8 +589,8 @@ describe("updateUserBalance", () => {
      * after being set.
      * CORRECT: the LOCAL calendar day, "2026-03-15".
      */
-    it.fails(
-      "KNOWN DEFECT: stamps the local calendar day for an early-morning update",
+    it(
+      "stamps the local calendar day for an early-morning update",
       async () => {
         // 05:00 local == 21:00 UTC on 2026-03-14.
         freezeAt("2026-03-15", 5);
@@ -608,7 +608,7 @@ describe("updateUserBalance", () => {
      * for the entire first 8 hours of the local day.
      * CORRECT: "2026-03-15".
      */
-    it.fails("KNOWN DEFECT: stamps the local calendar day for a midnight update", async () => {
+    it("stamps the local calendar day for a midnight update", async () => {
       freezeToday("2026-03-15");
       seedUser();
 
@@ -625,7 +625,7 @@ describe("updateUserBalance", () => {
      * (The same expression also appears at migrations.ts:96 and :205.)
      * CORRECT: "2026-03-15".
      */
-    it.fails("KNOWN DEFECT: createUserProfile seeds the local calendar day", async () => {
+    it("createUserProfile seeds the local calendar day", async () => {
       freezeAt("2026-03-15", 5);
 
       const profile = await createUserProfile("user-new", "new@example.com", "New User");

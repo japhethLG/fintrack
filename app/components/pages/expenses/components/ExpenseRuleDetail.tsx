@@ -14,6 +14,7 @@ import {
   type CreditCardPayoffSummary,
   type PayoffScenario,
 } from "@/lib/logic/creditCardCalculator";
+import { parseDate } from "@/lib/utils/dateUtils";
 
 interface IProps {
   rule: ExpenseRule;
@@ -575,12 +576,12 @@ const ExpenseRuleDetail: React.FC<IProps> = ({ rule, onEdit, onDelete, onToggleA
       <div className="grid grid-cols-2 gap-6 mb-6">
         <div>
           <p className="text-gray-400 text-sm mb-1">Start Date</p>
-          <p className="text-white font-medium">{new Date(rule.startDate).toLocaleDateString()}</p>
+          <p className="text-white font-medium">{parseDate(rule.startDate).toLocaleDateString()}</p>
         </div>
         <div>
           <p className="text-gray-400 text-sm mb-1">End Date</p>
           <p className="text-white font-medium">
-            {rule.endDate ? new Date(rule.endDate).toLocaleDateString() : "Ongoing"}
+            {rule.endDate ? parseDate(rule.endDate).toLocaleDateString() : "Ongoing"}
           </p>
         </div>
         <div>

@@ -3,12 +3,13 @@
  */
 
 import { ForecastData, Transaction } from "@/lib/types";
+import { dateFromDayNumber, dayNumberOfDate, formatDate } from "@/lib/utils/dateUtils";
 
 /**
  * Calculate future balance forecast based on projected transactions
  * @param currentBalance - Current account balance
  * @param allTransactions - All transactions to consider
- * @param startDate - Start date for forecast
+ * @param startDate - Start date for forecast (its LOCAL calendar day; time of day is ignored)
  * @param daysToForecast - Number of days to forecast (default: 90)
  * @returns Array of daily forecast data points
  */
@@ -23,7 +24,8 @@ export const calculateForecast = (
 
   // Only care about transactions from TODAY onwards
   // Assumption: currentBalance is the ACTUAL balance TODAY
-  const todayStr = startDate.toISOString().split("T")[0];
+  // (Local calendar day, like every stored scheduledDate: never the UTC day.)
+  const todayStr = formatDate(startDate);
   const relevantTransactions = allTransactions.filter(
     (t) => t.scheduledDate >= todayStr && t.status === "projected"
   );
@@ -37,10 +39,11 @@ export const calculateForecast = (
     transactionsByDate[t.scheduledDate].push(t);
   });
 
-  const currentDate = new Date(startDate);
+  // Iterate days by index, not by stepping a wall-clock instant (DST-safe).
+  const startDay = dayNumberOfDate(startDate);
 
   for (let i = 0; i < daysToForecast; i++) {
-    const dateStr = currentDate.toISOString().split("T")[0];
+    const dateStr = formatDate(dateFromDayNumber(startDay + i));
     const daysTransactions = transactionsByDate[dateStr] || [];
 
     // Process transactions for the day
@@ -56,8 +59,6 @@ export const calculateForecast = (
       date: dateStr,
       balance: runningBalance,
     });
-
-    currentDate.setDate(currentDate.getDate() + 1);
   }
 
   return forecast;

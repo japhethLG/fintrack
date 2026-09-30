@@ -13,7 +13,7 @@
  *   payroll: Jan 1, Jan 31, Feb 1, Feb 28, Mar 1, Mar 31, Apr 1, Apr 30, May 1, May 31, Jun 1, Jun 30 = 12
  *   rent:    Jan 1, Feb 1, Mar 1, Apr 1, May 1, Jun 1 = 6           -> 18 rows
  */
-import { test, expect, seedAndLogin, userProfile, incomeSource, fixedExpense, knownDefect } from "../../index";
+import { test, expect, seedAndLogin, userProfile, incomeSource, fixedExpense } from "../../index";
 import * as S from "./support";
 
 const NY = "America/New_York";
@@ -77,8 +77,6 @@ test.describe("month-boundary paydays land on the right calendar day (all zones)
 
 test.describe("date labels and buckets (America/New_York shows the previous day)", () => {
   test("Dashboard Upcoming Activity labels Mar 31 / Apr 1 / Apr 1 at 23:30 on Mar 31", async ({ page }, testInfo) => {
-    if (tzOf(testInfo) === NY)
-      knownDefect("E2E-JRN-01", "Upcoming Activity rows are labelled 'Mar 30', 'Mar 31', 'Mar 31' for payroll Mar 31 / payroll Apr 1 / rent Apr 1");
     await at(page, tzOf(testInfo), "2026-03-31", "23:30");
     await seedAndLogin(page, household());
     await expect(page.getByRole("heading", { name: "Upcoming Activity" })).toBeVisible();
@@ -91,8 +89,6 @@ test.describe("date labels and buckets (America/New_York shows the previous day)
   });
 
   test("Income > Upcoming Payments headings are TUESDAY, MAR 31 / WEDNESDAY, APR 1 / THURSDAY, APR 30", async ({ page }, testInfo) => {
-    if (tzOf(testInfo) === NY)
-      knownDefect("E2E-JRN-02", "headings read 'MONDAY, MAR 30', 'TUESDAY, MAR 31', 'WEDNESDAY, APR 29'");
     await at(page, tzOf(testInfo), "2026-03-31", "23:30");
     await seedAndLogin(page, household(), { path: "/income" });
     await expect(page.getByRole("heading", { name: "Income Management", level: 1 })).toBeVisible();
@@ -103,7 +99,6 @@ test.describe("date labels and buckets (America/New_York shows the previous day)
   });
 
   test("Expenses > Upcoming Bills heading for the 1st is WEDNESDAY, APR 1", async ({ page }, testInfo) => {
-    if (tzOf(testInfo) === NY) knownDefect("E2E-JRN-03", "heading reads 'TUESDAY, MAR 31' for the Apr 1 rent");
     await at(page, tzOf(testInfo), "2026-03-31", "23:30");
     await seedAndLogin(page, household(), { path: "/expenses" });
     await expect(page.getByRole("heading", { name: "Expense Management", level: 1 })).toBeVisible();
@@ -112,7 +107,6 @@ test.describe("date labels and buckets (America/New_York shows the previous day)
   });
 
   test("Transactions list prints the scheduled date of the first rows as 1/1/2026", async ({ page }, testInfo) => {
-    if (tzOf(testInfo) === NY) knownDefect("E2E-JRN-04", "the two Jan 1 rows are printed as 12/31/2025 (and Jan 31 as 1/30/2026, Feb 28 as 2/27/2026)");
     await at(page, tzOf(testInfo), "2026-03-31", "23:30");
     await seedAndLogin(page, household(), { path: "/transactions" });
     await expect(page.getByRole("heading", { name: "Transactions", level: 1 })).toBeVisible();
@@ -125,8 +119,6 @@ test.describe("date labels and buckets (America/New_York shows the previous day)
 
   test("Transactions header counts every occurrence of the default window (18 rows incl. Jun 30)", async ({ page }, testInfo) => {
     const tzName = tzOf(testInfo);
-    if (tzName === NY || tzName === MANILA)
-      knownDefect("E2E-JRN-05", "header reads 'Transactions (17)': the last day of the default window (Jun 30 payroll) is dropped");
     await at(page, tzName, "2026-03-31", "23:30");
     await seedAndLogin(page, household(), { path: "/transactions" });
     await expect(page.getByRole("heading", { name: "Transactions", level: 1 })).toBeVisible();
@@ -134,7 +126,6 @@ test.describe("date labels and buckets (America/New_York shows the previous day)
   });
 
   test("Dashboard weekly chart is labelled Week of Mar 1 and Week of Mar 29 for the March paydays", async ({ page }, testInfo) => {
-    if (tzOf(testInfo) === NY) knownDefect("E2E-JRN-06", "labels read 'Week of Feb 21' and 'Week of Mar 28'");
     await at(page, tzOf(testInfo), "2026-03-31", "23:30");
     await seedAndLogin(page, household());
     await expect(page.getByText("Weekly view")).toBeVisible();
@@ -144,8 +135,6 @@ test.describe("date labels and buckets (America/New_York shows the previous day)
   });
 
   test("Period Comparison for Mar 1-31 compares with Jan 29 - Feb 28 (income was $3,000)", async ({ page }, testInfo) => {
-    if (tzOf(testInfo) === NY)
-      knownDefect("E2E-JRN-07", "label reads 'vs Jan 28 - Feb 27' and Total Income 'was $2,000' (Feb 28 payroll left out)");
     await at(page, tzOf(testInfo), "2026-03-31", "23:30");
     await seedAndLogin(page, household());
     const card = page;
@@ -156,7 +145,6 @@ test.describe("date labels and buckets (America/New_York shows the previous day)
   });
 
   test("Income rule detail shows Start Date 1/1/2026", async ({ page }, testInfo) => {
-    if (tzOf(testInfo) === NY) knownDefect("E2E-JRN-08", "detail shows 'Start Date 12/31/2025'");
     await at(page, tzOf(testInfo), "2026-03-31", "23:30");
     await seedAndLogin(page, household(), { path: "/income" });
     await expect(page.getByRole("heading", { name: "Income Management", level: 1 })).toBeVisible();
@@ -170,12 +158,11 @@ test.describe("'today' seen by different screens (UTC-based vs local-based)", ()
   // Mar 31 clock (window from Jan 1): 8 rows before Mar 31 (payroll Jan1,Jan31,Feb1,Feb28,Mar1 + rent Jan1,Feb1,Mar1).
   // Apr 1 clock (window from Feb 1): payroll Feb1,Feb28,Mar1,Mar31 + rent Feb1,Mar1 = 6.
   const cases = [
-    { name: "23:30 on Mar 31", ymd: "2026-03-31", hhmm: "23:30", overdue: 8, defectIn: NY, observed: "Overdue card 9 (today's Mar 31 rows counted as overdue) vs Dashboard '8 Overdue Transactions'" },
-    { name: "00:30 on Apr 1", ymd: "2026-04-01", hhmm: "00:30", overdue: 6, defectIn: MANILA, observed: "Overdue card 5 (yesterday's Mar 31 payroll not yet overdue) vs Dashboard '6 Overdue Transactions'" },
+    { name: "23:30 on Mar 31", ymd: "2026-03-31", hhmm: "23:30", overdue: 8 },
+    { name: "00:30 on Apr 1", ymd: "2026-04-01", hhmm: "00:30", overdue: 6 },
   ];
   for (const c of cases) {
     test(`Transactions 'Overdue' card equals the Dashboard overdue alert at ${c.name}`, async ({ page }, testInfo) => {
-      if (tzOf(testInfo) === c.defectIn) knownDefect("E2E-JRN-09", c.observed);
       await at(page, tzOf(testInfo), c.ymd, c.hhmm);
       await seedAndLogin(page, household());
       await expect(page.getByText(`${c.overdue} Overdue Transactions`)).toBeVisible();
@@ -187,8 +174,6 @@ test.describe("'today' seen by different screens (UTC-based vs local-based)", ()
   for (const [tzName, ymd, hhmm] of [[NY, "2026-03-10", "23:30"], [MANILA, "2026-03-10", "00:30"]] as const) {
     test(`Add Income wizard defaults to the LOCAL date; first payment lands on it (${tzName} ${hhmm})`, async ({ page }, testInfo) => {
       const here = tzOf(testInfo);
-      if (here === tzName)
-        knownDefect("E2E-JRN-10", tzName === NY ? "Start Date defaults to 03/11/2026 (tomorrow) while Day of Month defaults to 10, so the first Gig pay is Apr 10" : "Start Date defaults to 03/09/2026 (yesterday)");
       await at(page, here, ymd, hhmm);
       await seedAndLogin(page, { user: userProfile({ currentBalance: 1000, initialBalance: 1000 }) }, { path: "/income" });
       await expect(page.getByRole("heading", { name: "Income Management", level: 1 })).toBeVisible();

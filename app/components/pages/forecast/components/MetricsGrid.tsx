@@ -5,6 +5,7 @@ import { Card, Icon } from "@/components/common";
 import { cn } from "@/lib/utils/cn";
 import { useCurrency } from "@/lib/hooks/useCurrency";
 import InsightCard from "./InsightCard";
+import { parseDate } from "@/lib/utils/dateUtils";
 
 interface Metrics {
   balance: number;
@@ -74,7 +75,7 @@ const MetricsGrid: React.FC<IProps> = ({
           value={metrics.runway.runOutDate ? `${metrics.runway.days} days` : "90+ days"}
           subtitle={
             metrics.nextCrunch
-              ? `Crunch on ${new Date(metrics.nextCrunch.date).toLocaleDateString()}`
+              ? `Crunch on ${parseDate(metrics.nextCrunch.date).toLocaleDateString()}`
               : "No crunch detected"
           }
           status={metrics.runway.runOutDate ? "warning" : "success"}
