@@ -9,12 +9,15 @@ import {
   query,
   where,
   getDocs,
+  runTransaction,
   writeBatch,
   Timestamp,
 } from "firebase/firestore";
+import type { DocumentReference } from "firebase/firestore";
 import { db } from "../config";
 import { DeletableDataType, Transaction } from "@/lib/types";
-import { getUserProfile, updateUserProfile } from "./users";
+import { BALANCE_MODEL_VERSION, getUserProfile } from "./users";
+import { getCompletedTransactions } from "./balance";
 import {
   getIncomeSource,
   getExpenseRule,
@@ -22,7 +25,19 @@ import {
   setExpenseRuleOverride,
 } from "./index";
 import { getTodayKey, parseDate } from "@/lib/utils/dateUtils";
+import { cleanMoney, sumLedger } from "@/lib/logic/balanceCalculator/ledgerMath";
 import { generateOccurrenceId } from "@/lib/logic/projectionEngine/occurrenceIdGenerator";
+
+const MAX_BATCH_OPERATIONS = 500;
+
+/** Delete documents in batches of at most 500 operations (the Firestore limit). */
+const deleteInBatches = async (refs: DocumentReference[]): Promise<void> => {
+  for (let i = 0; i < refs.length; i += MAX_BATCH_OPERATIONS) {
+    const batch = writeBatch(db);
+    refs.slice(i, i + MAX_BATCH_OPERATIONS).forEach((ref) => batch.delete(ref));
+    await batch.commit();
+  }
+};
 
 /**
  * Delete all projected transactions for a user.
@@ -44,58 +59,129 @@ export const deleteProjectedTransactions = async (userId: string): Promise<numbe
     return 0;
   }
 
-  // Delete in batches (Firestore limit is 500 operations per batch)
-  const batchSize = 500;
-  for (let i = 0; i < docs.length; i += batchSize) {
-    const batch = writeBatch(db);
-    const chunk = docs.slice(i, i + batchSize);
-    chunk.forEach((docSnapshot) => {
-      batch.delete(docSnapshot.ref);
-    });
-    await batch.commit();
+  await deleteInBatches(docs.map((docSnapshot) => docSnapshot.ref));
+  return docs.length;
+};
+
+// ============================================================================
+// RESETS
+// ============================================================================
+
+/** What a reset reports when it stopped after deleting only part of the data. */
+export class ResetIncompleteError extends Error {
+  readonly deleted: number;
+  readonly total: number;
+  constructor(deleted: number, total: number, cause: unknown) {
+    const reason = cause instanceof Error ? cause.message : String(cause);
+    super(
+      `The reset stopped part-way: ${deleted} of ${total} items were deleted, ${
+        total - deleted
+      } remain, and your balance was not changed. Run the reset again to finish. (${reason})`
+    );
+    this.name = "ResetIncompleteError";
+    this.deleted = deleted;
+    this.total = total;
+  }
+}
+
+/**
+ * Children before parents, so that if a reset ever stops part-way what remains is
+ * still self-consistent (rules and sources without their history, never history
+ * whose source vanished first) and running the reset again finishes the job.
+ */
+const DELETE_ORDER: DeletableDataType[] = [
+  "transactions",
+  "balance_history",
+  "alerts",
+  "expense_rules",
+  "income_sources",
+];
+
+/**
+ * Delete the chosen collections of ONE user, and (when `resetBalance`) reset the
+ * balance model with them: balance 0 and baseline 0, so the invariant
+ * `currentBalance == initialBalance + SUM(completed)` holds with nothing left.
+ *
+ * ATOMICITY (E2E-ROB-05). Every document is found first (a failing read changes
+ * nothing). The deletes then go out in batches of at most 500 operations, each
+ * atomic. The balance reset rides in the LAST batch, so it can never happen
+ * without the deletes before it. For the usual account (a few hundred documents)
+ * that is ONE batch: all or nothing. If a later batch fails after an earlier one
+ * committed, the error says exactly how many items were deleted and that the
+ * balance is untouched; the reset is idempotent, so running it again finishes it.
+ */
+const deleteUserData = async (
+  userId: string,
+  types: DeletableDataType[],
+  options: { resetBalance: boolean }
+): Promise<void> => {
+  const refs: DocumentReference[] = [];
+  for (const type of DELETE_ORDER.filter((candidate) => types.includes(candidate))) {
+    const snapshot = await getDocs(query(collection(db, type), where("userId", "==", userId)));
+    snapshot.docs.forEach((docSnapshot) => refs.push(docSnapshot.ref));
   }
 
-  return docs.length;
+  const chunks: DocumentReference[][] = [];
+  for (let i = 0; i < refs.length; i += MAX_BATCH_OPERATIONS) {
+    chunks.push(refs.slice(i, i + MAX_BATCH_OPERATIONS));
+  }
+  if (chunks.length === 0) chunks.push([]);
+  // the balance reset needs a slot in the last batch
+  if (options.resetBalance && chunks[chunks.length - 1].length >= MAX_BATCH_OPERATIONS) {
+    chunks.push([]);
+  }
+
+  let deleted = 0;
+  for (let index = 0; index < chunks.length; index++) {
+    const withReset = options.resetBalance && index === chunks.length - 1;
+    if (chunks[index].length === 0 && !withReset) continue;
+    const batch = writeBatch(db);
+    chunks[index].forEach((ref) => batch.delete(ref));
+    if (withReset) {
+      batch.update(doc(db, "users", userId), {
+        currentBalance: 0,
+        initialBalance: 0,
+        balanceModelVersion: BALANCE_MODEL_VERSION,
+        balanceLastUpdatedAt: getTodayKey(),
+        updatedAt: Timestamp.now(),
+      });
+    }
+    try {
+      await batch.commit();
+    } catch (error) {
+      if (deleted === 0) throw error; // nothing changed: report the real cause
+      throw new ResetIncompleteError(deleted, refs.length, error);
+    }
+    deleted += chunks[index].length;
+  }
 };
 
 /**
  * Delete all financial data for a user (income sources, expense rules, transactions, balance history, alerts)
- * This resets the user's financial data but keeps their profile.
+ * This resets the user's financial data but keeps their profile; balance and baseline go to 0.
  */
 export const deleteAllUserData = async (userId: string): Promise<void> => {
-  const collections = [
-    "income_sources",
-    "expense_rules",
-    "transactions",
-    "balance_history",
-    "alerts",
-  ];
-
-  for (const collectionName of collections) {
-    const collRef = collection(db, collectionName);
-    const q = query(collRef, where("userId", "==", userId));
-    const snapshot = await getDocs(q);
-
-    // Delete in batches (Firestore limit is 500 operations per batch)
-    const batchSize = 500;
-    const docs = snapshot.docs;
-
-    for (let i = 0; i < docs.length; i += batchSize) {
-      const batch = writeBatch(db);
-      const chunk = docs.slice(i, i + batchSize);
-      chunk.forEach((docSnapshot) => {
-        batch.delete(docSnapshot.ref);
-      });
-      await batch.commit();
-    }
-  }
-
-  // Reset user balance to 0
-  await updateUserProfile(userId, {
-    currentBalance: 0,
-    balanceLastUpdatedAt: getTodayKey(),
-  });
+  await deleteUserData(userId, DELETE_ORDER, { resetBalance: true });
 };
+
+/**
+ * Delete selected financial data collections for a user.
+ * Deleting TRANSACTIONS resets balance and baseline to 0 (the history the balance
+ * was built from is gone). Deleting anything else, balance history included,
+ * leaves the balance alone: snapshots are not part of the balance (UI-BAL-15).
+ */
+export const deleteSelectiveUserData = async (
+  userId: string,
+  dataTypes: DeletableDataType[]
+): Promise<void> => {
+  if (dataTypes.length === 0) return;
+  const uniqueTypes = Array.from(new Set<DeletableDataType>(dataTypes));
+  await deleteUserData(userId, uniqueTypes, { resetBalance: uniqueTypes.includes("transactions") });
+};
+
+// ============================================================================
+// LEGACY DATA
+// ============================================================================
 
 /**
  * Migrate legacy pending transactions into occurrence overrides.
@@ -115,12 +201,12 @@ export const migratePendingToOverrides = async (userId: string): Promise<number>
   if (snapshot.empty) return 0;
 
   let migrated = 0;
-  const batch = writeBatch(db);
+  const toDelete: DocumentReference[] = [];
 
   for (const docSnap of snapshot.docs) {
     const txn = docSnap.data() as Transaction;
     if (!txn.sourceId || !txn.sourceType) {
-      batch.delete(docSnap.ref);
+      toDelete.push(docSnap.ref);
       migrated++;
       continue;
     }
@@ -131,7 +217,7 @@ export const migratePendingToOverrides = async (userId: string): Promise<number>
       : await getExpenseRule(txn.sourceId);
 
     if (!source) {
-      batch.delete(docSnap.ref);
+      toDelete.push(docSnap.ref);
       migrated++;
       continue;
     }
@@ -158,70 +244,78 @@ export const migratePendingToOverrides = async (userId: string): Promise<number>
       await setExpenseRuleOverride(source.id, occurrenceId, override);
     }
 
-    batch.delete(docSnap.ref);
+    toDelete.push(docSnap.ref);
     migrated++;
   }
 
-  await batch.commit();
+  // every override is written before any pending row is deleted
+  await deleteInBatches(toDelete);
   return migrated;
 };
 
 /**
- * Delete selected financial data collections for a user.
- * Resets balance to 0 only when transactions or balance history are deleted.
- */
-export const deleteSelectiveUserData = async (
-  userId: string,
-  dataTypes: DeletableDataType[]
-): Promise<void> => {
-  if (dataTypes.length === 0) return;
-
-  const uniqueTypes = Array.from(new Set<DeletableDataType>(dataTypes));
-
-  for (const collectionName of uniqueTypes) {
-    const collRef = collection(db, collectionName);
-    const q = query(collRef, where("userId", "==", userId));
-    const snapshot = await getDocs(q);
-
-    const docs = snapshot.docs;
-    const batchSize = 500;
-
-    for (let i = 0; i < docs.length; i += batchSize) {
-      const batch = writeBatch(db);
-      const chunk = docs.slice(i, i + batchSize);
-      chunk.forEach((docSnapshot) => {
-        batch.delete(docSnapshot.ref);
-      });
-      await batch.commit();
-    }
-  }
-
-  const shouldResetBalance =
-    uniqueTypes.includes("transactions") || uniqueTypes.includes("balance_history");
-
-  if (shouldResetBalance) {
-    await updateUserProfile(userId, {
-      currentBalance: 0,
-      balanceLastUpdatedAt: getTodayKey(),
-    });
-  }
-};
-
-/**
- * Migrate user profile to include initialBalance field
- * If initialBalance doesn't exist, set it to currentBalance (preserving existing balance state)
- * This ensures backward compatibility with existing user data
+ * One-time, idempotent, versioned REBASE of a profile onto the current balance
+ * model (decision D1: keep the balance the user sees, fix the baseline).
+ *
+ * The old migration seeded `initialBalance = currentBalance` although
+ * `currentBalance` already contained every completed transaction, so
+ * `initialBalance + SUM(completed)` double counted the history (N-1B: Recalculate
+ * then wrote a balance too high). A profile without `balanceModelVersion`, or
+ * without a numeric `initialBalance`, is rebased once:
+ *
+ *   initialBalance = currentBalance - SUM(signed(completed stored rows))
+ *
+ * `currentBalance` is never touched. The discrepancy the old model had is logged
+ * with console.info. A profile already on the model (or one another tab rebased
+ * first) is left alone: no write at all.
  */
 export const migrateToInitialBalance = async (userId: string): Promise<void> => {
   const profile = await getUserProfile(userId);
   if (!profile) return;
 
-  // If initialBalance doesn't exist, set it to currentBalance
-  // This preserves the existing balance state for users who were already using the app
-  if (profile.initialBalance === undefined || profile.initialBalance === null) {
-    await updateUserProfile(userId, {
-      initialBalance: profile.currentBalance,
+  const isNumber = (value: unknown): value is number =>
+    typeof value === "number" && Number.isFinite(value);
+  const isCurrent = (p: { initialBalance?: unknown; balanceModelVersion?: number }) =>
+    isNumber(p.initialBalance) && (p.balanceModelVersion ?? 0) >= BALANCE_MODEL_VERSION;
+  if (isCurrent(profile)) return;
+
+  const ledgerSum = sumLedger(await getCompletedTransactions(userId));
+  const userRef = doc(db, "users", userId);
+
+  const outcome = await runTransaction(db, async (tx) => {
+    const fresh = await tx.get(userRef);
+    if (!fresh.exists()) return null;
+    const stored = fresh.data() as typeof profile;
+    if (isCurrent(stored)) return null; // another tab rebased first
+
+    const hasBalance = isNumber(stored.currentBalance);
+    const currentBalance = hasBalance ? stored.currentBalance : 0;
+    const initialBalance = cleanMoney(currentBalance - ledgerSum);
+    tx.update(userRef, {
+      initialBalance,
+      balanceModelVersion: BALANCE_MODEL_VERSION,
+      // a profile that never had a balance starts from nothing
+      ...(hasBalance ? {} : { currentBalance: 0 }),
+      updatedAt: Timestamp.now(),
     });
+    return {
+      previousInitial: isNumber(stored.initialBalance) ? stored.initialBalance : null,
+      initialBalance,
+      currentBalance,
+    };
+  });
+
+  if (outcome) {
+    const oldImplied =
+      outcome.previousInitial === null ? null : cleanMoney(outcome.previousInitial + ledgerSum);
+    console.info(
+      `[balance] rebased initialBalance for ${userId}: ${outcome.previousInitial ?? "none"} -> ${
+        outcome.initialBalance
+      } (currentBalance ${outcome.currentBalance} kept; completed history ${ledgerSum}` +
+        (oldImplied === null
+          ? ")"
+          : `; the old model implied ${oldImplied}, off by ${cleanMoney(oldImplied - outcome.currentBalance)})`)
+    );
   }
 };
 
@@ -277,4 +371,3 @@ export const normalizePartialTransactions = async (userId: string): Promise<void
 
   await batch.commit();
 };
-

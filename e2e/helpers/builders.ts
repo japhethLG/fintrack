@@ -69,6 +69,8 @@ export const userProfile = (o: Partial<UserProfileSeed> = {}): UserProfileSeed =
   currentBalance: 0,
   initialBalance: 0,
   balanceLastUpdatedAt: "2026-03-10",
+  // seeded profiles are already on the current balance model (see tests/helpers/builders.ts)
+  balanceModelVersion: 1,
   createdAt: ts(),
   updatedAt: ts(),
   ...o,

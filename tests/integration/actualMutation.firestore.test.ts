@@ -332,7 +332,7 @@ describe("completeTransaction", () => {
       expect(balance()).toBe(1_250);
     });
 
-    it("performs two balance adjustments — a reversal and an application", async () => {
+    it("performs ONE balance write for a re-completion: the old actual is replaced, not reversed then re-applied", async () => {
       seedUser(1_000);
       store.__seedEntities("transactions", [
         makeProjectedTransaction({ id: "t1", type: "expense", projectedAmount: 100 }),
@@ -343,8 +343,11 @@ describe("completeTransaction", () => {
 
       await completeTransaction("t1", 250);
 
-      // 1_000 restored by the reversal, then 750 after applying the new actual
-      expect(balanceWrites().slice(writesAfterFirst)).toEqual([1_000, 750]);
+      // REWRITTEN (write-path stream, atomicity). This test pinned TWO sequential writes,
+      // [1_000, 750]: the intermediate 1_000 was a visible half-applied state (and what a
+      // failure or a second writer between the two writes would have corrupted). The row
+      // and the balance now change in one transaction: 1_000 - 250 = 750, written once.
+      expect(balanceWrites().slice(writesAfterFirst)).toEqual([750]);
     });
 
     it("reverses the projected amount when the previous completion had no actual amount", async () => {
@@ -356,9 +359,11 @@ describe("completeTransaction", () => {
 
       await completeTransaction("t1", 250);
 
-      // reversal uses projectedAmount (100): 900 + 100 = 1_000, then -250 = 750
+      // The earlier completion counted projectedAmount (100): 900 + 100 = 1_000, then
+      // -250 = 750. REWRITTEN: one write of the final value (was [1_000, 750], a reversal
+      // and an application as two commits; they are now a single atomic commit).
       expect(balance()).toBe(750);
-      expect(balanceWrites()).toEqual([1_000, 750]);
+      expect(balanceWrites()).toEqual([750]);
     });
 
     it("reverses the projected amount for income when the previous completion had no actual amount", async () => {
@@ -617,7 +622,7 @@ describe("completeTransaction", () => {
      * CORRECT: an explicitly supplied empty string should clear the note; only
      * `undefined` should mean "leave the note alone".
      */
-    it.fails("KNOWN DEFECT: an empty note clears the existing note", async () => {
+    it("an empty note clears the existing note", async () => {
       seedUser(1_000);
       store.__seedEntities("transactions", [
         makeProjectedTransaction({ id: "t1", notes: "old note" }),
@@ -644,8 +649,8 @@ describe("completeTransaction", () => {
      * the full 565. The trailing balance assertion below is the half that must
      * survive a fix: the cash movement is correct, only the loan side is not.
      */
-    it.fails(
-      "KNOWN DEFECT: a loan payment without a payment breakdown still advances the loan",
+    it(
+      "a loan payment without a payment breakdown still advances the loan",
       async () => {
         seedUser(10_000);
         store.__seedEntities("expense_rules", [
@@ -682,7 +687,7 @@ describe("completeTransaction", () => {
      * 5_000, while the user's cash falls by the full 100. The trailing balance
      * assertion is the half that must survive a fix.
      */
-    it.fails("KNOWN DEFECT: completing a card payment reduces the card balance", async () => {
+    it("completing a card payment reduces the card balance", async () => {
       seedUser(10_000);
       store.__seedEntities("expense_rules", [makeCreditRule({}, { currentBalance: 5_000 })]);
       store.__seedEntities("transactions", [
@@ -717,8 +722,8 @@ describe("completeTransaction", () => {
      * balance at 11_200 (400 deducted twice), even though the cash side nets
      * correctly to a single payment.
      */
-    it.fails(
-      "KNOWN DEFECT: re-completing a loan payment does not advance the loan a second time",
+    it(
+      "re-completing a loan payment does not advance the loan a second time",
       async () => {
         seedUser(10_000);
         store.__seedEntities("expense_rules", [
@@ -860,23 +865,34 @@ describe("skipTransaction", () => {
       expect(balanceWrites()).toEqual([1_100]);
     });
 
-    it("leaves the stale actualAmount and variance on the skipped document", async () => {
+    it("drops the actual amount, actual date and variance of the completion it undoes", async () => {
+      // REWRITTEN (write-path stream, UI-LIFE-04/05). The old test pinned the defect: the
+      // skipped document kept actualAmount 130 and variance 30, so a skipped row printed
+      // the paid amount and sat on the day it had been "paid". A row that is no longer
+      // completed carries no completion data.
       seedUser(1_000);
       store.__seedEntities("transactions", [
-        makeCompletedTransaction({ id: "t1", projectedAmount: 100, actualAmount: 130 }),
+        makeCompletedTransaction({
+          id: "t1",
+          projectedAmount: 100,
+          actualAmount: 130,
+          actualDate: "2026-01-14",
+          variance: 30,
+        }),
       ]);
 
       await skipTransaction("t1");
 
-      // skipTransaction only rewrites status/notes, so the old actual survives;
-      // consumers must key off `status`, never off the presence of actualAmount
       const stored = storedTxn("t1");
       expect(stored.status).toBe("skipped");
-      expect(stored.actualAmount).toBe(130);
-      expect(stored.variance).toBe(30);
+      expect("actualAmount" in stored).toBe(false);
+      expect("actualDate" in stored).toBe(false);
+      expect("variance" in stored).toBe(false);
+      // the planned amount stays
+      expect(stored.projectedAmount).toBe(100);
     });
 
-    it("does not roll back loan counters advanced by the completion", async () => {
+    it("rolls back the loan progress the completion applied", async () => {
       seedUser(10_000);
       store.__seedEntities("expense_rules", [
         makeLoanRule({}, { currentBalance: 12_000, paymentsMade: 0 }),
@@ -895,13 +911,15 @@ describe("skipTransaction", () => {
       await completeTransaction("t-loan", 565);
       await skipTransaction("t-loan");
 
-      // cash is restored...
+      // cash is restored: 10_000 - 565 + 565
       expect(balance()).toBe(10_000);
-      // ...but the loan still thinks a payment was made (only revertToProjected
-      // decrements the counter)
+      // REWRITTEN (write-path stream, R6). The old test pinned the defect "the loan still
+      // thinks a payment was made" (paymentsMade 1, balance 11_600) after the payment was
+      // skipped, which made the phantom payment permanent. Completing applied 1 payment and
+      // 565 - 165 interest = 400 principal (12_000 -> 11_600); skipping undoes exactly that.
       const rule = storedRule("loan-1");
-      expect(rule.loanConfig!.paymentsMade).toBe(1);
-      expect(rule.loanConfig!.currentBalance).toBe(11_600);
+      expect(rule.loanConfig!.paymentsMade).toBe(0);
+      expect(rule.loanConfig!.currentBalance).toBe(12_000);
     });
   });
 
@@ -1182,8 +1200,8 @@ describe("revertToProjected", () => {
      * completion drops it to 11_200 — one payment recorded, two deducted. The
      * cash reversal itself is correct and unaffected by a fix.
      */
-    it.fails(
-      "KNOWN DEFECT: complete -> revert -> complete leaves the loan balance down by one payment, not two",
+    it(
+      "complete -> revert -> complete leaves the loan balance down by one payment, not two",
       async () => {
         seedUser(10_000);
         store.__seedEntities("expense_rules", [
@@ -1219,8 +1237,8 @@ describe("revertToProjected", () => {
      * CORRECT: reverting a completion that never advanced the counter must leave
      * it at 3.
      */
-    it.fails(
-      "KNOWN DEFECT: reverting a breakdown-less loan payment does not rewind an unrelated payment",
+    it(
+      "reverting a breakdown-less loan payment does not rewind an unrelated payment",
       async () => {
         seedUser(10_000);
         store.__seedEntities("expense_rules", [
@@ -1251,7 +1269,7 @@ describe("revertToProjected", () => {
      * deactivated, so the outstanding installment stops being projected at all.
      * CORRECT: with 5 of 6 paid again, the rule must be active.
      */
-    it.fails("KNOWN DEFECT: reverting the final installment reactivates the plan", async () => {
+    it("reverting the final installment reactivates the plan", async () => {
       seedUser(10_000);
       store.__seedEntities("expense_rules", [
         makeInstallmentRule({}, { installmentCount: 6, installmentsPaid: 5 }),
@@ -1763,7 +1781,7 @@ describe("getTransactions", () => {
      * CORRECT: the limit must apply to the filtered result, returning both
      * completed rows.
      */
-    it.fails("KNOWN DEFECT: limit applies after the status filter, not before", async () => {
+    it("limit applies after the status filter, not before", async () => {
       store.__reset();
       store.__seedEntities("transactions", [
         makeProjectedTransaction({ id: "p1", scheduledDate: "2026-01-01" }),
@@ -2369,7 +2387,7 @@ describe("updateLoanBalance", () => {
      * TODAY: the loan lands on 11_600 — the same place a scheduled payment
      * would have put it — and `paymentsMade` still advances by exactly one.
      */
-    it.fails("KNOWN DEFECT: an overpayment reduces the loan by the extra amount", async () => {
+    it("an overpayment reduces the loan by the extra amount", async () => {
       seedUser(10_000);
       store.__seedEntities("expense_rules", [
         makeLoanRule({}, { currentBalance: 12_000, paymentsMade: 0 }),

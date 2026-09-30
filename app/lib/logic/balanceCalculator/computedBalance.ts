@@ -4,46 +4,49 @@
  */
 
 import { Transaction } from "@/lib/types";
-import { getUserProfile, updateUserBalance } from "@/lib/firebase/firestore";
+import { getUserProfile, updateUserBalance, recalculateBalance } from "@/lib/firebase/firestore";
+import { cleanMoney, sumLedger } from "./ledgerMath";
 
 /**
  * Calculate balance from initial balance + all completed transactions
  * This is the source of truth for balance calculation
+ *
+ * `transactions` must be the user's STORED rows (all of them). Never pass the
+ * merged or date-windowed list from the UI: completed history outside the window
+ * would silently drop out of the sum.
+ *
  * @param initialBalance - User's starting balance baseline
- * @param transactions - All transactions to consider
+ * @param transactions - All stored transactions to consider
  * @returns Computed current balance
  */
 export const computeBalanceFromTransactions = (
   initialBalance: number,
   transactions: Transaction[]
 ): number => {
-  let balance = initialBalance;
-
-  transactions.forEach((t) => {
-    if (t.status === "completed") {
-      const amount = t.actualAmount ?? t.projectedAmount;
-      if (t.type === "income") {
-        balance += amount;
-      } else {
-        balance -= amount;
-      }
-    }
-  });
-
-  return balance;
+  const baseline = Number.isFinite(initialBalance) ? initialBalance : 0;
+  return cleanMoney(baseline + sumLedger(transactions));
 };
 
 /**
  * Sync computed balance to user profile
  * Recalculates balance from initial balance + transactions and updates user profile
+ *
+ * Without `transactions` the rows are read from Firestore (every completed stored
+ * row of the user): that is the form the app uses. Passing a list computes from
+ * exactly that list (it must be ALL stored rows).
+ *
  * @param userId - User ID
- * @param transactions - All transactions for the user
+ * @param transactions - All stored transactions for the user (optional)
  * @returns The new computed balance
  */
 export const syncComputedBalance = async (
   userId: string,
-  transactions: Transaction[]
+  transactions?: Transaction[]
 ): Promise<number> => {
+  if (transactions === undefined) {
+    return (await recalculateBalance(userId)).computed;
+  }
+
   const profile = await getUserProfile(userId);
   if (!profile) throw new Error("User profile not found");
 

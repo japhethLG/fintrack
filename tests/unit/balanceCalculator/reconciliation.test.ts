@@ -10,10 +10,10 @@ import {
 } from "@/lib/logic/balanceCalculator/reconciliation";
 import {
   completeTransaction,
+  deleteTransaction,
   deleteTransactionsBySource,
   getTransactions,
 } from "@/lib/firebase/firestore";
-import { removeTransactionAction } from "@/contexts/FinancialContext/actions/transactionActions";
 import * as store from "../../helpers/firestoreEmulator";
 import {
   makeCompletedTransaction,
@@ -492,17 +492,15 @@ describe("generateReconciliationReport", () => {
       expect(drifted.affectedTransactions[0].actualAmount).toBe(800);
     });
 
-    it("detects the drift a UI delete of a completed rule-based row leaves behind", async () => {
-      // Entirely real code path, no hand-mutation. Two rule-based bills are paid
-      // through `completeTransaction`, then one is deleted through
-      // `removeTransactionAction` — the action the transaction list's delete
-      // button calls. Its balance reversal is gated on `sourceType === "manual"`
-      // (app/contexts/FinancialContext/actions/transactionActions.ts:346), so a
-      // completed EXPENSE_RULE row is thrown away with its money still deducted.
-      // That defect is pinned as `it.fails` in
-      // tests/integration/actualMutation.actions.test.ts:2060; what this test
-      // shows is that the reconciliation report — if anything ever called it —
-      // would name the resulting drift exactly.
+    it("detects the drift a balance-blind delete of a completed rule-based row leaves behind", async () => {
+      // REWRITTEN (write-path stream). This test used `removeTransactionAction` to
+      // PRODUCE the drift, because that action skipped the balance reversal for a
+      // completed rule-based row (the defect is fixed: the action now reverses it, see
+      // tests/integration/actualMutation.actions.test.ts "reverses the balance impact of
+      // a completed rule-based transaction"). The reconciliation report itself is
+      // unchanged, so the drift is now produced by the plain `deleteTransaction`, which
+      // removes a document without touching the balance: a completed EXPENSE_RULE row
+      // thrown away with its money still deducted. The arithmetic below is identical.
       seedProfile({ initialBalance: 5_000, currentBalance: 5_000 });
       store.__seedEntities("expense_rules", [makeExpenseRule({ id: "exp-1" })]);
       store.__seedEntities("transactions", [
@@ -533,7 +531,7 @@ describe("generateReconciliationReport", () => {
       const beforeDelete = await generateReconciliationReport(USER, await storedRows());
       expect(beforeDelete.difference).toBe(0);
 
-      await removeTransactionAction("txn-feb", USER);
+      await deleteTransaction("txn-feb");
       expect(store.__get("transactions", "txn-feb")).toBeUndefined();
       expect(storedBalance()).toBe(2_550); // no reversal happened
 
@@ -589,7 +587,7 @@ describe("generateReconciliationReport", () => {
      * unrounded `computedBalance`, because a fix is free to round either operand
      * and pinning the noisy intermediate would make the fix read as a regression.
      */
-    it.fails("KNOWN DEFECT: reports no drift when the only difference is float noise", async () => {
+    it("reports no drift when the only difference is float noise", async () => {
       seedProfile({ initialBalance: 3_000, currentBalance: 3_000 });
       store.__seedEntities("transactions", [
         makeTransaction({
@@ -757,9 +755,11 @@ describe("fixBalanceDiscrepancy", () => {
       expect(after.difference).toBe(0);
     });
 
-    it("repairs the drift a UI delete of a completed rule-based row leaves behind", async () => {
-      // The full loop the app never runs: real completion, real delete action
-      // that skips the balance reversal, detect, fix, re-detect.
+    it("repairs the drift a balance-blind delete of a completed rule-based row leaves behind", async () => {
+      // REWRITTEN (write-path stream): the drift is produced by the plain
+      // `deleteTransaction` (document removed, balance untouched) because the delete
+      // ACTION now reverses the balance itself (see the previous test).
+      // The full loop: real completion, balance-blind delete, detect, fix, re-detect.
       //
       // Worth being clear about what "auto-fix" means here: the repair moves the
       // balance to whatever the SURVIVING ledger says, so it hands the 1200 back.
@@ -782,7 +782,7 @@ describe("fixBalanceDiscrepancy", () => {
       ]);
 
       await completeTransaction("txn-jan", 1_200);
-      await removeTransactionAction("txn-jan", USER);
+      await deleteTransaction("txn-jan");
 
       const drifted = await generateReconciliationReport(USER, await storedRows());
       expect(drifted.difference).toBe(-1_200);

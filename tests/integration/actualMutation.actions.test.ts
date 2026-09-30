@@ -468,7 +468,7 @@ describe("markTransactionCompleteAction", () => {
       expect(installmentOf("inst-1").installmentsPaid).toBe(3);
     });
 
-    it("does not deactivate an installment rule on its final payment", async () => {
+    it("deactivates an installment rule on its final payment, exactly as the stored-row path does", async () => {
       seedUser();
       const rule = seedRule(makeInstallmentRule({}, { installmentCount: 6, installmentsPaid: 5 }));
 
@@ -480,11 +480,14 @@ describe("markTransactionCompleteAction", () => {
         [rule]
       );
 
-      // The projection path writes only installmentsPaid — unlike
-      // updateInstallmentProgress, which also flips isActive off when the plan
-      // finishes. Nothing here should silently deactivate the rule.
+      // REWRITTEN (write-path stream, R6 "one completion path"). This test pinned the
+      // projection path's OLD difference from the stored-row path ("nothing here should
+      // silently deactivate the rule"). The two gestures must leave the plan in the same
+      // state, and the stored-row path (firestore suite: "deactivates the rule on the
+      // final installment") and the reactivation-on-revert test both define a finished
+      // plan as inactive. 5 paid of 6 + this payment = 6 of 6: finished.
       expect(installmentOf("inst-1").installmentsPaid).toBe(6);
-      expect(store.__get<ExpenseRule>("expense_rules", "inst-1")!.isActive).toBe(true);
+      expect(store.__get<ExpenseRule>("expense_rules", "inst-1")!.isActive).toBe(false);
     });
 
     it("updates only the loan counter when a rule carries both a loan and an installment config", async () => {
@@ -620,8 +623,8 @@ describe("markTransactionCompleteAction", () => {
      * sibling cases just below (card, occurrence override). One fix at
      * transactionActions.ts:95 clears all of them.
      */
-    it.fails(
-      "KNOWN DEFECT: records the amortized payment as the projected amount for a loan occurrence",
+    it(
+      "records the amortized payment as the projected amount for a loan occurrence",
       async () => {
         seedUser();
         const rule = seedRule(makeLoanRule({ amount: 999, startDate: "2026-01-01" }));
@@ -648,8 +651,8 @@ describe("markTransactionCompleteAction", () => {
      * Same root cause as the loan case above; kept separate only because the
      * amount comes from a different schedule generator.
      */
-    it.fails(
-      "KNOWN DEFECT: records the scheduled minimum payment as the projected amount for a card occurrence",
+    it(
+      "records the scheduled minimum payment as the projected amount for a card occurrence",
       async () => {
         seedUser();
         const rule = seedRule(makeCreditRule({ amount: 999, startDate: "2026-01-01" }));
@@ -677,8 +680,8 @@ describe("markTransactionCompleteAction", () => {
      *
      * Same root cause as the two cases above (transactionActions.ts:95).
      */
-    it.fails(
-      "KNOWN DEFECT: honours an occurrence amount override when recording the projected amount",
+    it(
+      "honours an occurrence amount override when recording the projected amount",
       async () => {
         seedUser();
         const rule = seedRule(
@@ -716,7 +719,7 @@ describe("markTransactionCompleteAction", () => {
      * it, and are the contrast this defect is measured against. One fix at
      * transactionActions.ts:89-110 clears both failures.
      */
-    it.fails("KNOWN DEFECT: stores the variance of a materialized completion", async () => {
+    it("stores the variance of a materialized completion", async () => {
       seedUser();
       const rule = seedRule(makeExpenseRule({ amount: 1_200 }));
 
@@ -741,11 +744,16 @@ describe("markTransactionCompleteAction", () => {
      * schedule is regenerated from a balance that never shrinks.
      * CORRECT: both paths converge on the same loanConfig.
      */
-    it.fails(
-      "KNOWN DEFECT: reduces the loan balance the same way whether the row was stored or projected",
+    it(
+      "reduces the loan balance the same way whether the row was stored or projected",
       async () => {
         seedUser();
-        const fromProjection = seedRule(makeLoanRule({ id: "loan-a" }));
+        // FIXTURE (write-path stream): the loan's first payment is on 2026-03-01, so the
+        // projection being completed really exists (payment #1: interest 12,000 x 1% = 120,
+        // principal 565 - 120 = 445), exactly what the stored row below carries. With the
+        // default start date (2026-01-01, paymentsMade 0) there is no projection on
+        // 2026-03-01 to resolve, which made the two rows incomparable.
+        const fromProjection = seedRule(makeLoanRule({ id: "loan-a", startDate: "2026-03-01" }));
         seedRule(makeLoanRule({ id: "loan-b" }));
         // 565 payment = 445 principal + 120 interest.
         const breakdown = makePaymentBreakdown({ principalPaid: 445, interestPaid: 120 });
@@ -783,8 +791,8 @@ describe("markTransactionCompleteAction", () => {
      * ever and the card never pays down.
      * CORRECT: the payment reduces the card balance.
      */
-    it.fails(
-      "KNOWN DEFECT: reduces the card balance when a card payment is completed",
+    it(
+      "reduces the card balance when a card payment is completed",
       async () => {
         seedUser();
         const rule = seedRule(makeCreditRule({ amount: 100 }, { currentBalance: 5_000 }));
@@ -1233,8 +1241,8 @@ describe("rescheduleTransactionAction", () => {
      * has to happen here.
      * CORRECT: keep the existing amount and only change scheduledDate.
      */
-    it.fails(
-      "KNOWN DEFECT: preserves an existing amount override when only the date is rescheduled",
+    it(
+      "preserves an existing amount override when only the date is rescheduled",
       async () => {
         const rule = seedRule(
           makeExpenseRule({
@@ -1400,8 +1408,8 @@ describe("addManualTransactionAction", () => {
      * why.
      * CORRECT: adding an already-completed 400 expense leaves 9,600.
      */
-    it.fails(
-      "KNOWN DEFECT: applies the balance impact of an already-completed manual row",
+    it(
+      "applies the balance impact of an already-completed manual row",
       async () => {
         seedUser({ currentBalance: 10_000 });
 
@@ -1883,8 +1891,8 @@ describe("updateManualTransactionAction", () => {
      * moved by 250 — the row and the balance now disagree.
      * CORRECT: for a completed row the balance follows actualAmount only.
      */
-    it.fails(
-      "KNOWN DEFECT: editing only the projected amount of a completed row leaves the balance alone",
+    it(
+      "editing only the projected amount of a completed row leaves the balance alone",
       async () => {
         seedUser({ currentBalance: 9_900 });
         seedManual({
@@ -1908,8 +1916,8 @@ describe("updateManualTransactionAction", () => {
      * action credits a further 100.
      * CORRECT: reverse with the old type, apply with the new one.
      */
-    it.fails(
-      "KNOWN DEFECT: flipping a completed income row to an expense reverses the credit",
+    it(
+      "flipping a completed income row to an expense reverses the credit",
       async () => {
         seedUser({ currentBalance: 10_500 });
         seedManual({
@@ -1932,8 +1940,8 @@ describe("updateManualTransactionAction", () => {
      * error with no trace.
      * CORRECT: 10,000 - 500 = 9,500.
      */
-    it.fails(
-      "KNOWN DEFECT: flipping the type of a completed row at the same amount re-signs the balance",
+    it(
+      "flipping the type of a completed row at the same amount re-signs the balance",
       async () => {
         seedUser({ currentBalance: 10_500 });
         seedManual({
@@ -2057,8 +2065,8 @@ describe("removeTransactionAction", () => {
      * with nothing on the ledger to explain it.
      * CORRECT: any completed row reverses its impact when deleted.
      */
-    it.fails(
-      "KNOWN DEFECT: reverses the balance impact of a completed rule-based transaction",
+    it(
+      "reverses the balance impact of a completed rule-based transaction",
       async () => {
         seedUser({ currentBalance: 9_600 });
         seedTxn(
@@ -2266,8 +2274,8 @@ describe("revertTransactionToProjectedAction", () => {
      * custom date — the projection snaps back to the pattern.
      * CORRECT: preserve the stored date for every frequency.
      */
-    it.fails(
-      "KNOWN DEFECT: preserves the custom date of a reverted weekly occurrence",
+    it(
+      "preserves the custom date of a reverted weekly occurrence",
       async () => {
         seedUser({ currentBalance: 8_800 });
         seedRule(
@@ -2294,8 +2302,8 @@ describe("revertTransactionToProjectedAction", () => {
      * the custom date is dropped just as silently.
      * CORRECT: preserve the stored date.
      */
-    it.fails(
-      "KNOWN DEFECT: preserves the custom date of a reverted bi-weekly occurrence",
+    it(
+      "preserves the custom date of a reverted bi-weekly occurrence",
       async () => {
         seedUser({ currentBalance: 8_800 });
         seedRule(makeExpenseRule({ frequency: "bi-weekly", startDate: "2026-01-01" }));
@@ -2321,8 +2329,8 @@ describe("revertTransactionToProjectedAction", () => {
      * later change to dayOfMonth.
      * CORRECT: no override, the row sits exactly where the pattern puts it.
      */
-    it.fails(
-      "KNOWN DEFECT: compares against scheduleConfig.dayOfMonth rather than the start date's day",
+    it(
+      "compares against scheduleConfig.dayOfMonth rather than the start date's day",
       async () => {
         seedUser({ currentBalance: 8_800 });
         seedRule(

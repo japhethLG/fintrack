@@ -6,8 +6,8 @@
 import {
   doc,
   getDoc,
-  setDoc,
   updateDoc,
+  runTransaction,
   Timestamp,
   onSnapshot,
 } from "firebase/firestore";
@@ -15,6 +15,10 @@ import { db } from "../config";
 import { UserProfile } from "@/lib/types";
 import { removeUndefined } from "./utils";
 import { getTodayKey } from "@/lib/utils/dateUtils";
+import { cleanMoney } from "@/lib/logic/balanceCalculator/ledgerMath";
+
+/** The balance model new profiles are created on (see UserProfile.balanceModelVersion). */
+export const BALANCE_MODEL_VERSION = 1;
 
 export const createUserProfile = async (
   uid: string,
@@ -22,9 +26,12 @@ export const createUserProfile = async (
   displayName: string
 ): Promise<UserProfile> => {
   const userRef = doc(db, "users", uid);
-  const snapshot = await getDoc(userRef);
+  // Create-if-absent in one transaction: two tabs signing in at the same moment
+  // cannot both create (and the loser overwrite) the profile.
+  return runTransaction(db, async (tx) => {
+    const snapshot = await tx.get(userRef);
+    if (snapshot.exists()) return snapshot.data() as UserProfile;
 
-  if (!snapshot.exists()) {
     const now = Timestamp.now();
     const newProfile: UserProfile = {
       uid,
@@ -33,6 +40,7 @@ export const createUserProfile = async (
       currentBalance: 0,
       initialBalance: 0,
       balanceLastUpdatedAt: getTodayKey(),
+      balanceModelVersion: BALANCE_MODEL_VERSION,
       preferences: {
         currency: "PHP",
         dateFormat: "MM/DD/YYYY",
@@ -43,10 +51,9 @@ export const createUserProfile = async (
       createdAt: now,
       updatedAt: now,
     };
-    await setDoc(userRef, newProfile);
+    tx.set(userRef, newProfile);
     return newProfile;
-  }
-  return snapshot.data() as UserProfile;
+  });
 };
 
 export const getUserProfile = async (uid: string): Promise<UserProfile | null> => {
@@ -98,13 +105,26 @@ export const updateUserBalance = async (uid: string, newBalance: number): Promis
   await updateDoc(userRef, cleanedUpdates);
 };
 
+/**
+ * Add `delta` to the stored balance, atomically. The read and the write happen in
+ * one transaction, so two adjustments in flight cannot lose one of them. (Gestures
+ * on transactions do NOT use this: they change the balance inside the same
+ * transaction as the row; see ledger.ts.)
+ */
 export const adjustUserBalance = async (uid: string, delta: number): Promise<number> => {
-  const profile = await getUserProfile(uid);
-  if (!profile) throw new Error("User profile not found");
-
-  const newBalance = profile.currentBalance + delta;
-  await updateUserBalance(uid, newBalance);
-  return newBalance;
+  const userRef = doc(db, "users", uid);
+  return runTransaction(db, async (tx) => {
+    const snapshot = await tx.get(userRef);
+    if (!snapshot.exists()) throw new Error("User profile not found");
+    const current = (snapshot.data() as UserProfile).currentBalance;
+    const newBalance = cleanMoney(current + delta);
+    tx.update(userRef, {
+      currentBalance: newBalance,
+      balanceLastUpdatedAt: getTodayKey(),
+      updatedAt: Timestamp.now(),
+    });
+    return newBalance;
+  });
 };
 
 // Real-time listener for user profile

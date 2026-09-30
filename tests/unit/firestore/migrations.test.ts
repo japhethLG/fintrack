@@ -314,8 +314,8 @@ describe("migrateToInitialBalance", () => {
   });
 
   describe("KNOWN DEFECTS", () => {
-    it.fails(
-      "KNOWN DEFECT: the derived initialBalance double-counts completed history",
+    it(
+      "the derived initialBalance double-counts completed history",
       async () => {
         // app/lib/firebase/firestore/migrations.ts:223 sets initialBalance = currentBalance.
         // But currentBalance ALREADY includes every completed transaction, and
@@ -359,8 +359,8 @@ describe("migrateToInitialBalance", () => {
       }
     );
 
-    it.fails(
-      "KNOWN DEFECT: a legacy profile with no currentBalance never gets an initialBalance",
+    it(
+      "a legacy profile with no currentBalance never gets an initialBalance",
       async () => {
         // The migration's stated job (AuthContext.tsx:72 "ensure initialBalance
         // field exists") is not met for the oldest documents. migrations.ts:223
@@ -907,14 +907,31 @@ describe("deleteSelectiveUserData", () => {
     expect(rawProfile(USER).balanceLastUpdatedAt).toBe(TODAY);
   });
 
-  it("resets the balance when balance history is deleted", async () => {
+  it("leaves the balance alone when only balance history is deleted", async () => {
+    // REWRITTEN (write-path stream, UI-BAL-15 + user decision "a Balance History reset
+    // must not zero the balance"). This test pinned the opposite: deleting the daily
+    // snapshots (nothing in the app even writes them) zeroed the balance while every
+    // transaction it is made of stayed. Snapshots are not part of the balance.
     seedProfile(USER, { currentBalance: 8_000, balanceLastUpdatedAt: "2026-01-01" });
     seedOneOfEverything(USER, "a");
 
     await deleteSelectiveUserData(USER, ["balance_history"]);
 
+    expect(store.__count("balance_history")).toBe(0);
+    expect(store.__opsFor("users")).toHaveLength(0);
+    expect(rawProfile(USER).currentBalance).toBe(8_000);
+    expect(rawProfile(USER).balanceLastUpdatedAt).toBe("2026-01-01");
+  });
+
+  it("resets balance AND baseline to 0 when transactions are deleted, so the invariant holds with no history", async () => {
+    seedProfile(USER, { currentBalance: 8_000, initialBalance: 10_000 });
+    seedOneOfEverything(USER, "a");
+
+    await deleteSelectiveUserData(USER, ["transactions"]);
+
+    // 0 = 0 + SUM(no completed rows)
     expect(rawProfile(USER).currentBalance).toBe(0);
-    expect(rawProfile(USER).balanceLastUpdatedAt).toBe(TODAY);
+    expect(rawProfile(USER).initialBalance).toBe(0);
   });
 
   it("leaves the balance completely untouched for the other data types", async () => {
@@ -1010,8 +1027,8 @@ describe("deleteAllUserData", () => {
     expect(store.__opsFor("users").map((op) => op.id)).toEqual([USER]);
   });
 
-  it.fails(
-    "KNOWN DEFECT: initialBalance survives the wipe, so the computed balance resurrects the deleted money",
+  it(
+    "initialBalance survives the wipe, so the computed balance resurrects the deleted money",
     async () => {
       // migrations.ts:94 resets currentBalance to 0 but never touches
       // initialBalance. computeBalanceFromTransactions (computedBalance.ts:16) is

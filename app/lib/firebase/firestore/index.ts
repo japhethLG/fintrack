@@ -20,6 +20,7 @@ export {
   updateUserProfile,
   updateUserBalance,
   adjustUserBalance,
+  BALANCE_MODEL_VERSION,
   subscribeToUserProfile,
   deleteUserProfile,
 } from "./users";
@@ -34,6 +35,7 @@ export {
   updateIncomeSource,
   deleteIncomeSource,
   setIncomeSourceOverride,
+  patchIncomeSourceOverride,
   removeIncomeSourceOverride,
   subscribeToIncomeSources,
 } from "./incomeSources";
@@ -48,6 +50,7 @@ export {
   updateExpenseRule,
   deleteExpenseRule,
   setExpenseRuleOverride,
+  patchExpenseRuleOverride,
   removeExpenseRuleOverride,
   updateLoanBalance,
   updateCreditBalance,
@@ -67,11 +70,29 @@ export {
   completeTransaction,
   skipTransaction,
   revertToProjected,
+  completeOccurrence,
+  skipOccurrence,
+  addTransactionWithBalance,
+  updateManualTransactionWithBalance,
+  deleteTransactionWithBalance,
   deleteTransaction,
   deleteTransactionsBySource,
   subscribeToTransactions,
   subscribeToStoredTransactions,
 } from "./transactions";
+
+// ============================================================================
+// LEDGER: BALANCE TOOLS
+// ============================================================================
+export {
+  getCompletedTransactions,
+  recalculateBalance,
+  setInitialBalance,
+  overrideCurrentBalance,
+} from "./balance";
+export { LedgerOwnershipError, occurrenceRowId } from "./ledger";
+
+export type { OccurrenceBase } from "./transactions";
 
 // ============================================================================
 // BALANCE HISTORY OPERATIONS
@@ -90,6 +111,7 @@ export {
   deleteProjectedTransactions,
   deleteAllUserData,
   deleteSelectiveUserData,
+  ResetIncompleteError,
   migrateToInitialBalance,
   migratePendingToOverrides,
 } from "./migrations";

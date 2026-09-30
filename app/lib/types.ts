@@ -12,6 +12,13 @@ export interface UserProfile {
   currentBalance: number;
   initialBalance: number;
   balanceLastUpdatedAt: string;
+  /**
+   * Version of the balance model this profile's numbers follow. From version 1 on,
+   * `currentBalance == initialBalance + SUM(signed(completed stored rows))` holds and
+   * is maintained atomically with every change to a stored row. A profile without it
+   * is rebased once (see migrateToInitialBalance); absent on legacy documents.
+   */
+  balanceModelVersion?: number;
   preferences: {
     currency: string;
     dateFormat: string;

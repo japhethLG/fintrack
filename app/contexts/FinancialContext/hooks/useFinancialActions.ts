@@ -237,9 +237,13 @@ export function useFinancialActions({
     [user]
   );
 
-  const revertTransactionToProjected = useCallback(async (id: string) => {
-    await revertTransactionToProjectedAction(id);
-  }, []);
+  const revertTransactionToProjected = useCallback(
+    async (id: string) => {
+      if (!user) throw new Error("User not authenticated");
+      await revertTransactionToProjectedAction(id, user.uid);
+    },
+    [user]
+  );
 
   // ============================================================================
   // OVERRIDE ACTIONS

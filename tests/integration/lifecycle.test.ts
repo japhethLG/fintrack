@@ -448,7 +448,7 @@ describe("overspend: the actual comes in above the projection", () => {
      * field only materializes if the user edits the actual a second time.
      * CORRECT: the stored row must carry variance = 1350 - 1200 = 150.
      */
-    it.fails("KNOWN DEFECT: persists the variance on a first-time completion", async () => {
+    it("persists the variance on a first-time completion", async () => {
       await completeOccurrence(JAN_RENT_ID, 1_350);
 
       expect(onlyStoredRow().variance).toBe(150);
@@ -966,25 +966,29 @@ describe("loan lifecycle: paying the first of six amortized payments", () => {
     expect(stored.status).toBe("completed");
     expect(stored.occurrenceId).toBe("loan-1_2026-01");
     expect(stored.actualAmount).toBe(ORIGINAL_PMT);
-    // the realized row's projectedAmount comes from `source.amount`
-    // (transactionActions.ts:94) — the RULE's headline figure — not from the
-    // amortization step's `payment`, so variance is measured against a rounded
-    // number rather than against the schedule the user was shown
+    // the realized row's projectedAmount is the amortization step's payment
+    // (here equal to rule.amount, so this assertion cannot tell the two sources apart)
     expect(stored.projectedAmount).toBe(ORIGINAL_PMT);
     expect(balance()).toBe(cents(20_000 - ORIGINAL_PMT));
-    // no breakdown is carried onto the realized row at all
-    expect(stored.paymentBreakdown).toBeUndefined();
+    // REWRITTEN (write-path stream, R6). This asserted `paymentBreakdown` was
+    // undefined ("no breakdown is carried onto the realized row at all"). The realized row
+    // now carries the breakdown of the payment it realizes, exactly like a stored-row
+    // completion: payment #1 of 6, interest 6000 x 1% = 60.00, principal 1035.29 - 60 = 975.29.
+    expect(stored.paymentBreakdown).toMatchObject({ paymentNumber: 1, totalPayments: 6 });
+    expect(stored.paymentBreakdown!.interestPaid).toBeCloseTo(60, 2);
+    expect(stored.paymentBreakdown!.principalPaid).toBeCloseTo(975.29, 2);
   });
 
-  it("advances paymentsMade but leaves the outstanding loan balance untouched", async () => {
+  it("advances paymentsMade and reduces the outstanding loan balance by the principal paid", async () => {
     await completeOccurrence("proj_loan-1::2026-01-01::loan-1_2026-01", ORIGINAL_PMT);
 
     const config = storedRule("loan-1").loanConfig!;
-    // transactionActions.ts:127-131 increments paymentsMade only; the stored-row
-    // path (completeTransaction -> updateLoanBalance) would ALSO have reduced
-    // currentBalance. The two completion paths disagree.
+    // REWRITTEN (write-path stream, R6). Was "advances paymentsMade but leaves the
+    // outstanding loan balance untouched" (6_000): the projection path skipped the principal
+    // reduction the stored-row path applied. Both paths now apply the same consequence:
+    // 6000 - (1035.29 - 60.00 interest) = 6000 - 975.29 = 5024.71, one payment made.
     expect(config.paymentsMade).toBe(1);
-    expect(config.currentBalance).toBe(6_000);
+    expect(config.currentBalance).toBeCloseTo(5_024.71, 2);
   });
 
   it("keeps the final payment in the remaining schedule", async () => {
@@ -1047,8 +1051,8 @@ describe("loan lifecycle: paying the first of six amortized payments", () => {
      * CORRECT: after one payment the balance must fall by the principal portion,
      * 6000 - (1035.29 - 60) = 5024.71.
      */
-    it.fails(
-      "KNOWN DEFECT: completing a projected loan payment reduces the outstanding balance",
+    it(
+      "completing a projected loan payment reduces the outstanding balance",
       async () => {
         await completeOccurrence("proj_loan-1::2026-01-01::loan-1_2026-01", ORIGINAL_PMT);
 
@@ -1068,7 +1072,7 @@ describe("loan lifecycle: paying the first of six amortized payments", () => {
     // but the LAST payment absorbs the unreduced currentBalance (6000 instead of 5024.71),
     // so "all remaining payments keep the original amount" needs the write path to reduce
     // currentBalance on completion. When that lands this test turns red: remove `.fails`.
-    it.fails("KNOWN DEFECT: the remaining payments keep their original amount", async () => {
+    it("the remaining payments keep their original amount", async () => {
       await completeOccurrence("proj_loan-1::2026-01-01::loan-1_2026-01", ORIGINAL_PMT);
 
       projectedRows(loanView()).forEach((t) =>
