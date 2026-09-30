@@ -112,13 +112,21 @@ export const makeExpenseRule = (overrides: Partial<ExpenseRule> = {}): ExpenseRu
   ...overrides,
 });
 
-/** Amortized cash loan: 12,000 over 24 months at 12% APR. */
+/**
+ * Amortized cash loan: 12,000 over 24 months at 12% APR.
+ *
+ * `monthlyPayment` is the exact PMT of those terms,
+ *   12000 * 0.01 * 1.01^24 / (1.01^24 - 1) = 564.8816666791...
+ * (it used to be a rounded 565.0, which nothing read until the loan engine started
+ * honouring the stored payment; a fixture whose payment disagrees with its own
+ * principal/rate/term describes a different loan).
+ */
 export const makeLoanConfig = (overrides: Partial<LoanConfig> = {}): LoanConfig => ({
   principalAmount: 12_000,
   currentBalance: 12_000,
   interestRate: 12,
   termMonths: 24,
-  monthlyPayment: 565.0,
+  monthlyPayment: 564.881666679176,
   calculationType: "amortized",
   loanStartDate: "2026-01-01",
   firstPaymentDate: "2026-01-01",

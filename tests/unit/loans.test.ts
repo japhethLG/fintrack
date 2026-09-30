@@ -225,9 +225,9 @@ describe("calculateAmortizationSchedule", () => {
       expect(ymd(startDate)).toBe("2026-01-15");
     });
 
-    describe("known defects", () => {
+    describe("month-end start dates (were known defects; fixed by stepping from a fixed anchor)", () => {
       /**
-       * DEFECT: month-end start dates skip a month.
+       * FIXED - was: month-end start dates skip a month.
        * loanAmortization.ts:63 advances with `currentDate.setMonth(getMonth() + 1)`,
        * which overflows when the day of month does not exist in the target month:
        * Jan 31 + 1 month => Feb 31 => Mar 3 in 2026 (28-day February). The schedule
@@ -237,8 +237,8 @@ describe("calculateAmortizationSchedule", () => {
        * CORRECT: one payment per calendar month, clamped to the last day of short
        * months: 2026-01-31, 2026-02-28, 2026-03-31, 2026-04-30.
        */
-      it.fails(
-        "KNOWN DEFECT: clamps a month-end payment day to the last day of short months",
+      it(
+        "clamps a month-end payment day to the last day of short months",
         () => {
           const schedule = calculateAmortizationSchedule({
             principal: 4_000,
@@ -262,7 +262,7 @@ describe("calculateAmortizationSchedule", () => {
        * in February. Asserting one distinct calendar month per period makes that
        * visible independently of the exact clamped day.
        */
-      it.fails("KNOWN DEFECT: emits one payment per consecutive calendar month", () => {
+      it("emits one payment per consecutive calendar month", () => {
         const schedule = calculateAmortizationSchedule({
           principal: 4_000,
           annualRate: 0,
@@ -277,9 +277,8 @@ describe("calculateAmortizationSchedule", () => {
 
   describe("negative amortization (payment below the monthly interest)", () => {
     // 10,000 @ 12% APR accrues 100.00 of interest a month; a 50.00 payment can
-    // never touch principal, so the balance NEVER reduces and the loan is never
-    // repaid. The guard at loanAmortization.ts:47-50 clamps principal at 0 so the
-    // loop cannot spin forever - it stops at the maxMonths cap instead.
+    // never touch principal. The unpaid interest capitalises, so the balance
+    // GROWS (see the defect notes below for why the old "flat 10,000" was wrong).
     const schedule = calculateAmortizationSchedule({
       principal: 10_000,
       annualRate: 12,
@@ -288,52 +287,62 @@ describe("calculateAmortizationSchedule", () => {
       startDate: d("2026-01-01"),
     });
 
-    it("terminates at the maxMonths cap instead of hanging", () => {
+    it("terminates at the term instead of hanging", () => {
       expect(schedule).toHaveLength(12);
       expect(scheduleDates(schedule)[11]).toBe("2026-12-01");
     });
 
-    it("clamps principal to zero rather than letting it go negative", () => {
-      expect(schedule.map((step) => step.principal)).toEqual(Array(12).fill(0));
+    it("reports the shortfall as NEGATIVE principal instead of clamping it to zero", () => {
+      // REWRITTEN (was: "clamps principal to zero rather than letting it go negative").
+      // Month 1: interest 100.00, paid 50.00 -> principal = 50 - 100 = -50.00.
+      // Month 2: balance 10,050 -> interest 100.50 -> principal = 50 - 100.50 = -50.50.
+      // Clamping at 0 discarded the unpaid interest, which broke
+      // remaining = opening + interest - paid (see the next test).
+      expect(schedule[0].principal).toBeCloseTo(-50, 9);
+      expect(schedule[1].principal).toBeCloseTo(-50.5, 9);
     });
 
-    it("leaves the balance untouched for the whole schedule", () => {
-      expect(schedule.map((step) => step.remainingBalance)).toEqual(Array(12).fill(10_000));
-      expect(schedule.map((step) => step.interest)).toEqual(Array(12).fill(100));
+    it("grows the balance: 10,050.00, 10,100.50, 10,151.50 ...", () => {
+      // REWRITTEN (was: "leaves the balance untouched for the whole schedule", 10,000 x 12).
+      // 10,000 + 100.00 - 50 = 10,050.00; x1.01 - 50 = 10,100.50; x1.01 - 50 = 10,151.505 -> 10,151.50
+      // (emitted rounded to the cent; 10,151.505 is 10,151.50 in binary floating point).
+      expect(schedule[0].remainingBalance).toBe(10_050);
+      expect(schedule[1].remainingBalance).toBe(10_100.5);
+      expect(schedule[2].remainingBalance).toBeCloseTo(10_151.5, 2);
+      expect(schedule.slice(0, 11).map((s) => s.interest).every((x, i, a) => i === 0 || x > a[i - 1])).toBe(true);
     });
 
-    describe("known defects", () => {
+    it("collects the capitalised debt in the last term month (the loan matures at its term)", () => {
+      // After 11 payments of 50 the balance is 10,000*1.01^11 - 50*(1.01^11 - 1)/0.01
+      //   = 11,156.68347 - 50 * 11.566835 = 10,578.3417; month 12 interest 1% = 105.7834
+      //   -> pays 10,578.3417 + 105.7834 = 10,684.1252.
+      const last = schedule[11];
+      expect(last.principal).toBeCloseTo(10_578.3417, 3);
+      expect(last.payment).toBeCloseTo(10_684.1252, 3);
+      expect(last.remainingBalance).toBe(0);
+    });
+
+    describe("previously known defects (fixed)", () => {
       /**
-       * DEFECT: unpaid interest is silently discarded.
-       * loanAmortization.ts:47-50 clamps `principal` to 0 when the payment does not
-       * cover the interest, then loanAmortization.ts:52 does `balance -= principal`
-       * - i.e. subtracts nothing. The 50.00 of interest that went unpaid simply
-       * vanishes: the schedule reports a flat 10,000 balance forever, understating
-       * the debt and making the loan look interest-free from period 1 onward.
-       * CORRECT: unpaid interest capitalises into the balance, so period 1 closes at
+       * FIXED - was: unpaid interest silently discarded (loanAmortization.ts clamped
+       * principal to 0, then `balance -= principal` subtracted nothing).
+       * CORRECT: unpaid interest capitalises, so period 1 closes at
        * 10,000 + (100 - 50) = 10,050 and the balance grows every period.
        */
-      it.fails("KNOWN DEFECT: capitalises unpaid interest into the outstanding balance", () => {
+      it("capitalises unpaid interest into the outstanding balance", () => {
         expect(schedule[0].remainingBalance).toBeCloseTo(10_050, 2);
         expect(schedule[1].remainingBalance).toBeGreaterThan(schedule[0].remainingBalance);
       });
 
       /**
-       * DEFECT (same root cause, loanAmortization.ts:47-52): the documented split
-       * invariant `payment === principal + interest` breaks once principal is
-       * clamped - the step claims a 50.00 payment made up of 0 principal and 100.00
-       * interest. Any consumer that trusts the breakdown (the projection layer adds
-       * principalPaid + interestPaid to get the cash amount) reads a different
-       * number from `payment`.
+       * FIXED - was: the split invariant `payment === principal + interest` broke once
+       * principal was clamped (a 50.00 payment made of 0 principal and 100.00 interest).
        */
-      it.fails(
-        "KNOWN DEFECT: keeps payment equal to principal plus interest in every period",
-        () => {
-          schedule.forEach((step) => {
-            expect(step.payment).toBeCloseTo(step.principal + step.interest, 2);
-          });
-        }
-      );
+      it("keeps payment equal to principal plus interest in every period", () => {
+        schedule.forEach((step) => {
+          expect(step.payment).toBeCloseTo(step.principal + step.interest, 2);
+        });
+      });
     });
   });
 
@@ -557,7 +566,7 @@ describe("generateLoanProjections", () => {
     });
   });
 
-  describe("known defects", () => {
+  describe("previously known defects (fixed) and the ones still open", () => {
     /**
      * DEFECT 1: the projected payment inflates after every completed payment.
      * loanProjections.ts:28-37 shortens the term (`remainingPayments =
@@ -568,7 +577,8 @@ describe("generateLoanProjections", () => {
      * CORRECT: the contractual payment is fixed for the life of the loan, so the
      * projected amount must not change as payments are recorded.
      */
-    it.fails("KNOWN DEFECT: keeps the projected payment constant as payments are made", () => {
+    it(
+      "keeps the projected payment constant as payments are made", () => {
       const amountAt = (paymentsMade: number) => {
         const rule = makeLoanRule({ startDate: "2026-01-01" }, { paymentsMade });
         return generateLoanProjections(rule, VIEW_START, VIEW_END)[0].projectedAmount;
@@ -587,8 +597,8 @@ describe("generateLoanProjections", () => {
      * CORRECT: payment N+1 falls one month after payment N, i.e. the first remaining
      * payment is `paymentsMade` months after the rule start date.
      */
-    it.fails(
-      "KNOWN DEFECT: dates the first remaining payment after the payments already made",
+    it(
+      "dates the first remaining payment after the payments already made",
       () => {
         const rule = makeLoanRule({ startDate: "2026-01-01" }, { paymentsMade: 3 });
         const projections = generateLoanProjections(rule, VIEW_START, VIEW_END);
@@ -598,22 +608,35 @@ describe("generateLoanProjections", () => {
     );
 
     /**
-     * DEFECT 3: paymentNumber is double-counted.
-     * loanProjections.ts:43 computes `paymentsMade + index + 1`, but `index` already
-     * restarts from the schedule's own first step - which (defect 2) is dated at
-     * `rule.startDate`. With paymentsMade 3 the payment sitting on the rule start
-     * date is labelled payment 4 of 24 even though it is the first step of the
-     * generated schedule.
-     * CORRECT: the number must agree with the payment's position - the step at the
-     * rule start date is payment 1. Note this defect and defect 2 have to be fixed
-     * together: once the schedule no longer slides, the first projection is
-     * legitimately payment 4 AND dated 2026-04-01.
+     * FIXED (and REWRITTEN) - DEFECT 3: paymentNumber is the ABSOLUTE position in the loan.
+     *
+     * The original test asserted "the payment sitting on the rule start date is payment 1"
+     * while, in the same file, the next test asserted that paymentNumber is the absolute
+     * position in the loan regardless of the window. Those cannot both hold once payments
+     * have been made: with paymentsMade 3 the start-date payment is one of the three
+     * ALREADY PAID and is no longer projected at all. The absolute convention is the
+     * correct one because the old number changed with the viewport (June 2026 printed
+     * #6 in a year view and #1 in a June view, see the next test); a number that changes
+     * when the user scrolls cannot be right under any convention.
+     *
+     * Rewritten to the absolute convention, in both halves that the old test mixed up:
+     *  - nothing paid: the payment on the rule start date (2026-01-01) IS payment 1;
+     *  - 3 paid: the first PROJECTED payment is the 4th (2026-04-01), not 7 (3 added to
+     *    an index that already counted them) and not 1 (restarting from the window).
      */
-    it.fails("KNOWN DEFECT: does not add paymentsMade on top of the schedule's own index", () => {
-      const rule = makeLoanRule({ startDate: "2026-01-01" }, { paymentsMade: 3 });
-      const projections = generateLoanProjections(rule, VIEW_START, VIEW_END);
-      const atStartDate = projections.find((t) => t.scheduledDate === "2026-01-01");
+    it("numbers the payment on the rule start date 1, and the first projected payment after 3 made number 4", () => {
+      const fresh = generateLoanProjections(makeLoanRule({ startDate: "2026-01-01" }), VIEW_START, VIEW_END);
+      const atStartDate = fresh.find((t) => t.scheduledDate === "2026-01-01");
       expect(atStartDate?.paymentBreakdown?.paymentNumber).toBe(1);
+
+      const resumed = generateLoanProjections(
+        makeLoanRule({ startDate: "2026-01-01" }, { paymentsMade: 3 }),
+        VIEW_START,
+        VIEW_END
+      );
+      expect(resumed[0].scheduledDate).toBe("2026-04-01"); // months 1-3 are already paid
+      expect(resumed[0].paymentBreakdown?.paymentNumber).toBe(4);
+      expect(resumed.find((t) => t.scheduledDate === "2026-01-01")).toBeUndefined();
     });
 
     /**
@@ -626,8 +649,8 @@ describe("generateLoanProjections", () => {
      * CORRECT: paymentNumber is a property of the loan, not of the viewport - the
      * June payment of a loan starting 2026-01-01 is payment 6 of 24.
      */
-    it.fails(
-      "KNOWN DEFECT: numbers payments by position in the loan, not in the view window",
+    it(
+      "numbers payments by position in the loan, not in the view window",
       () => {
         const rule = makeLoanRule({ startDate: "2026-01-01" });
         const projections = generateLoanProjections(rule, d("2026-06-01"), d("2026-07-31"));
@@ -646,8 +669,8 @@ describe("generateLoanProjections", () => {
      * CORRECT: the user-entered payment drives the projections (and, with 800 a
      * month, the loan is retired in 17 payments instead of 24).
      */
-    it.fails(
-      "KNOWN DEFECT: projects the user-entered monthlyPayment instead of a recomputed PMT",
+    it(
+      "projects the user-entered monthlyPayment instead of a recomputed PMT",
       () => {
         const rule = makeLoanRule({ startDate: "2026-01-01" }, { monthlyPayment: 800 });
         const projections = generateLoanProjections(rule, VIEW_START, VIEW_END);
@@ -688,7 +711,7 @@ describe("generateLoanProjections", () => {
      * splits. Under flat rate at 12% on 12,000 over 24 months, every period charges
      * 12,000 * 1% = 120.00 of interest, not a declining amount.
      */
-    it.fails("KNOWN DEFECT: honours a flat_rate calculationType", () => {
+    it("honours a flat_rate calculationType", () => {
       const flat = generateLoanProjections(
         makeLoanRule({ startDate: "2026-01-01" }, { calculationType: "flat_rate" }),
         VIEW_START,
@@ -704,7 +727,7 @@ describe("generateLoanProjections", () => {
       expect(flat[1].paymentBreakdown!.interestPaid).toBeCloseTo(120, 2);
     });
 
-    it.fails("KNOWN DEFECT: honours a reducing_balance calculationType", () => {
+    it("honours a reducing_balance calculationType", () => {
       const reducing = generateLoanProjections(
         makeLoanRule({ startDate: "2026-01-01" }, { calculationType: "reducing_balance" }),
         VIEW_START,

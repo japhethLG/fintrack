@@ -63,6 +63,11 @@ const ExpenseRuleDetail: React.FC<IProps> = ({ rule, onEdit, onDelete, onToggleA
     return calculatePayoffSummary(rule.creditConfig);
   }, [rule.creditConfig]);
 
+  const hasCreditLimit =
+    !!rule.creditConfig &&
+    Number.isFinite(rule.creditConfig.creditLimit) &&
+    rule.creditConfig.creditLimit > 0;
+
   const displayAmount = getDisplayAmount();
 
   const getScheduleDescription = () => {
@@ -192,7 +197,8 @@ const ExpenseRuleDetail: React.FC<IProps> = ({ rule, onEdit, onDelete, onToggleA
               Credit Card Overview
             </h4>
 
-            {/* Credit Utilization */}
+            {/* Credit Utilization (needs a usable credit limit: a blank limit must not print NaN%) */}
+            {hasCreditLimit && (
             <div className="mb-4">
               <div className="flex justify-between text-sm mb-2">
                 <span className="text-gray-400">Credit Utilization</span>
@@ -221,11 +227,14 @@ const ExpenseRuleDetail: React.FC<IProps> = ({ rule, onEdit, onDelete, onToggleA
                 />
               </div>
             </div>
+            )}
 
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               <div>
                 <p className="text-xs text-gray-400">Credit Limit</p>
-                <p className="text-white font-medium">{formatCurrency(rule.creditConfig.creditLimit)}</p>
+                <p className="text-white font-medium">
+                  {hasCreditLimit ? formatCurrency(rule.creditConfig.creditLimit) : "—"}
+                </p>
               </div>
               <div>
                 <p className="text-xs text-gray-400">Current Balance</p>
@@ -234,7 +243,9 @@ const ExpenseRuleDetail: React.FC<IProps> = ({ rule, onEdit, onDelete, onToggleA
               <div>
                 <p className="text-xs text-gray-400">Available Credit</p>
                 <p className="text-success font-medium">
-                  {formatCurrency(rule.creditConfig.creditLimit - rule.creditConfig.currentBalance)}
+                  {hasCreditLimit
+                    ? formatCurrency(rule.creditConfig.creditLimit - rule.creditConfig.currentBalance)
+                    : "—"}
                 </p>
               </div>
               <div>
@@ -358,7 +369,7 @@ const ExpenseRuleDetail: React.FC<IProps> = ({ rule, onEdit, onDelete, onToggleA
             </div>
 
             {/* Interest vs Principal visualization */}
-            {isFinite(creditPayoffSummary.totalInterestToPay) && (
+            {isFinite(creditPayoffSummary.totalInterestToPay) && creditPayoffSummary.totalAmountToPay > 0 && (
               <div className="mt-4 p-4 bg-gray-900/50 rounded-lg">
                 <p className="text-xs text-gray-400 mb-2">Payment Breakdown Visualization</p>
                 <div className="flex h-6 rounded-lg overflow-hidden">
@@ -470,7 +481,9 @@ const ExpenseRuleDetail: React.FC<IProps> = ({ rule, onEdit, onDelete, onToggleA
                       <div className="flex items-center justify-between mb-2">
                         <span className="font-medium text-white">{scenario.name}</span>
                         <Badge variant="success">
-                          Save {formatCurrency(scenario.interestSavings)}
+                          {isFinite(scenario.interestSavings)
+                            ? `Save ${formatCurrency(scenario.interestSavings)}`
+                            : "Ends the endless interest"}
                         </Badge>
                       </div>
                       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
@@ -488,7 +501,11 @@ const ExpenseRuleDetail: React.FC<IProps> = ({ rule, onEdit, onDelete, onToggleA
                         </div>
                         <div>
                           <p className="text-xs text-gray-400">Time Saved</p>
-                          <p className="text-success">{formatPayoffTime(scenario.timeSavingsMonths)}</p>
+                          <p className="text-success">
+                            {isFinite(scenario.timeSavingsMonths)
+                              ? formatPayoffTime(scenario.timeSavingsMonths)
+                              : "Debt-free instead of never"}
+                          </p>
                         </div>
                       </div>
                     </div>
@@ -498,11 +515,24 @@ const ExpenseRuleDetail: React.FC<IProps> = ({ rule, onEdit, onDelete, onToggleA
 
               {!showPayoffScenarios && (
                 <p className="text-sm text-gray-400">
-                  See how you could save up to{" "}
-                  <span className="text-success font-medium">
-                    {formatCurrency(Math.max(...creditPayoffSummary.scenarios.map((s) => s.interestSavings)))}
-                  </span>{" "}
-                  in interest by increasing your payments.
+                  {creditPayoffSummary.scenarios.some((s) => !isFinite(s.interestSavings)) ? (
+                    <>
+                      At this payment the card never pays off.{" "}
+                      <span className="text-success font-medium">
+                        A higher payment ends the endless interest.
+                      </span>
+                    </>
+                  ) : (
+                    <>
+                      See how you could save up to{" "}
+                      <span className="text-success font-medium">
+                        {formatCurrency(
+                          Math.max(...creditPayoffSummary.scenarios.map((s) => s.interestSavings))
+                        )}
+                      </span>{" "}
+                      in interest by increasing your payments.
+                    </>
+                  )}
                 </p>
               )}
             </div>

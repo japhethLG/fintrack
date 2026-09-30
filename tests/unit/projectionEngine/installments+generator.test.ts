@@ -360,23 +360,21 @@ describe("generateInstallmentProjections", () => {
   });
 
   describe("month-end start dates", () => {
-    it("drifts off the month end once February clamps the anniversary", () => {
+    it("returns to the month end after February instead of drifting to the 28th", () => {
       const rule = makeInstallmentRule({ startDate: "2026-01-31" });
 
       const rows = generateInstallmentProjections(rule, WIDE_START, WIDE_END);
 
-      // Documented current behaviour, not desired behaviour: the generator walks
-      // the cursor forward with dayjs `addMonths(currentDate, 1)`
-      // (installmentProjections.ts:77). Jan 31 + 1 month clamps to Feb 28, and every
-      // later step is taken from the clamped date, so the plan permanently loses the
-      // month end and settles on the 28th. See "known defects" below.
-      expect(datesOf(rows)).toEqual([
-        "2026-01-31",
-        "2026-02-28",
-        "2026-03-28",
-        "2026-04-28",
-        "2026-05-28",
-        "2026-06-28",
+      // REWRITTEN (was "drifts off the month end once February clamps the anniversary", which
+      // documented the defect: Jan 31, Feb 28, Mar 28, Apr 28 ... via `addMonths(currentDate, 1)`
+      // on the already-clamped cursor). Every installment is now `startDate + i months` from the
+      // ORIGINAL anchor, so February clamps to the 28th for that month only:
+      //   Jan 31 + 2 = Mar 31, + 3 = Apr 30 (30 days), + 4 = May 31, + 5 = Jun 30.
+      expect(datesOf(rows).slice(2)).toEqual([
+        "2026-03-31",
+        "2026-04-30",
+        "2026-05-31",
+        "2026-06-30",
       ]);
     });
 
@@ -402,7 +400,7 @@ describe("generateInstallmentProjections", () => {
      * exactly what every other monthly projection does via
      * occurrenceCalculator.ts:131-138 (`clampDayToMonth(dayOfMonth, ...)`).
      */
-    it.fails("KNOWN DEFECT: keeps a month-end plan on the last day of every month", () => {
+    it("keeps a month-end plan on the last day of every month (FIXED)", () => {
       const rule = makeInstallmentRule({ startDate: "2026-01-31" });
 
       const rows = generateInstallmentProjections(rule, WIDE_START, WIDE_END);
@@ -429,7 +427,7 @@ describe("generateInstallmentProjections", () => {
      * rather than the shifted date - otherwise a single override (skip, amount, or
      * reschedule) silently applies to two different payments.
      */
-    it.fails("KNOWN DEFECT: gives every installment a unique occurrence id", () => {
+    it("gives every installment a unique occurrence id (FIXED)", () => {
       const rule = makeInstallmentRule({
         startDate: "2026-01-31",
         weekendAdjustment: "after",
@@ -495,7 +493,7 @@ describe("generateInstallmentProjections", () => {
      * skip wipes out the entire plan.
      * CORRECT: distinct occurrence ids per installment.
      */
-    it.fails("KNOWN DEFECT: does not collapse a one-time-frequency plan onto one id", () => {
+    it("does not collapse a one-time-frequency plan onto one id (FIXED)", () => {
       const rule = makeInstallmentRule({ startDate: "2026-01-10", frequency: "one-time" });
 
       const rows = generateInstallmentProjections(rule, WIDE_START, WIDE_END);

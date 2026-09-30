@@ -160,7 +160,9 @@ export function h1Seed(overrides: Partial<AppSeed> = {}): AppSeed {
       currentBalance: 12_000,
       interestRate: 12,
       termMonths: 24,
-      monthlyPayment: 564.88,
+      // exact PMT (564.8816666791...), the unrounded figure the form persists; the engine now honours
+      // the stored payment, and a pre-rounded 564.88 would hide UI-DISP-10 (3-decimal row amounts)
+      monthlyPayment: 564.881666679176,
       loanStartDate: "2026-03-20",
       firstPaymentDate: "2026-03-20",
       paymentsMade: 0,

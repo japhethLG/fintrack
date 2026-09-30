@@ -41,7 +41,6 @@ test.describe("loan paid for 4 months (8,000 @ 12% APR, 8 months, first payment 
   ];
 
   test("each of the 4 payments is the same 1,045.52 EMI", async ({ page }) => {
-    knownDefect("E2E-JRN-15", "EMIs offered are 1,045.52, 1,189.03, 1,380.39, 1,648.32 (payment is recomputed over the unreduced balance and fewer months)");
     await page.clock.setFixedTime(new Date("2026-03-15T12:00:00Z"));
     await seedAndLogin(page, seed(), { path: "/calendar" });
     await expect(page.getByRole("heading", { name: "Financial Calendar", level: 1 })).toBeVisible();
@@ -65,7 +64,6 @@ test.describe("loan paid for 4 months (8,000 @ 12% APR, 8 months, first payment 
   });
 
   test("after 4 payments the user's money is 20,000 - 4 x 1,045.52 = 15,817.91 and pages agree with the ledger", async ({ page }) => {
-    knownDefect("E2E-JRN-15b", "balance is 14,736.75 because the EMIs were inflated (see E2E-JRN-15)");
     await page.clock.setFixedTime(new Date("2026-03-15T12:00:00Z"));
     await seedAndLogin(page, seed(), { path: "/calendar" });
     await expect(page.getByRole("heading", { name: "Financial Calendar", level: 1 })).toBeVisible();

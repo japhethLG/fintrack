@@ -193,13 +193,15 @@ describe("calculatePayoffSummary: strategy routing", () => {
     expect(calculatePayoffSummary(decliningCard()).monthsToPayoff).toBe(40);
   });
 
-  it("routes the full_balance strategy to a level schedule at the whole balance", () => {
+  it("routes the full_balance strategy to a single payment of the whole balance", () => {
+    // REWRITTEN (was: totalAmountToPay equals a LEVEL 5,000 schedule = 5,000 + 102). Paying the
+    // statement balance in full by the due date incurs no interest (grace period), so the card is
+    // cleared by ONE payment of exactly 5,000.00 and the total is 5,000.00. The old expectation
+    // modelled a second, interest-only bill (UI-RULE-41).
     const summary = calculatePayoffSummary(fixedCard({ paymentStrategy: "full_balance" }));
     expect(summary.effectiveMonthlyPayment).toBe(5_000);
-    expect(summary.totalAmountToPay).toBeCloseTo(
-      paidOver(calculateCreditCardPayoff(5_000, 24, 5_000, d(TODAY))),
-      10
-    );
+    expect(summary.totalAmountToPay).toBe(5_000);
+    expect(summary.monthsToPayoff).toBe(1);
   });
 
   it("routes an unrecognised strategy to a level schedule at the minimum payment", () => {
@@ -446,15 +448,19 @@ describe("calculatePayoffSummary: minimum payment trap", () => {
     expect(summary.totalInterestToPay).toBeCloseTo(8_319.96219, 5);
   });
 
-  it("treats a payment that beats the interest by half a cent as never paying off", () => {
-    // 100.005 against 100 of interest makes 0.005/month of progress. The
-    // schedule's own `month > 12 && principal < 0.01` guard stops it at 13 rows
-    // with the balance essentially untouched, so the summary reports Infinity.
-    // Coherent with the trap flag, and not overstated: 5,000 at half a cent a
-    // month is 83,000 years.
+  it("pays off a card whose payment beats the interest by half a cent, after 501 months (still a trap)", () => {
+    // REWRITTEN (was: "treats ... as never paying off", Infinity, with the claim "5,000 at half a
+    // cent a month is 83,000 years"). That claim is wrong: progress COMPOUNDS, because interest
+    // falls as the balance falls. 100.005 against 2%/month on 5,000:
+    //   balance after n payments = 5,000.25 - 0.25 x 1.02^n  (5,000 x 1.02^n - 100.005 x (1.02^n - 1)/0.02)
+    //   zero when 1.02^n = 20,001  ->  n = ln(20001)/ln(1.02) = 500.1  ->  501 payments.
+    // The old "Infinity" came from the month>12 truncation (DBT-9/10), not from the arithmetic.
+    // It is still flagged as a trap (100.005 <= 1.1 x 100) and well inside the 600-month horizon.
     const summary = calculatePayoffSummary(fixedCard({ fixedPaymentAmount: 100.005 }));
-    expect(summary.monthsToPayoff).toBe(Infinity);
-    expect(summary.payoffDate).toBeNull();
+    expect(Math.log(20_001) / Math.log(1.02)).toBeCloseTo(500.1, 1);
+    expect(summary.monthsToPayoff).toBe(501);
+    expect(summary.payoffDate).not.toBeNull();
+    expect(summary.payoffDate && ymd(summary.payoffDate)).toBe(addMonths(TODAY, 500));
     expect(summary.isMinimumPaymentTrap).toBe(true);
   });
 
@@ -494,22 +500,18 @@ describe("calculatePayoffSummary: full_balance", () => {
     expect(summary.yearsToPayoff).toBe(1 / 12);
   });
 
-  it("needs a SECOND month for an interest-bearing card, because the interest is charged first", () => {
-    // Consequence of a defect that is already encoded, against the code that
-    // owns it: tests/unit/creditCards.test.ts, "KNOWN DEFECT: retires the card
-    // in a single payment for full_balance". getEffectivePayment returns exactly
-    // `currentBalance` (5,000) but calculateCreditCardPayoff charges that
-    // month's 100 of interest before applying it, so 100 of balance survives
-    // into a second month and attracts another 2. Not re-encoded here: the fix
-    // lives in the payment/payoff layer, and this test pins what the summary
-    // reports until then, so the numbers below are documented rather than
-    // endorsed.
+  it("clears an interest-bearing card in ONE month: the statement balance paid in full accrues no interest", () => {
+    // REWRITTEN (was: "needs a SECOND month ... because the interest is charged first": 2 payments,
+    // 5,102 total, 102 interest - the consequence of the defect encoded in
+    // tests/unit/creditCards.test.ts "retires the card in a single payment for full_balance").
+    // Paying the full statement balance by the due date is the card's grace period: no interest,
+    // one payment of exactly 5,000.00, dated today.
     const summary = calculatePayoffSummary(fixedCard({ paymentStrategy: "full_balance" }));
     expect(summary.effectiveMonthlyPayment).toBe(5_000);
-    expect(summary.monthsToPayoff).toBe(2);
-    expect(summary.totalAmountToPay).toBe(5_102);
-    expect(summary.totalInterestToPay).toBe(102);
-    expect(summary.payoffDate && ymd(summary.payoffDate)).toBe(addMonths(TODAY, 1));
+    expect(summary.monthsToPayoff).toBe(1);
+    expect(summary.totalAmountToPay).toBe(5_000);
+    expect(summary.totalInterestToPay).toBe(0);
+    expect(summary.payoffDate && ymd(summary.payoffDate)).toBe(TODAY);
   });
 });
 
@@ -621,7 +623,7 @@ describe("calculatePayoffSummary: settled card", () => {
    *
    * CORRECT: nothing owed means nothing left to pay, over no further months.
    */
-  it.fails("KNOWN DEFECT: reports a settled card as already paid off", () => {
+  it("reports a settled card as already paid off (FIXED)", () => {
     const summary = calculatePayoffSummary(makeCreditConfig({ currentBalance: 0 }));
     expect(summary.monthsToPayoff).toBe(0);
     expect(summary.totalAmountToPay).toBe(0);
@@ -647,7 +649,7 @@ describe("calculatePayoffSummary: settled card", () => {
    *
    * CORRECT: there is no trap when there is no debt.
    */
-  it.fails("KNOWN DEFECT: does not flag a settled card as a minimum payment trap", () => {
+  it("does not flag a settled card as a minimum payment trap (FIXED)", () => {
     const summary = calculatePayoffSummary(
       makeCreditConfig({ currentBalance: 0, paymentStrategy: "full_balance" })
     );
@@ -752,18 +754,15 @@ describe("calculatePayoffScenarios: which scenarios are generated", () => {
     // gives 200/month while clearing the card in 24 months needs 264.36. The
     // two-year plan is therefore suppressed even though it is the faster option.
     //
-    // The Double Payment scenario drops out too, for a different reason: its own
-    // guard (scenarioCalculator.ts:30) requires the doubled schedule to actually
-    // reach a zero balance, and 200/month does not retire a 5,000 balance at 24%.
-    // So a trapped user is offered exactly one way out.
-    //
-    // Pinned rather than filed: suppressing an option dearer than "double your
-    // payment" is defensible. Worth noting that the one-year scenario carries no
-    // equivalent guard and is offered at 472.80, nearly five times the minimum.
+    // REWRITTEN (was: "The Double Payment scenario drops out too ... 200/month does not retire a
+    // 5,000 balance at 24%", expecting only ["Pay Off in 1 Year"]). That is arithmetically false:
+    // 200/month against 100/month of interest retires the card in ln(2)/ln(1.02) = 35.003 -> 36
+    // payments. It only "dropped out" because the baseline was truncated (DBT-9), which inverted
+    // the advice for exactly the user who needs it (D3). Doubling is offered, cheapest first.
     expect(calculatePaymentForMonths(5_000, 24, 24)).toBe(264.36);
     const summary = calculatePayoffSummary(trapCard());
     expect(summary.effectiveMonthlyPayment).toBe(100);
-    expect(summary.scenarios.map((s) => s.name)).toEqual(["Pay Off in 1 Year"]);
+    expect(summary.scenarios.map((s) => s.name)).toEqual(["Double Payment", "Pay Off in 1 Year"]);
   });
 
   it("offers nothing at all for a zero-APR card, because there is no interest to save", () => {
@@ -946,21 +945,14 @@ describe("calculatePayoffScenarios: drops non-improving scenarios", () => {
 // ============================================================================
 
 describe("calculatePayoffScenarios: degenerate cards", () => {
-  it("stays sane for a card already paying its full balance", () => {
-    // Nothing NaN, nothing infinite — but the single surviving suggestion is to
-    // pay 10,000 a month on a 5,000 card to save 2 of interest. It exists only
-    // because of the already-encoded full_balance defect (see
-    // "needs a SECOND month..." above): the current plan is modelled as 2
-    // payments and 102 of interest, so a payment large enough to absorb the
-    // first month's interest as well "saves" the 2 charged in month two. Fix
-    // that defect and this scenario breaks even and disappears.
+  it("offers no advice to a card already paying its full balance (nothing to improve)", () => {
+    // REWRITTEN (was: a single 'Double Payment' of 10,000 "saving" 2 of interest, which the old
+    // comment said "exists only because of the already-encoded full_balance defect ... Fix that
+    // defect and this scenario breaks even and disappears"). The defect is fixed: the current plan
+    // is ONE payment of 5,000 with 0 interest, so every alternative costs interest and saves nothing.
     const summary = calculatePayoffSummary(fixedCard({ paymentStrategy: "full_balance" }));
     expect(nonFiniteScenarioFields(summary.scenarios)).toEqual([]);
-    expect(summary.scenarios.map((s) => s.name)).toEqual(["Double Payment"]);
-    expect(summary.scenarios[0].monthlyPayment).toBe(10_000);
-    expect(summary.scenarios[0].monthsToPayoff).toBe(1);
-    expect(summary.scenarios[0].interestSavings).toBe(2);
-    expect(summary.scenarios[0].timeSavingsMonths).toBe(1);
+    expect(summary.scenarios).toEqual([]);
   });
 
   it("stays sane when the minimum payment already exceeds the one-year payment", () => {
@@ -979,12 +971,23 @@ describe("calculatePayoffScenarios: degenerate cards", () => {
     expect(summary.scenarios[0].monthsToPayoff).toBe(1);
   });
 
-  it("returns no NaN or Infinity in any scenario field for a trapped card", () => {
+  it("returns no NaN in any scenario field for a trapped card, and only the two savings are Infinity", () => {
+    // REWRITTEN (was: no NaN *or Infinity* in any field). Against a debt the same summary calls
+    // endless (monthsToPayoff / totalInterestToPay Infinity) the saving from escaping it IS
+    // unbounded; the old finite "626 and one month" was a slice of a truncated schedule (D3,
+    // DBT-9). The scenarios' own cost fields (payment, months, interest, total) stay finite.
     const summary = calculatePayoffSummary(trapCard());
     // Non-vacuity: `flatMap` over an empty list is empty, so pin that there IS
     // at least one scenario before asserting all their fields are finite.
     expect(summary.scenarios.length).toBeGreaterThan(0);
-    expect(nonFiniteScenarioFields(summary.scenarios)).toEqual([]);
+    expect(nonFiniteScenarioFields(summary.scenarios).sort()).toEqual(
+      summary.scenarios
+        .flatMap((sc) => [`${sc.name}.interestSavings`, `${sc.name}.timeSavingsMonths`])
+        .sort()
+    );
+    summary.scenarios.forEach((sc) => {
+      numericFieldsOf(sc).forEach(([, value]) => expect(Number.isNaN(value)).toBe(false));
+    });
   });
 
   it("returns no NaN or Infinity in any scenario field for a percent_plus_interest trap card", () => {
@@ -1025,7 +1028,7 @@ describe("calculatePayoffScenarios: known defects", () => {
    * CORRECT: a card that never pays off has no finite interest baseline, so
    * doubling the payment must appear, with a positive saving.
    */
-  it.fails("KNOWN DEFECT: still offers to double the payment on a card that never pays off", () => {
+  it("still offers to double the payment on a card that never pays off (FIXED, D3)", () => {
     const summary = calculatePayoffSummary(trapCard());
     // Preconditions, true today: this card never pays off.
     expect(summary.monthsToPayoff).toBe(Infinity);
@@ -1054,7 +1057,7 @@ describe("calculatePayoffScenarios: known defects", () => {
    * CORRECT: with no finite baseline the saving is unbounded; at the very least
    * it cannot be smaller than the 12 months the scenario itself takes.
    */
-  it.fails("KNOWN DEFECT: does not quote a one-month saving against a debt that never ends", () => {
+  it("does not quote a one-month saving against a debt that never ends (FIXED, D3)", () => {
     const summary = calculatePayoffSummary(trapCard());
     expect(summary.monthsToPayoff).toBe(Infinity);
 
@@ -1088,7 +1091,7 @@ describe("calculatePayoffScenarios: known defects", () => {
    * Infinity must also be unbounded — the scenario fields must agree with
    * `totalInterestToPay`/`monthsToPayoff` for the same card.
    */
-  it.fails("KNOWN DEFECT: quotes a finite saving against a baseline it calls Infinity", () => {
+  it("quotes an unbounded saving against a baseline it calls Infinity (FIXED, D3)", () => {
     const summary = calculatePayoffSummary(trapCard());
 
     // The module's own verdict on this card.

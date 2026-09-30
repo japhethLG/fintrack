@@ -1,8 +1,18 @@
 /**
  * Payment amount calculations for credit cards
+ *
+ * Blank optional fields reach this layer as NaN (`parseFloat("")`). They are
+ * read as 0 here so one empty input can never turn a payment, a schedule and
+ * every balance built on it into NaN.
  */
 
 import { CreditConfig } from "./types";
+
+const finiteOr = (value: number | undefined, fallback: number): number =>
+  value !== undefined && Number.isFinite(value) ? value : fallback;
+
+/** The card balance, never negative and never NaN. */
+const balanceOf = (config: CreditConfig): number => Math.max(0, finiteOr(config.currentBalance, 0));
 
 /**
  * Calculate minimum payment based on credit card config
@@ -10,17 +20,17 @@ import { CreditConfig } from "./types";
  * @returns Calculated minimum payment amount
  */
 export const calculateMinimumPayment = (config: CreditConfig): number => {
-  const monthlyInterest = config.currentBalance * (config.apr / 100 / 12);
+  const balance = balanceOf(config);
+  const monthlyInterest = balance * (finiteOr(config.apr, 0) / 100 / 12);
+  const percent = finiteOr(config.minimumPaymentPercent, 0);
+  const floor = finiteOr(config.minimumPaymentFloor, 0);
 
   if (config.minimumPaymentMethod === "percent_plus_interest") {
-    const percentPortion = config.currentBalance * (config.minimumPaymentPercent / 100);
-    return Math.max(config.minimumPaymentFloor, percentPortion + monthlyInterest);
+    const percentPortion = balance * (percent / 100);
+    return Math.max(floor, percentPortion + monthlyInterest);
   }
 
-  return Math.max(
-    config.minimumPaymentFloor,
-    config.currentBalance * (config.minimumPaymentPercent / 100)
-  );
+  return Math.max(floor, balance * (percent / 100));
 };
 
 /**
@@ -30,10 +40,12 @@ export const calculateMinimumPayment = (config: CreditConfig): number => {
  */
 export const getEffectivePayment = (config: CreditConfig): number => {
   switch (config.paymentStrategy) {
-    case "fixed":
-      return config.fixedPaymentAmount || calculateMinimumPayment(config);
+    case "fixed": {
+      const fixed = finiteOr(config.fixedPaymentAmount, 0);
+      return fixed > 0 ? fixed : calculateMinimumPayment(config);
+    }
     case "full_balance":
-      return config.currentBalance;
+      return balanceOf(config);
     case "minimum":
     default:
       return calculateMinimumPayment(config);
@@ -45,14 +57,18 @@ export const getEffectivePayment = (config: CreditConfig): number => {
  * @param balance - Current balance
  * @param apr - Annual percentage rate
  * @param months - Target number of months to pay off
- * @returns Required monthly payment amount
+ * @returns Required monthly payment amount (0 when there is nothing to pay or
+ *   the target is not a whole number of months >= 1; never Infinity)
  */
 export const calculatePaymentForMonths = (
   balance: number,
   apr: number,
   months: number
 ): number => {
-  const monthlyRate = apr / 100 / 12;
+  if (!Number.isFinite(balance) || balance <= 0) return 0;
+  if (!Number.isFinite(months) || months < 1) return 0;
+
+  const monthlyRate = finiteOr(apr, 0) / 100 / 12;
 
   if (monthlyRate === 0) {
     return balance / months;
@@ -86,4 +102,3 @@ export const formatPayoffTime = (months: number): string => {
 
   return `${years} year${years !== 1 ? 's' : ''}, ${remainingMonths} month${remainingMonths !== 1 ? 's' : ''}`;
 };
-

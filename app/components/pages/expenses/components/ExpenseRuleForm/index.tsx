@@ -15,7 +15,7 @@ import {
   expenseRuleSchema,
   getDefaultValues,
   buildScheduleConfig,
-  calculateLoanPayment,
+  calculateLoanPlan,
   calculateInstallmentAmount,
   calculateCreditCardPayment,
   type ExpenseRuleFormValues,
@@ -159,11 +159,9 @@ const ExpenseRuleForm: React.FC<IProps> = ({
         values.loanInterestRate &&
         values.loanTermMonths
       ) {
-        finalAmount = calculateLoanPayment(
-          parseFloat(values.loanPrincipal),
-          parseFloat(values.loanInterestRate),
-          parseInt(values.loanTermMonths)
-        );
+        // The saved payment is the same number the Details step and the projections use:
+        // computed from the current balance and term by the loan's calculation type.
+        finalAmount = calculateLoanPlan(values)?.payment ?? 0;
       } else if (values.expenseType === "credit_card" && values.creditBalance) {
         // Use fixed payment amount if strategy is "fixed", otherwise calculate minimum
         if (values.creditPaymentStrategy === "fixed" && values.creditFixedPayment) {

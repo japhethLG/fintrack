@@ -2,8 +2,8 @@
  * Comprehensive credit card payoff summary
  */
 
-import { CreditConfig, CreditCardPayoffSummary, MonthlyBreakdown } from "./types";
-import { calculateCreditCardPayoff, calculateDecliningMinimumPayoff } from "./payoffCalculator";
+import { CreditConfig, CreditCardPayoffSummary } from "./types";
+import { buildPayoffSchedule } from "./payoffCalculator";
 import { getEffectivePayment } from "./paymentCalculator";
 import { calculatePayoffScenarios } from "./scenarioCalculator";
 
@@ -20,20 +20,28 @@ export const calculatePayoffSummary = (
   interestPaidSoFar: number = 0
 ): CreditCardPayoffSummary => {
   const effectivePayment = getEffectivePayment(config);
-  const currentMonthlyInterest = config.currentBalance * (config.apr / 100 / 12);
+  const balance = Number.isFinite(config.currentBalance) ? config.currentBalance : 0;
+  const apr = Number.isFinite(config.apr) ? config.apr : 0;
+  const currentMonthlyInterest = Math.max(0, balance) * (apr / 100 / 12);
 
-  // Use declining minimum calculation for minimum strategy,
-  // fixed payment calculation for fixed/full_balance strategies
-  let schedule: MonthlyBreakdown[];
-  if (config.paymentStrategy === "minimum") {
-    schedule = calculateDecliningMinimumPayoff(config);
-  } else {
-    schedule = calculateCreditCardPayoff(
-      config.currentBalance,
-      config.apr,
-      effectivePayment
-    );
+  // A settled card is paid off: nothing to pay, nothing to warn about.
+  if (balance <= 0.01) {
+    return {
+      payoffDate: new Date(),
+      monthsToPayoff: 0,
+      totalAmountToPay: 0,
+      totalInterestToPay: 0,
+      currentMonthlyInterest: 0,
+      effectiveMonthlyPayment: effectivePayment,
+      principalPaidSoFar,
+      interestPaidSoFar,
+      scenarios: [],
+      isMinimumPaymentTrap: false,
+      yearsToPayoff: 0,
+    };
   }
+
+  const schedule = buildPayoffSchedule(config);
 
   const lastPayment = schedule[schedule.length - 1];
   const willPayOff = lastPayment && lastPayment.remainingBalance < 0.01;

@@ -7,7 +7,7 @@ import { FormInput } from "@/components/formElements";
 import { EXPENSE_CATEGORY_LABELS } from "@/lib/constants";
 import { useCurrency } from "@/lib/hooks/useCurrency";
 import {
-  calculateLoanPayment,
+  calculateLoanPlan,
   calculateInstallmentAmount,
   calculateCreditCardPayment,
   type ExpenseRuleFormValues,
@@ -32,6 +32,9 @@ const ReviewStep: React.FC<IProps> = ({ error }) => {
   const loanPrincipal = useWatch({ control, name: "loanPrincipal" });
   const loanInterestRate = useWatch({ control, name: "loanInterestRate" });
   const loanTermMonths = useWatch({ control, name: "loanTermMonths" });
+  const loanCurrentBalance = useWatch({ control, name: "loanCurrentBalance" });
+  const loanCalculationType = useWatch({ control, name: "loanCalculationType" });
+  const loanStartDate = useWatch({ control, name: "loanStartDate" });
 
   // Credit
   const creditBalance = useWatch({ control, name: "creditBalance" });
@@ -47,16 +50,29 @@ const ReviewStep: React.FC<IProps> = ({ error }) => {
   const installmentHasInterest = useWatch({ control, name: "installmentHasInterest" });
   const installmentInterestRate = useWatch({ control, name: "installmentInterestRate" });
 
-  const calculatedLoanPayment = useMemo(() => {
+  // Same plan (balance, term, type) as the Details step and the saved rule
+  const loanPlan = useMemo(() => {
     if (expenseType !== "cash_loan" || !loanPrincipal || !loanInterestRate || !loanTermMonths) {
       return null;
     }
-    return calculateLoanPayment(
-      parseFloat(loanPrincipal),
-      parseFloat(loanInterestRate),
-      parseInt(loanTermMonths)
-    );
-  }, [expenseType, loanPrincipal, loanInterestRate, loanTermMonths]);
+    return calculateLoanPlan({
+      loanPrincipal,
+      loanCurrentBalance,
+      loanInterestRate,
+      loanTermMonths,
+      loanCalculationType,
+      loanStartDate,
+    });
+  }, [
+    expenseType,
+    loanPrincipal,
+    loanCurrentBalance,
+    loanInterestRate,
+    loanTermMonths,
+    loanCalculationType,
+    loanStartDate,
+  ]);
+  const calculatedLoanPayment = loanPlan?.payment ?? null;
 
   const calculatedCreditPayment = useMemo(() => {
     if (expenseType !== "credit_card" || !creditBalance || !creditApr || !creditMinPaymentPercent) {
@@ -165,10 +181,10 @@ const ReviewStep: React.FC<IProps> = ({ error }) => {
             <div>
               <p className="text-xs text-gray-400">Total Interest</p>
               <p className="text-danger font-medium">
-                {formatCurrency(
-                  calculatedLoanPayment * parseInt(loanTermMonths) - parseFloat(loanPrincipal),
-                  { minimumFractionDigits: 2, maximumFractionDigits: 2 }
-                )}
+                {formatCurrency(loanPlan?.totalInterest ?? 0, {
+                  minimumFractionDigits: 2,
+                  maximumFractionDigits: 2,
+                })}
               </p>
             </div>
           </div>

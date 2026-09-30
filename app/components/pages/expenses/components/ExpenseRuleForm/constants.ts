@@ -37,14 +37,21 @@ export const LOAN_CALCULATION_TYPES: {
   {
     value: "amortized",
     label: "Amortized (Standard)",
-    description: "Fixed EMI, decreasing interest",
+    description:
+      "Fixed EMI: the same payment every month; interest is charged on the remaining balance, so it shrinks while principal grows",
   },
   {
     value: "reducing_balance",
     label: "Reducing Balance",
-    description: "Interest on remaining balance",
+    description:
+      "Equal principal every month plus interest on the remaining balance, so the payment starts highest and falls each month",
   },
-  { value: "flat_rate", label: "Flat Rate", description: "Interest on original principal" },
+  {
+    value: "flat_rate",
+    label: "Flat Rate",
+    description:
+      "Interest is charged on the original principal for the whole term: the same payment and the same interest every month",
+  },
 ];
 
 export const PAYMENT_STRATEGIES: { value: CreditPaymentStrategy; label: string }[] = [
