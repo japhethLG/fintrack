@@ -119,5 +119,6 @@ export {
   deleteAccountData,
   ResetIncompleteError,
   migrateToInitialBalance,
+  migrateLoanInstallmentDayOfMonth,
   migratePendingToOverrides,
 } from "./migrations";

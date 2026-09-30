@@ -9,6 +9,7 @@ import {
   makeCompletedTransaction,
   makeExpenseRule,
   makeFakeUser,
+  makeLoanRule,
   makeManualTransaction,
   makeUserProfile,
 } from "../harness";
@@ -129,4 +130,19 @@ describe("account deletion and resets report exactly what happened", () => {
     expect(app.store.__count("transactions")).toBe(1);
     expect(app.store.__get("users", "user-1")).toMatchObject({ currentBalance: 9_000, initialBalance: 10_000 });
   }, 60_000);
+});
+
+describe("login runs the one-time schedule migration", () => {
+  it("a legacy loan started on the 10th with a stored day of 15 is pinned to the 10th, once", async () => {
+    const app = await renderApp({
+      route: "/settings",
+      today: TODAY,
+      seed: {
+        profile: { scheduleModelVersion: undefined },
+        expenseRules: [makeLoanRule({ id: "loan-a", startDate: "2026-01-10", scheduleConfig: { dayOfMonth: 15 } })],
+      },
+    });
+    expect(app.store.__get<{ scheduleConfig: { dayOfMonth: number } }>("expense_rules", "loan-a")?.scheduleConfig.dayOfMonth).toBe(10);
+    expect(app.store.__get<{ scheduleModelVersion: number }>("users", "user-1")?.scheduleModelVersion).toBe(1);
+  }, 40_000);
 });

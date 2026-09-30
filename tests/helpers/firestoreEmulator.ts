@@ -247,7 +247,14 @@ interface QueryRef {
   constraints: Constraint[];
 }
 
-const DELETE_SENTINEL = { __kind: "deleteField" } as const;
+/**
+ * Like the real SDK's FieldValue, the sentinel is a class INSTANCE, not a plain object: code that
+ * walks plain objects (removeUndefined) must pass it through untouched.
+ */
+class FieldValueSentinel {
+  readonly __kind = "deleteField";
+}
+const DELETE_SENTINEL = new FieldValueSentinel();
 
 const isCollectionRef = (value: unknown): value is CollectionRef =>
   !!value && (value as CollectionRef).__kind === "collection";

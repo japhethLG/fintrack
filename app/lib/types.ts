@@ -19,6 +19,13 @@ export interface UserProfile {
    * is rebased once (see migrateToInitialBalance); absent on legacy documents.
    */
   balanceModelVersion?: number;
+  /**
+   * Version of the schedule data this profile's rules follow. From version 1 on, a loan or
+   * installment rule's `scheduleConfig.dayOfMonth` is a day the USER chose (the engine pays on
+   * it). Older rules carry a hidden day the old form saved (the day of creation) which the old
+   * engine ignored; the one-time migration sets it to the start date's day so nothing moves.
+   */
+  scheduleModelVersion?: number;
   preferences: {
     currency: string;
     dateFormat: string;

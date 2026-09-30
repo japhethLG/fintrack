@@ -56,6 +56,7 @@ export const makeUserProfile = (overrides: Partial<UserProfile> = {}): UserProfi
   balanceLastUpdatedAt: "2026-01-01",
   // fixtures are already on the current balance model (legacy-migration tests override this)
   balanceModelVersion: 1,
+  scheduleModelVersion: 1,
   preferences: {
     currency: "USD",
     dateFormat: "YYYY-MM-DD",

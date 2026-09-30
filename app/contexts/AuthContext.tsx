@@ -19,6 +19,7 @@ import {
   deleteAccountData,
   subscribeToUserProfile,
   migrateToInitialBalance,
+  migrateLoanInstallmentDayOfMonth,
 } from "@/lib/firebase/firestore";
 
 interface AuthContextType {
@@ -76,6 +77,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           await createUserProfile(user.uid, user.email || "", user.displayName || "User");
           // Run migration to ensure initialBalance field exists
           await migrateToInitialBalance(user.uid);
+          // pin legacy loan / installment days so the engine's dayOfMonth moves nothing
+          await migrateLoanInstallmentDayOfMonth(user.uid);
         } catch (error) {
           console.error("Error creating user profile or running migration:", error);
         }

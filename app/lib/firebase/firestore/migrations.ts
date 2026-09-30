@@ -15,8 +15,8 @@ import {
 } from "firebase/firestore";
 import type { DocumentReference } from "firebase/firestore";
 import { db } from "../config";
-import { DeletableDataType, Transaction } from "@/lib/types";
-import { BALANCE_MODEL_VERSION, getUserProfile } from "./users";
+import { DeletableDataType, ExpenseRule, Transaction } from "@/lib/types";
+import { BALANCE_MODEL_VERSION, SCHEDULE_MODEL_VERSION, getUserProfile } from "./users";
 import { getCompletedTransactions } from "./balance";
 import {
   getIncomeSource,
@@ -331,6 +331,79 @@ export const migrateToInitialBalance = async (userId: string): Promise<void> => 
           : `; the old model implied ${oldImplied}, off by ${cleanMoney(oldImplied - outcome.currentBalance)})`)
     );
   }
+};
+
+/**
+ * One-time, idempotent, versioned step: pin the day of month of legacy loan and installment
+ * rules to their start date's day.
+ *
+ * The old expense form saved the DAY OF CREATION as a hidden `scheduleConfig.dayOfMonth`, which
+ * the old engine ignored for loans and installments (payments fell on the start date's day).
+ * The engine now honours `dayOfMonth`, so a legacy rule started on the 10th with a stored 15
+ * would suddenly pay on the 15th: a day the user never chose. For every `cash_loan` and
+ * `installment` rule the day is set to the start date's day (parsed with the local `parseDate`),
+ * so payments keep falling where they always did.
+ *
+ * `scheduleModelVersion` on the profile makes it run once; it is essential: a rerun would
+ * overwrite a day the user chose later. The rule updates and the stamp go out together (one
+ * atomic batch for up to 499 rules). Every change is logged with console.info.
+ *
+ * @returns the number of rules changed
+ */
+export const migrateLoanInstallmentDayOfMonth = async (userId: string): Promise<number> => {
+  const profile = await getUserProfile(userId);
+  if (!profile) return 0;
+  if ((profile.scheduleModelVersion ?? 0) >= SCHEDULE_MODEL_VERSION) return 0;
+
+  const snapshot = await getDocs(
+    query(collection(db, "expense_rules"), where("userId", "==", userId))
+  );
+  const changes: { ref: DocumentReference; id: string; day: number; from: unknown; hasConfig: boolean }[] = [];
+  snapshot.docs.forEach((docSnapshot) => {
+    const rule = docSnapshot.data() as ExpenseRule;
+    if (rule.expenseType !== "cash_loan" && rule.expenseType !== "installment") return;
+    if (typeof rule.startDate !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(rule.startDate)) return;
+    const day = parseDate(rule.startDate).getDate();
+    if (rule.scheduleConfig?.dayOfMonth === day) return;
+    changes.push({
+      ref: docSnapshot.ref,
+      id: docSnapshot.id,
+      day,
+      from: rule.scheduleConfig?.dayOfMonth,
+      hasConfig: !!rule.scheduleConfig,
+    });
+  });
+
+  const userRef = doc(db, "users", userId);
+  const stamp = { scheduleModelVersion: SCHEDULE_MODEL_VERSION, updatedAt: Timestamp.now() };
+  const apply = (batch: ReturnType<typeof writeBatch>, change: (typeof changes)[number]) => {
+    const fields = change.hasConfig
+      ? { "scheduleConfig.dayOfMonth": change.day, updatedAt: Timestamp.now() }
+      : { scheduleConfig: { dayOfMonth: change.day }, updatedAt: Timestamp.now() };
+    batch.update(change.ref, fields);
+  };
+
+  // the stamp rides in the LAST batch, so a stopped run is simply re-run
+  for (let i = 0; i < changes.length; i += MAX_BATCH_OPERATIONS - 1) {
+    const chunk = changes.slice(i, i + MAX_BATCH_OPERATIONS - 1);
+    const isLast = i + MAX_BATCH_OPERATIONS - 1 >= changes.length;
+    const batch = writeBatch(db);
+    chunk.forEach((change) => apply(batch, change));
+    if (isLast) batch.update(userRef, stamp);
+    await batch.commit();
+  }
+  if (changes.length === 0) {
+    const batch = writeBatch(db);
+    batch.update(userRef, stamp);
+    await batch.commit();
+  }
+
+  changes.forEach((change) =>
+    console.info(
+      `[schedule] ${userId}: rule ${change.id} dayOfMonth ${change.from ?? "none"} -> ${change.day} (start date's day, so payments stay where they were)`
+    )
+  );
+  return changes.length;
 };
 
 /**

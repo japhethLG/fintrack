@@ -15,6 +15,7 @@ import {
   deleteAllUserData,
   deleteProjectedTransactions,
   deleteSelectiveUserData,
+  migrateLoanInstallmentDayOfMonth,
   migratePendingToOverrides,
   migrateToInitialBalance,
   normalizePartialTransactions,
@@ -23,13 +24,17 @@ import { getUserProfile } from "@/lib/firebase/firestore/users";
 import { computeBalanceFromTransactions } from "@/lib/logic/balanceCalculator/computedBalance";
 import { generateReconciliationReport } from "@/lib/logic/balanceCalculator/reconciliation";
 import { generateOccurrenceId } from "@/lib/logic/projectionEngine/occurrenceIdGenerator";
+import { generateProjections } from "@/lib/logic/projectionEngine";
 import * as store from "../../helpers/firestoreEmulator";
 import {
   makeAlert,
   makeBalanceSnapshot,
   makeCompletedTransaction,
+  makeCreditRule,
   makeExpenseRule,
   makeIncomeSource,
+  makeInstallmentRule,
+  makeLoanRule,
   makeProjectedTransaction,
   makeSkippedTransaction,
   makeTransaction,
@@ -1225,4 +1230,100 @@ describe("normalizePartialTransactions", () => {
       expect(row?.variance ?? 0).toBe(0);
     }
   );
+});
+
+// ============================================================================
+// migrateLoanInstallmentDayOfMonth (versioned, idempotent; runs at login)
+//
+// The old form saved the day of CREATION as a hidden scheduleConfig.dayOfMonth. The old engine
+// ignored it for loans and installments (payments on the start date's day); the engine now
+// honours it, so without this step a legacy loan started on the 10th with a stored 15 would
+// suddenly pay on the 15th.
+// ============================================================================
+
+describe("migrateLoanInstallmentDayOfMonth", () => {
+  const legacyUser = (): void => {
+    const p: Record<string, unknown> = { ...makeUserProfile({ uid: USER }) };
+    delete p.scheduleModelVersion;
+    store.__seed("users", USER, p);
+  };
+  const loanStartedOn10th = () =>
+    makeLoanRule({
+      id: "loan-a",
+      userId: USER,
+      startDate: "2026-01-10",
+      scheduleConfig: { dayOfMonth: 15 }, // the hidden day the old form saved
+    });
+  const payDates = (rule: ReturnType<typeof makeLoanRule>): string[] =>
+    generateProjections([], [rule], d("2026-01-01"), d("2026-04-30")).map((t) => t.scheduledDate);
+  const storedRule = (id: string) => store.__get<ExpenseRule>("expense_rules", id)!;
+
+  it("a legacy loan started on the 10th with a stored 15 keeps paying on the 10th", async () => {
+    legacyUser();
+    store.__seedEntities("expense_rules", [loanStartedOn10th()]);
+    // without the migration the engine would now pay on the 15th: Jan 15 (start day 10 has
+    // passed? no: 15 >= 10, so the first payment is Jan 15), Feb 15, Mar 15, Apr 15
+    expect(payDates(storedRule("loan-a"))).toEqual(["2026-01-15", "2026-02-15", "2026-03-15", "2026-04-15"]);
+
+    await expect(migrateLoanInstallmentDayOfMonth(USER)).resolves.toBe(1);
+
+    expect(storedRule("loan-a").scheduleConfig?.dayOfMonth).toBe(10);
+    expect(payDates(storedRule("loan-a"))).toEqual(["2026-01-10", "2026-02-10", "2026-03-10", "2026-04-10"]);
+    expect(rawProfile(USER).scheduleModelVersion).toBe(1);
+  });
+
+  it("migrates installments too, creates a missing scheduleConfig, and leaves other rule types alone", async () => {
+    legacyUser();
+    const plan = makeInstallmentRule({ id: "plan-a", userId: USER, startDate: "2026-02-03", scheduleConfig: undefined });
+    store.__seedEntities("expense_rules", [
+      plan,
+      makeExpenseRule({ id: "fixed-a", userId: USER, startDate: "2026-01-10", scheduleConfig: { dayOfMonth: 20 } }),
+      makeCreditRule({ id: "card-a", userId: USER, startDate: "2026-01-10", scheduleConfig: { dayOfMonth: 20 } }),
+    ]);
+    const infoSpy = vi.spyOn(console, "info").mockImplementation(() => {});
+    try {
+      await expect(migrateLoanInstallmentDayOfMonth(USER)).resolves.toBe(1);
+      expect(storedRule("plan-a").scheduleConfig).toEqual({ dayOfMonth: 3 });
+      expect(storedRule("fixed-a").scheduleConfig?.dayOfMonth).toBe(20);
+      expect(storedRule("card-a").scheduleConfig?.dayOfMonth).toBe(20);
+      // every change is logged
+      expect(infoSpy.mock.calls.map((c) => String(c[0])).some((m) => m.includes("rule plan-a dayOfMonth none -> 3"))).toBe(true);
+    } finally {
+      infoSpy.mockRestore();
+    }
+  });
+
+  it("is idempotent: a second run, and a day the user chose afterwards, are never touched", async () => {
+    legacyUser();
+    store.__seedEntities("expense_rules", [loanStartedOn10th()]);
+    await migrateLoanInstallmentDayOfMonth(USER);
+    const opsAfterFirst = store.__ops.length;
+
+    // the user now deliberately edits the loan to pay on the 25th
+    store.__seed("expense_rules", "loan-a", { ...storedRule("loan-a"), scheduleConfig: { dayOfMonth: 25 } });
+    await expect(migrateLoanInstallmentDayOfMonth(USER)).resolves.toBe(0);
+
+    expect(store.__ops.length).toBe(opsAfterFirst);
+    expect(storedRule("loan-a").scheduleConfig?.dayOfMonth).toBe(25);
+  });
+
+  it("does nothing for a profile already on the model, and never touches another user's rules", async () => {
+    store.__seed("users", USER, makeUserProfile({ uid: USER })); // fixtures are on version 1
+    store.__seedEntities("expense_rules", [loanStartedOn10th()]);
+    await expect(migrateLoanInstallmentDayOfMonth(USER)).resolves.toBe(0);
+    expect(store.__ops).toHaveLength(0);
+
+    legacyUser();
+    store.__seedEntities("expense_rules", [makeLoanRule({ id: "theirs", userId: OTHER, startDate: "2026-01-10", scheduleConfig: { dayOfMonth: 15 } })]);
+    await migrateLoanInstallmentDayOfMonth(USER);
+    expect(storedRule("theirs").scheduleConfig?.dayOfMonth).toBe(15);
+  });
+
+  it("a rule already on its start date's day is not rewritten, and a user with no loans just gets the stamp", async () => {
+    legacyUser();
+    store.__seedEntities("expense_rules", [makeLoanRule({ id: "ok", userId: USER, startDate: "2026-01-10", scheduleConfig: { dayOfMonth: 10 } })]);
+    await expect(migrateLoanInstallmentDayOfMonth(USER)).resolves.toBe(0);
+    expect(store.__opsFor("expense_rules")).toHaveLength(0);
+    expect(rawProfile(USER).scheduleModelVersion).toBe(1);
+  });
 });
