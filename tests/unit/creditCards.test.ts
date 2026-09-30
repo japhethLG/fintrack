@@ -361,41 +361,51 @@ describe("calculateCreditCardPayoff", () => {
 
   describe("minimum payment trap (payment below the monthly interest)", () => {
     // 5,000 at 24% accrues 100/month of interest; a 50 payment cannot cover it.
+    // REWRITTEN for D3 (verdict: the old clamp was a bug, see tests/unit/creditCards.compounding.test.ts):
+    // the unpaid interest capitalises, so the balance GROWS and money is conserved.
     const trap = () => calculateCreditCardPayoff(5_000, 24, 50, d("2026-01-15"));
 
-    it("clamps principal to zero rather than going negative", () => {
+    it("reports the shortfall as negative principal instead of clamping it to zero", () => {
+      // was: "clamps principal to zero rather than going negative" (every principal === 0).
+      // Month 1: 50 - 100 = -50.00; every month the shortfall grows with the balance.
       const rows = trap();
-      expect(rows.every((r) => r.principal === 0)).toBe(true);
-      expect(rows.every((r) => r.principal >= 0)).toBe(true);
-      expect(rows[rows.length - 1].cumulativePrincipal).toBe(0);
+      expect(rows.every((r) => r.principal < 0)).toBe(true);
+      expect(rows[0].principal).toBeCloseTo(-50, 9);
+      expect(rows[rows.length - 1].cumulativePrincipal).toBeLessThan(0);
     });
 
-    it("holds the balance flat instead of growing it", () => {
-      // NOTE: this documents the model, not reality. A real card capitalises the
-      // unpaid interest, so the balance would compound upward at ~2%/month. The
-      // Math.max(0, ...) clamp on principal means the balance can only ever stay
-      // flat, so this projection UNDERSTATES the trap: the user is shown a debt
-      // that never grows. See the "known defects" block below.
+    it("grows the balance every month instead of holding it flat", () => {
+      // was: "holds the balance flat instead of growing it" (the test's own NOTE called the
+      // flat balance an understatement). 5,000 -> 5,050.00 -> 5,101.00 -> 5,153.02 ...
       const rows = trap();
-      expect(rows.every((r) => r.remainingBalance === 5_000)).toBe(true);
+      expect(rows[0].remainingBalance).toBeCloseTo(5_050, 9);
+      rows.forEach((r, i) => {
+        if (i > 0) expect(r.remainingBalance).toBeGreaterThan(rows[i - 1].remainingBalance);
+      });
     });
 
-    it("still accrues interest every month", () => {
+    it("accrues interest on the growing balance: 100, 101, 102.02 ...", () => {
+      // was: "still accrues interest every month" (interest === 100 on every row, 1,300 after 13).
+      // Interest_n = 2% x balance_(n-1) = 50 + 50 x 1.02^(n-1) (balance_(n-1) = 2,500 + 2,500 x 1.02^(n-1)).
       const rows = trap();
-      expect(rows.every((r) => r.interest === 100)).toBe(true);
-      // 13 pushed rows x 100 of interest.
-      expect(rows[rows.length - 1].cumulativeInterest).toBeCloseTo(1_300, 10);
+      expect(rows[0].interest).toBeCloseTo(100, 9);
+      expect(rows[1].interest).toBeCloseTo(101, 9);
+      expect(rows[2].interest).toBeCloseTo(102.02, 9);
+      // after 13 rows: 13 x 50 + 50 x (1.02^13 - 1)/0.02 = 650 + 734.02 = 1,384.02 (not 1,300)
+      const closedForm = 13 * 50 + (50 * (Math.pow(1.02, 13) - 1)) / 0.02;
+      expect(rows[12].cumulativeInterest).toBeCloseTo(closedForm, 6);
+      expect(closedForm).toBeCloseTo(1_384.02, 2);
     });
 
-    it("bails out after month 12 instead of running to maxMonths", () => {
-      // The guard is `month > 12 && principal < 0.01`, checked after the push,
-      // so month 13 is recorded and then the loop breaks.
-      expect(trap()).toHaveLength(13);
-      expect(calculateCreditCardPayoff(5_000, 24, 50, d("2026-01-15"), 600)).toHaveLength(13);
+    it("is not cut short after month 12: it runs to the 600-month horizon", () => {
+      // was: "bails out after month 12 instead of running to maxMonths" (13 rows).
+      // A card whose payment never covers the interest does not stop having a payment due.
+      expect(trap()).toHaveLength(600);
+      expect(calculateCreditCardPayoff(5_000, 24, 50, d("2026-01-15"), 40)).toHaveLength(40);
     });
 
-    it("charges the unchanged payment every month it does run", () => {
-      expect(paymentsOf(trap())).toEqual(Array(13).fill(50));
+    it("charges the unchanged payment every month", () => {
+      expect(paymentsOf(trap())).toEqual(Array(600).fill(50));
     });
   });
 
@@ -450,7 +460,7 @@ describe("calculateCreditCardPayoff", () => {
      * (5,000 -> 5,050 -> 5,101 -> ...) and the conservation identity holds here
      * exactly as it does for a schedule that does pay itself off.
      */
-    it.fails("KNOWN DEFECT: grows the balance when the payment does not cover interest", () => {
+    it("grows the balance when the payment does not cover interest (FIXED, D3)", () => {
       const rows = calculateCreditCardPayoff(5_000, 24, 50, d("2026-01-15"));
       // Length first: never index into a possibly-shorter array inside it.fails.
       expect(rows.length).toBeGreaterThanOrEqual(2);
@@ -615,9 +625,10 @@ describe("calculateDecliningMinimumPayoff", () => {
   });
 
   describe("minimum payment trap", () => {
-    it("bails out after month 12 when the recomputed minimum only covers interest", () => {
-      // 2% of the balance against a 2%/month rate: principal is always 0, so the
-      // declining minimum never makes progress either.
+    it("holds a balance flat, without truncating, when the recomputed minimum exactly covers the interest", () => {
+      // was: "bails out after month 12 ..." (13 rows). 2% of the balance against a 2%/month rate:
+      // payment = interest = 100 every month, principal exactly 0, balance flat at 5,000 -
+      // and a flat, never-ending debt still has a payment due in month 14, 15 ... 600.
       const trapped = makeCreditConfig({
         currentBalance: 5_000,
         apr: 24,
@@ -626,7 +637,7 @@ describe("calculateDecliningMinimumPayoff", () => {
         minimumPaymentMethod: "percent_only",
       });
       const rows = calculateDecliningMinimumPayoff(trapped, d("2026-01-15"), 600);
-      expect(rows).toHaveLength(13);
+      expect(rows).toHaveLength(600);
       expect(rows.every((r) => r.remainingBalance === 5_000)).toBe(true);
     });
   });
@@ -880,7 +891,7 @@ describe("generateCreditProjections", () => {
      * schedule (here 4, since 1,200 at 0% APR paying 300/month takes exactly
      * four payments).
      */
-    it.fails("KNOWN DEFECT: reports the total number of payments in the schedule", () => {
+    it("reports the total number of payments in the schedule (FIXED)", () => {
       const result = generateCreditProjections(
         fixedCard({}, { currentBalance: 1_200, apr: 0, fixedPaymentAmount: 300 }),
         window.start,
@@ -978,7 +989,7 @@ describe("generateCreditProjections", () => {
      * Correct behaviour: a rule starting 2026-04-10 with a due date of 31 must
      * schedule its first payment on 2026-04-30, not 2026-05-31.
      */
-    it.fails("KNOWN DEFECT: keeps the first payment inside the rule's start month", () => {
+    it("keeps the first payment inside the rule's start month (FIXED)", () => {
       const result = generateCreditProjections(
         fixedCard({ startDate: "2026-04-10" }, { dueDate: 31 }),
         d("2026-04-01"),
@@ -1004,7 +1015,7 @@ describe("generateCreditProjections", () => {
      * Correct behaviour: one payment per calendar month, February clamped to the
      * 28th.
      */
-    it.fails("KNOWN DEFECT: still bills February when the due date is the 31st", () => {
+    it("still bills February when the due date is the 31st (FIXED)", () => {
       const result = generateCreditProjections(
         fixedCard({}, { dueDate: 31 }),
         d("2026-01-01"),
@@ -1025,7 +1036,7 @@ describe("generateCreditProjections", () => {
      * 2026-03-10 and is then pushed out to 2026-03-31.
      * Correct behaviour: no projected transaction is dated after viewEndDate.
      */
-    it.fails("KNOWN DEFECT: never emits a payment dated after the end of the window", () => {
+    it("never emits a payment dated after the end of the window (FIXED)", () => {
       const result = generateCreditProjections(
         fixedCard({}, { dueDate: 31 }),
         d("2026-01-01"),
@@ -1047,7 +1058,7 @@ describe("generateCreditProjections", () => {
      * second payment of 102 the following month.
      * Correct behaviour: "pay the full balance" clears the card in one payment.
      */
-    it.fails("KNOWN DEFECT: retires the card in a single payment for full_balance", () => {
+    it("retires the card in a single payment for full_balance (FIXED)", () => {
       const result = generateCreditProjections(
         fixedCard({}, { paymentStrategy: "full_balance" }),
         window.start,
@@ -1066,7 +1077,7 @@ describe("generateCreditProjections", () => {
      * Correct behaviour: the projection keeps billing the minimum for as long as
      * the window asks — a trapped card does not stop having a payment due.
      */
-    it.fails("KNOWN DEFECT: keeps projecting payments for a trapped minimum-payment card", () => {
+    it("keeps projecting payments for a trapped minimum-payment card (FIXED)", () => {
       // 2% minimum against a 2%/month rate: principal is always zero.
       const result = generateCreditProjections(
         minimumCard({ currentBalance: 5_000, apr: 24, minimumPaymentPercent: 2 }),
