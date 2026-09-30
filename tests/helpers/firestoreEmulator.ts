@@ -19,9 +19,24 @@ import { vi } from "vitest";
  *   import * as store from "../helpers/firestoreEmulator";
  *   beforeEach(() => store.__reset());
  *
- * Not supported (nothing in this repo uses it): sub-collections, transactions,
- * cursor pagination, array-membership operators beyond `in`, composite index
- * semantics.
+ * FIDELITY (mirrors the real SDK; never more lenient than it):
+ *  - `writeBatch` is ATOMIC: every queued write is validated first (injected
+ *    faults, `update` of a missing document, `undefined` field values, the
+ *    500-write limit); if any fails, NOTHING is applied and commit() rejects.
+ *  - `runTransaction` is optimistic, like the client SDK: reads record the
+ *    version of each document, the callback's writes are buffered, and at
+ *    commit the reads are re-validated. A document that changed since it was
+ *    read makes the attempt retry (up to 5 times, then it rejects). Reads after
+ *    a write reject, as in the real SDK. Two transactions in flight therefore
+ *    serialise exactly as they would against the server.
+ *  - `undefined` field values are rejected by every write (the real SDK does,
+ *    unless ignoreUndefinedProperties is set, which this app does not set).
+ *  - `__injectFault` makes the next matching write / batch commit / transaction
+ *    commit reject BEFORE anything is applied (a server-side rejection).
+ *
+ * Not supported (nothing in this repo uses it): sub-collections, cursor
+ * pagination, array-membership operators beyond `in`, composite index
+ * semantics, "applied server-side but the ack was lost".
  */
 
 // ============================================================================
@@ -32,6 +47,87 @@ type DocData = Record<string, unknown>;
 
 const collections = new Map<string, Map<string, DocData>>();
 let autoId = 0;
+
+/** Per-document write counter: the optimistic-concurrency token of runTransaction. */
+const versions = new Map<string, number>();
+const versionKey = (collectionName: string, id: string) => `${collectionName}/${id}`;
+const versionOf = (collectionName: string, id: string) =>
+  versions.get(versionKey(collectionName, id)) ?? 0;
+const bump = (collectionName: string, id: string) =>
+  versions.set(versionKey(collectionName, id), versionOf(collectionName, id) + 1);
+
+/** A FirebaseError-shaped error (code + message), as the real SDK throws. */
+export class FirestoreError extends Error {
+  constructor(
+    public readonly code: string,
+    message: string
+  ) {
+    super(message);
+    this.name = "FirebaseError";
+  }
+}
+
+interface InjectedFault {
+  collection?: string;
+  times: number;
+  error: Error;
+}
+const faults: InjectedFault[] = [];
+
+/**
+ * Make writes to `collection` (any collection when omitted) reject `times`
+ * times (default 1; Infinity for always) with `error`. The rejection happens at
+ * commit time, before any write of that commit is applied.
+ */
+export const __injectFault = (fault: {
+  collection?: string;
+  times?: number;
+  error?: Error;
+}): void => {
+  faults.push({
+    collection: fault.collection,
+    times: fault.times ?? 1,
+    error: fault.error ?? new FirestoreError("unavailable", "Firestore fault injected"),
+  });
+};
+export const __clearFaults = (): void => {
+  faults.length = 0;
+};
+
+const checkFault = (collectionName: string): void => {
+  const fault = faults.find((f) => f.collection === undefined || f.collection === collectionName);
+  if (!fault) return;
+  fault.times -= 1;
+  if (fault.times <= 0) faults.splice(faults.indexOf(fault), 1);
+  throw fault.error;
+};
+
+const findUndefined = (value: unknown, path: string): string | null => {
+  if (value === undefined) return path;
+  if (Array.isArray(value)) {
+    for (let i = 0; i < value.length; i++) {
+      const found = findUndefined(value[i], `${path}[${i}]`);
+      if (found) return found;
+    }
+  } else if (value !== null && typeof value === "object" && Object.getPrototypeOf(value) === Object.prototype) {
+    for (const [key, inner] of Object.entries(value as Record<string, unknown>)) {
+      const found = findUndefined(inner, path ? `${path}.${key}` : key);
+      if (found) return found;
+    }
+  }
+  return null;
+};
+
+/** The real SDK rejects `undefined` field values (ignoreUndefinedProperties is off). */
+const assertNoUndefined = (fn: string, data: unknown): void => {
+  const found = findUndefined(data, "");
+  if (found !== null) {
+    throw new FirestoreError(
+      "invalid-argument",
+      `Function ${fn}() called with invalid data. Unsupported field value: undefined (found in field ${found})`
+    );
+  }
+};
 
 /** Every write, in order — for asserting call sequences and write counts. */
 export interface OpLogEntry {
@@ -69,6 +165,8 @@ const clone = <T>(value: T): T => {
 /** Reset all data, the auto-id counter, the op log, and snapshot listeners. */
 export const __reset = (): void => {
   collections.clear();
+  versions.clear();
+  faults.length = 0;
   __ops.length = 0;
   listeners.length = 0;
   autoId = 0;
@@ -84,6 +182,7 @@ export const __reset = (): void => {
  */
 export const __seed = (collectionName: string, id: string, data: object): void => {
   getCollection(collectionName).set(id, clone(data as DocData));
+  bump(collectionName, id);
 };
 
 /** Seed many documents keyed by id. */
@@ -379,69 +478,173 @@ export const getDoc = vi.fn(async (ref: DocRef) => docSnapshot(ref));
 
 export const getDocs = vi.fn(async (target: QueryRef | CollectionRef) => runQuery(target));
 
+// ---------------------------------------------------------------------------
+// One write pipeline for every writer (single writes, batches, transactions):
+// validate everything, then apply everything, then notify once.
+// ---------------------------------------------------------------------------
+
+type WriteOp =
+  | { kind: "set"; ref: DocRef; data: DocData; logAs?: "add" }
+  | { kind: "update"; ref: DocRef; data: DocData }
+  | { kind: "delete"; ref: DocRef };
+
+/** Throws (applying nothing) when any op would be rejected by the server. */
+const validateOps = (fn: string, ops: WriteOp[]): void => {
+  const created = new Set<string>();
+  for (const op of ops) {
+    checkFault(op.ref.collection);
+    if (op.kind !== "delete") assertNoUndefined(fn, op.data);
+    const key = versionKey(op.ref.collection, op.ref.id);
+    if (op.kind === "update" && !getCollection(op.ref.collection).has(op.ref.id) && !created.has(key)) {
+      throw new FirestoreError(
+        "not-found",
+        `No document to update: ${op.ref.collection}/${op.ref.id}`
+      );
+    }
+    if (op.kind === "set") created.add(key);
+  }
+};
+
+const applyOps = (ops: WriteOp[]): void => {
+  for (const op of ops) {
+    const col = getCollection(op.ref.collection);
+    if (op.kind === "delete") {
+      col.delete(op.ref.id);
+      __ops.push({ op: "delete", collection: op.ref.collection, id: op.ref.id });
+    } else if (op.kind === "set") {
+      col.set(op.ref.id, clone(op.data));
+      __ops.push({
+        op: op.logAs ?? "set",
+        collection: op.ref.collection,
+        id: op.ref.id,
+        data: clone(op.data),
+      });
+    } else {
+      col.set(op.ref.id, applyUpdates(col.get(op.ref.id) ?? {}, op.data));
+      __ops.push({ op: "update", collection: op.ref.collection, id: op.ref.id, data: clone(op.data) });
+    }
+    bump(op.ref.collection, op.ref.id);
+  }
+  notify();
+};
+
+const commitOps = (fn: string, ops: WriteOp[]): void => {
+  validateOps(fn, ops);
+  applyOps(ops);
+};
+
 export const addDoc = vi.fn(async (ref: CollectionRef, data: DocData) => {
   autoId += 1;
   const id = `auto-${autoId}`;
-  getCollection(ref.path).set(id, clone(data));
-  __ops.push({ op: "add", collection: ref.path, id, data: clone(data) });
-  notify();
-  return { id, ref: { __kind: "doc", collection: ref.path, id } as DocRef };
+  const docRef = { __kind: "doc", collection: ref.path, id } as DocRef;
+  commitOps("addDoc", [{ kind: "set", ref: docRef, data, logAs: "add" }]);
+  return { id, ref: docRef };
 });
 
 export const setDoc = vi.fn(async (ref: DocRef, data: DocData) => {
-  getCollection(ref.collection).set(ref.id, clone(data));
-  __ops.push({ op: "set", collection: ref.collection, id: ref.id, data: clone(data) });
-  notify();
+  commitOps("setDoc", [{ kind: "set", ref, data }]);
 });
 
 export const updateDoc = vi.fn(async (ref: DocRef, updates: DocData) => {
-  const existing = getCollection(ref.collection).get(ref.id);
-  if (existing === undefined) {
-    // Matches the real SDK: updateDoc on a missing document rejects.
-    throw new Error(`firestoreEmulator: no document at ${ref.collection}/${ref.id}`);
-  }
-  getCollection(ref.collection).set(ref.id, applyUpdates(existing, updates));
-  __ops.push({ op: "update", collection: ref.collection, id: ref.id, data: clone(updates) });
-  notify();
+  // Matches the real SDK: updateDoc on a missing document rejects (validateOps).
+  commitOps("updateDoc", [{ kind: "update", ref, data: updates }]);
 });
 
 export const deleteDoc = vi.fn(async (ref: DocRef) => {
-  getCollection(ref.collection).delete(ref.id);
-  __ops.push({ op: "delete", collection: ref.collection, id: ref.id });
-  notify();
+  commitOps("deleteDoc", [{ kind: "delete", ref }]);
 });
 
+const MAX_BATCH_WRITES = 500;
+
 export const writeBatch = vi.fn((_db: unknown) => {
-  const queued: (() => void)[] = [];
+  const queued: WriteOp[] = [];
+  let committed = false;
   const batch = {
     set(ref: DocRef, data: DocData) {
-      queued.push(() => {
-        getCollection(ref.collection).set(ref.id, clone(data));
-        __ops.push({ op: "set", collection: ref.collection, id: ref.id, data: clone(data) });
-      });
+      queued.push({ kind: "set", ref, data });
       return batch;
     },
     update(ref: DocRef, updates: DocData) {
-      queued.push(() => {
-        const existing = getCollection(ref.collection).get(ref.id);
-        if (existing === undefined) return;
-        getCollection(ref.collection).set(ref.id, applyUpdates(existing, updates));
-        __ops.push({ op: "update", collection: ref.collection, id: ref.id, data: clone(updates) });
-      });
+      queued.push({ kind: "update", ref, data: updates });
       return batch;
     },
     delete(ref: DocRef) {
-      queued.push(() => {
-        getCollection(ref.collection).delete(ref.id);
-        __ops.push({ op: "delete", collection: ref.collection, id: ref.id });
-      });
+      queued.push({ kind: "delete", ref });
       return batch;
     },
     async commit() {
-      queued.forEach((apply) => apply());
-      queued.length = 0;
-      notify();
+      if (committed) {
+        throw new FirestoreError(
+          "failed-precondition",
+          "A write batch can no longer be used after commit() has been called."
+        );
+      }
+      committed = true;
+      if (queued.length > MAX_BATCH_WRITES) {
+        throw new FirestoreError("invalid-argument", "maximum 500 writes allowed per request");
+      }
+      commitOps("WriteBatch.commit", queued);
     },
   };
   return batch;
 });
+
+// ---------------------------------------------------------------------------
+// Transactions (optimistic concurrency, like the client SDK)
+// ---------------------------------------------------------------------------
+
+const MAX_TRANSACTION_ATTEMPTS = 5;
+
+export interface Transaction {
+  get(ref: DocRef): Promise<ReturnType<typeof docSnapshot>>;
+  set(ref: DocRef, data: DocData): Transaction;
+  update(ref: DocRef, updates: DocData): Transaction;
+  delete(ref: DocRef): Transaction;
+}
+
+export const runTransaction = vi.fn(
+  async <T>(_db: unknown, updateFunction: (transaction: Transaction) => Promise<T>): Promise<T> => {
+    for (let attempt = 1; attempt <= MAX_TRANSACTION_ATTEMPTS; attempt++) {
+      const reads = new Map<string, { collection: string; id: string; version: number }>();
+      const writes: WriteOp[] = [];
+      const transaction: Transaction = {
+        async get(ref) {
+          if (writes.length > 0) {
+            throw new FirestoreError(
+              "invalid-argument",
+              "Firestore transactions require all reads to be executed before all writes."
+            );
+          }
+          reads.set(versionKey(ref.collection, ref.id), {
+            collection: ref.collection,
+            id: ref.id,
+            version: versionOf(ref.collection, ref.id),
+          });
+          return docSnapshot(ref);
+        },
+        set(ref, data) {
+          writes.push({ kind: "set", ref, data });
+          return transaction;
+        },
+        update(ref, updates) {
+          writes.push({ kind: "update", ref, data: updates });
+          return transaction;
+        },
+        delete(ref) {
+          writes.push({ kind: "delete", ref });
+          return transaction;
+        },
+      };
+      const result = await updateFunction(transaction);
+      // Commit: a document read by this attempt that changed since means retry.
+      const stale = [...reads.values()].some((r) => versionOf(r.collection, r.id) !== r.version);
+      if (stale) continue;
+      if (writes.length > MAX_BATCH_WRITES) {
+        throw new FirestoreError("invalid-argument", "maximum 500 writes allowed per request");
+      }
+      commitOps("Transaction.commit", writes);
+      return result;
+    }
+    throw new FirestoreError("aborted", "Transaction failed: too much contention on the documents it read.");
+  }
+);

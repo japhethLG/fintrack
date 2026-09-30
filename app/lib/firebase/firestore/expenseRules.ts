@@ -97,9 +97,29 @@ export const setExpenseRuleOverride = async (
 ): Promise<void> => {
   const docRef = doc(db, "expense_rules", ruleId);
   await updateDoc(docRef, {
-    [`occurrenceOverrides.${occurrenceId}`]: override,
+    // Firestore rejects `undefined` leaves (a legacy pending row may have no notes).
+    [`occurrenceOverrides.${occurrenceId}`]: removeUndefined({ ...override }),
     updatedAt: Timestamp.now(),
   });
+};
+
+/**
+ * Change some fields of one occurrence override WITHOUT replacing the others
+ * (a reschedule keeps the amount and notes the user set). Each field is written
+ * through its own dotted path, so siblings are untouched.
+ */
+export const patchExpenseRuleOverride = async (
+  ruleId: string,
+  occurrenceId: string,
+  patch: OccurrenceOverride
+): Promise<void> => {
+  const docRef = doc(db, "expense_rules", ruleId);
+  const fields: { [field: string]: unknown } = { updatedAt: Timestamp.now() };
+  Object.entries(removeUndefined({ ...patch })).forEach(([key, value]) => {
+    fields[`occurrenceOverrides.${occurrenceId}.${key}`] = value;
+  });
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  await updateDoc(docRef, fields as { [x: string]: any });
 };
 
 export const removeExpenseRuleOverride = async (

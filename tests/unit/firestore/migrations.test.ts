@@ -731,8 +731,8 @@ describe("migratePendingToOverrides", () => {
     ]);
   });
 
-  it.fails(
-    "KNOWN DEFECT: the override is written with notes: undefined, which real Firestore rejects",
+  it(
+    "the override is written with notes: undefined, which real Firestore rejects",
     async () => {
       // migrations.ts:149-153 builds `{ scheduledDate, amount, notes: txn.notes }`
       // and hands it straight to setIncomeSourceOverride (incomeSources.ts:98),

@@ -352,7 +352,14 @@ describe("addExpenseRule", () => {
     expect(stored.loanConfig?.calculationType).toBe("amortized");
   });
 
-  it("strips only TOP-LEVEL undefined — an undefined leaf inside a nested config survives", async () => {
+  it("strips an undefined leaf at ANY depth, because real Firestore rejects it", async () => {
+    // REWRITTEN (write-path stream). This test used to pin the SHALLOW behaviour of
+    // removeUndefined ("an undefined leaf inside a nested config survives") and said
+    // in its own comment that real Firestore REJECTS such a write. The emulator is now
+    // as strict as the SDK (an `undefined` field value rejects addDoc/updateDoc/batch
+    // writes), so the old pinned behaviour would be a rejected write. The helper is now
+    // deep: the optional leaf is omitted, which is what the forms' conditional spreads
+    // already do by hand.
     const created = await addExpenseRule(
       USER_A,
       ruleInput({
@@ -368,15 +375,7 @@ describe("addExpenseRule", () => {
     );
 
     const stored = storedRule(created.id);
-    // `removeUndefined` (app/lib/firebase/firestore/utils.ts:14) iterates only
-    // the object's OWN top-level keys, so a nested undefined is written through.
-    // Real Firestore REJECTS that write ("Unsupported field value: undefined").
-    // NOT encoded as a KNOWN DEFECT because no current caller reaches it: both
-    // ExpenseRuleForm/formHelpers.ts and IncomeSourceForm/formHelpers.ts build
-    // their optional config leaves with a conditional spread. This test pins the
-    // shallow behaviour so the latent hazard is visible rather than asserted-away.
-    expect("fixedPaymentAmount" in (stored.creditConfig as object)).toBe(true);
-    expect(stored.creditConfig?.fixedPaymentAmount).toBeUndefined();
+    expect("fixedPaymentAmount" in (stored.creditConfig as object)).toBe(false);
     // the sibling keys are untouched
     expect(stored.creditConfig?.creditLimit).toBe(10_000);
   });

@@ -6,6 +6,8 @@
  *    a removeUndefined() helper for exactly this reason)
  *  - updateDoc on a missing doc rejects with code "not-found"
  *  - writeBatch is atomic: validated on commit, nothing applied on failure
+ *  - runTransaction: optimistic (reads re-validated at commit, up to 5 retries),
+ *    reads-before-writes enforced, writes applied atomically
  *  - queries: docs missing an orderBy/inequality field are excluded; default
  *    order is by document id; ties broken by document id
  *  - onSnapshot: first snapshot is async, later ones fire only when the
@@ -502,4 +504,71 @@ export const writeBatch = (_db?: Firestore): WriteBatch => {
     },
   };
   return batch;
+};
+
+// ============================================================================
+// TRANSACTIONS (optimistic concurrency, like the client SDK)
+// ============================================================================
+
+export interface Transaction {
+  get(ref: DocumentReference): Promise<DocumentSnapshot>;
+  set(ref: DocumentReference, data: Data, options?: { merge?: boolean }): Transaction;
+  update(ref: DocumentReference, first: unknown, ...rest: unknown[]): Transaction;
+  delete(ref: DocumentReference): Transaction;
+}
+
+const MAX_TRANSACTION_ATTEMPTS = 5;
+
+/**
+ * Same contract as the real client SDK: the callback may run several times;
+ * reads must all precede writes; writes are buffered and committed atomically
+ * (validated first, nothing applied on failure); if a document READ by the
+ * attempt changed before commit, the attempt is retried (up to 5 times, then
+ * the promise rejects with `aborted`). A document's identity for this check is
+ * its structural signature, which also sees changes made by another tab
+ * (storage events replace the store).
+ */
+export const runTransaction = async <T>(
+  _db: Firestore,
+  updateFunction: (transaction: Transaction) => Promise<T>
+): Promise<T> => {
+  for (let attempt = 1; attempt <= MAX_TRANSACTION_ATTEMPTS; attempt++) {
+    const reads = new Map<string, { ref: DocumentReference; signature: string }>();
+    const writes: WriteOp[] = [];
+    const transaction: Transaction = {
+      async get(ref) {
+        if (writes.length > 0) {
+          throw new FirebaseError(
+            "invalid-argument",
+            "Firestore transactions require all reads to be executed before all writes."
+          );
+        }
+        reads.set(ref.path, { ref, signature: signatureOf(readDoc(ref.parentPath, ref.id) ?? null) });
+        return makeDocSnapshot(ref);
+      },
+      set(ref, data, options) {
+        writes.push({ kind: "set", ref, data, merge: !!options?.merge });
+        return transaction;
+      },
+      update(ref, first, ...rest) {
+        writes.push({ kind: "update", ref, data: normaliseUpdate("Transaction.update", first, rest) });
+        return transaction;
+      },
+      delete(ref) {
+        writes.push({ kind: "delete", ref });
+        return transaction;
+      },
+    };
+    const result = await updateFunction(transaction);
+    const stale = [...reads.values()].some(
+      (r) => signatureOf(readDoc(r.ref.parentPath, r.ref.id) ?? null) !== r.signature
+    );
+    if (stale) continue;
+    if (writes.length > 500) {
+      throw new FirebaseError("invalid-argument", "maximum 500 writes allowed per request");
+    }
+    applyOps("Transaction.commit", writes);
+    return result;
+  }
+  throw new FirebaseError("aborted", "Transaction failed: too much contention on the documents it read.");
 };
