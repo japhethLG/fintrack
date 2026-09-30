@@ -86,7 +86,11 @@ describe("what each checkbox combination deletes", () => {
     // the account and its preferences survive ("Your account and preferences will be preserved")
     const doc = app.store.__get<{ displayName: string; email: string; initialBalance: number; preferences: { currency: string; defaultWarningThreshold: number } }>("users", "user-1")!;
     expect(doc).toMatchObject({ displayName: "Test User", email: "test@example.com", preferences: { currency: "USD", defaultWarningThreshold: 500 } });
-    expect(doc.initialBalance).toBe(10_000);
+    // REWRITTEN (write-path stream, UI-BAL-14): deleting TRANSACTIONS resets balance and baseline
+    // to 0 (the history the balance was built from is gone: 0 = 0 + SUM(nothing)). This
+    // expected 10,000 for every collection, which for "transactions" is exactly the orphaned
+    // baseline UI-BAL-14 describes. Every other collection leaves the baseline alone.
+    expect(doc.initialBalance).toBe(col === "transactions" ? 0 : 10_000);
   }, 40_000);
 
   it("ticking All Financial Data deletes all five collections for this user only", async () => {
@@ -114,9 +118,8 @@ describe("what each checkbox combination deletes", () => {
 });
 
 describe("balance after a reset", () => {
-  knownDefect(
-    "UI-BAL-14",
-    "resetting Transactions zeroes currentBalance but keeps initialBalance, so Settings offers to resurrect the deleted money",
+  it(
+    "UI-BAL-14 — resetting Transactions zeroes currentBalance but keeps initialBalance, so Settings offers to resurrect the deleted money",
     async () => {
       // observed: Current $0.00 vs Starting Balance $10,000.00, banner "$10,000.00", Recalculate -> $10,000
       const app = await renderApp({ ui: <Screens only={["settings"]} />, today: "2026-01-15", seed: world() });
@@ -131,9 +134,8 @@ describe("balance after a reset", () => {
     40_000
   );
 
-  knownDefect(
-    "UI-BAL-15",
-    "resetting only Balance History (snapshots nothing ever writes) still zeroes the balance while every transaction stays",
+  it(
+    "UI-BAL-15 — resetting only Balance History (snapshots nothing ever writes) still zeroes the balance while every transaction stays",
     async () => {
       // observed: Current $0.00 with the 1,000 expense still completed; correct 10,000 - 1,000 = 9,000
       const app = await renderApp({ ui: <Screens only={["settings"]} />, today: "2026-01-15", seed: world() });
@@ -146,9 +148,8 @@ describe("balance after a reset", () => {
     40_000
   );
 
-  knownDefect(
-    "UI-BAL-16",
-    "'All Financial Data' leaves initialBalance at 10,000 with zero transactions, so Dashboard says 0 and Settings says the baseline is 10,000",
+  it(
+    "UI-BAL-16 — 'All Financial Data' leaves initialBalance at 10,000 with zero transactions, so Dashboard says 0 and Settings says the baseline is 10,000",
     async () => {
       // observed: Dashboard/Settings current $0.00, Starting Balance $10,000.00, mismatch banner $10,000.00
       const app = await renderApp({ ui: <Screens only={["settings", "dashboard"]} />, today: "2026-01-15", seed: world() });
@@ -162,14 +163,20 @@ describe("balance after a reset", () => {
     40_000
   );
 
-  it("Recalculate after a Transactions reset writes the old baseline back (documents the resurrection)", async () => {
+  it("after a Transactions reset there is nothing to recalculate: no banner, and Recalculate (if forced) keeps 0", async () => {
+    // REWRITTEN (write-path stream, UI-BAL-14). This test "documented the resurrection": the
+    // reset left balance 0 but baseline 10,000, the banner quoted $10,000 and one click
+    // conjured 10,000 out of the deleted data. Balance and baseline are now both 0, so the
+    // banner is absent and recalculating (here through the firestore tool, since the button is
+    // not offered) writes 0 + SUM(no rows) = 0.
     const app = await renderApp({ ui: <Screens only={["settings"]} />, today: "2026-01-15", seed: world() });
     await runSelectiveReset(app, ["Transactions"]);
     expect(storedBalance(app)).toBe(0);
-    expect(mismatchBanner(screenEl("settings"))).toBe(10_000);
-    const { clickRecalculate } = await import("./support");
-    await clickRecalculate(app);
-    expect(storedBalance(app)).toBe(10_000);
+    expect(mismatchBanner(screenEl("settings"))).toBeNull();
+    expect(screen.queryByRole("button", { name: /Recalculate Balance/ })).not.toBeInTheDocument();
+    const { recalculateBalance } = await import("@/lib/firebase/firestore");
+    await recalculateBalance(app.uid);
+    expect(storedBalance(app)).toBe(0);
   }, 40_000);
 });
 
@@ -262,9 +269,8 @@ describe("messages and copy around the reset", () => {
     balanceHistory: [makeBalanceSnapshot({ id: "b1" }), makeBalanceSnapshot({ id: "b2" }), makeBalanceSnapshot({ id: "b3" })],
   };
 
-  knownDefect(
-    "UI-BAL-20",
-    "Transactions count in the modal includes generated projections (2 stored rows are offered as many more)",
+  it(
+    "UI-BAL-20 — Transactions count in the modal includes generated projections (2 stored rows are offered as many more)",
     async () => {
       // observed: "Projected and completed items • N items" with N = 2 stored + every projected occurrence in the window
       const app = await renderApp({ route: "/settings", today: "2026-01-15", seed: countSeed });
@@ -277,9 +283,8 @@ describe("messages and copy around the reset", () => {
     40_000
   );
 
-  knownDefect(
-    "UI-BAL-21",
-    "Balance History count is a hard-coded 0 while three snapshots are stored",
+  it(
+    "UI-BAL-21 — Balance History count is a hard-coded 0 while three snapshots are stored",
     async () => {
       const app = await renderApp({ route: "/settings", today: "2026-01-15", seed: countSeed });
       expect(app.store.__count("balance_history")).toBe(3);
@@ -290,9 +295,8 @@ describe("messages and copy around the reset", () => {
     40_000
   );
 
-  knownDefect(
-    "UI-BAL-22",
-    "the 'All Financial Data' total is not the sum of what would be deleted (stored 1 rule + 2 transactions + 3 snapshots = 6)",
+  it(
+    "UI-BAL-22 — the 'All Financial Data' total is not the sum of what would be deleted (stored 1 rule + 2 transactions + 3 snapshots = 6)",
     async () => {
       // observed: 1 + (2 + projections) + 0 = a larger number that counts rows nobody stored
       const app = await renderApp({ route: "/settings", today: "2026-01-15", seed: countSeed });
@@ -424,9 +428,8 @@ describe("Delete Account", () => {
     expect(app.store.__get("users", "user-1")).toBeUndefined();
   }, 40_000);
 
-  knownDefect(
-    "UI-BAL-23",
-    "when Firebase refuses to delete the auth user (requires-recent-login) the user's data and profile are already gone",
+  it(
+    "UI-BAL-23 — when Firebase refuses to delete the auth user (requires-recent-login) the user's data and profile are already gone",
     async () => {
       // observed: error banner shown, but income_sources/expense_rules/transactions/alerts/users/{uid} are all deleted,
       // and the user is still signed in with an empty account.

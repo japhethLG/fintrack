@@ -215,9 +215,8 @@ describe("manual transaction form validation", () => {
 // ---------------------------------------------------------------------------
 
 describe("manual transactions: type flip on a completed row", () => {
-  knownDefect(
-    "UI-LIFE-01",
-    "flipping a completed manual expense to income (same amount) leaves the balance unchanged",
+  it(
+    "UI-LIFE-01 — flipping a completed manual expense to income (same amount) leaves the balance unchanged",
     async () => {
       // observed: balance stays 9,900 (updateManualTransactionAction only adjusts when the amount
       // differs and always uses the EXISTING type). Correct: a 100 expense that becomes a 100
@@ -233,9 +232,8 @@ describe("manual transactions: type flip on a completed row", () => {
     T
   );
 
-  knownDefect(
-    "UI-LIFE-02",
-    "flipping type AND changing the amount of a completed manual row adjusts by the wrong sign",
+  it(
+    "UI-LIFE-02 — flipping type AND changing the amount of a completed manual row adjusts by the wrong sign",
     async () => {
       // 100 expense -> 130 income. Correct: 9,900 + 100 (undo expense) + 130 = 10,130.
       // observed: 9,870 (treated as still an expense: -(130-100)).
@@ -250,9 +248,8 @@ describe("manual transactions: type flip on a completed row", () => {
     T
   );
 
-  knownDefect(
-    "UI-LIFE-02b",
-    "the SCREEN balance after a type flip disagrees with the row (Settings card shows the stale number)",
+  it(
+    "UI-LIFE-02b — the SCREEN balance after a type flip disagrees with the row (Settings card shows the stale number)",
     async () => {
       // same root cause as UI-LIFE-01, asserted on what the user reads: the balance card must
       // equal 10,000 - (nothing completed as expense) + 100 income = 10,100.
@@ -269,9 +266,8 @@ describe("manual transactions: type flip on a completed row", () => {
 });
 
 describe("manual transactions: created as Completed", () => {
-  knownDefect(
-    "UI-LIFE-03",
-    "Add Transaction with Status=Completed does not move the balance",
+  it(
+    "UI-LIFE-03 — Add Transaction with Status=Completed does not move the balance",
     async () => {
       // observed: 10,000 stays 10,000. Correct: a completed 40 expense -> 9,960.
       const app = await mountTx({});
@@ -290,9 +286,8 @@ describe("manual transactions: created as Completed", () => {
     T
   );
 
-  knownDefect(
-    "UI-LIFE-03b",
-    "add-as-completed then delete leaves the balance HIGHER than it started (delete reverses a debit that never happened)",
+  it(
+    "UI-LIFE-03b — add-as-completed then delete leaves the balance HIGHER than it started (delete reverses a debit that never happened)",
     async () => {
       // observed: create completed 40 (no debit) then delete (+40 credit) -> 10,040 instead of 10,000.
       const app = await mountTx({});
@@ -321,9 +316,8 @@ describe("manual transactions: created as Completed", () => {
 });
 
 describe("manual transactions: leaving the Completed state keeps stale actual fields", () => {
-  knownDefect(
-    "UI-LIFE-04",
-    "reverting a completed manual row to projected keeps its old actualAmount, so a projected row prints the paid amount",
+  it(
+    "UI-LIFE-04 — reverting a completed manual row to projected keeps its old actualAmount, so a projected row prints the paid amount",
     async () => {
       // seed: projected 100, actually paid 120; balance already reflects 120 (9,880).
       // observed: after Revert the balance is right (10,000) but the doc keeps actualAmount 120 and
@@ -340,9 +334,8 @@ describe("manual transactions: leaving the Completed state keeps stale actual fi
     T
   );
 
-  knownDefect(
-    "UI-LIFE-04b",
-    "Edit form: completed -> projected keeps the old actualAmount (same defect through the other UI path)",
+  it(
+    "UI-LIFE-04b — Edit form: completed -> projected keeps the old actualAmount (same defect through the other UI path)",
     async () => {
       const app = await mountTx({
         profile: { currentBalance: 9_880 },
@@ -356,9 +349,8 @@ describe("manual transactions: leaving the Completed state keeps stale actual fi
     T
   );
 
-  knownDefect(
-    "UI-LIFE-05",
-    "skipping a completed transaction keeps its actualDate, so the skipped row stays on the day it was 'paid'",
+  it(
+    "UI-LIFE-05 — skipping a completed transaction keeps its actualDate, so the skipped row stays on the day it was 'paid'",
     async () => {
       // seed: scheduled Jan 12, paid on Jan 14. After Skip the transaction must sit on its scheduled day.
       // observed: merged/list/calendar place it on actualDate 2026-01-14.
@@ -377,9 +369,8 @@ describe("manual transactions: leaving the Completed state keeps stale actual fi
 });
 
 describe("manual transactions: the Edit form rewrites fields the user did not touch", () => {
-  knownDefect(
-    "UI-LIFE-06",
-    "saving only a note on a completed row overwrites projectedAmount with the actual amount (variance lost)",
+  it(
+    "UI-LIFE-06 — saving only a note on a completed row overwrites projectedAmount with the actual amount (variance lost)",
     async () => {
       // seed: projected 100, actual 120 (variance +20). Edit only the notes.
       // observed: projectedAmount becomes 120 because the form pre-fills 'amount' with actualAmount.
@@ -397,9 +388,8 @@ describe("manual transactions: the Edit form rewrites fields the user did not to
     T
   );
 
-  knownDefect(
-    "UI-LIFE-06b",
-    "saving only a note on a completed row resets actualDate to the scheduled date",
+  it(
+    "UI-LIFE-06b — saving only a note on a completed row resets actualDate to the scheduled date",
     async () => {
       // seed: scheduled Jan 12, paid Jan 14. observed: actualDate becomes 2026-01-12.
       const app = await mountTx({
@@ -426,9 +416,8 @@ describe("variance and notes", () => {
     expect(await within(dlg).findByText(/\+\$20(\.00)? variance from expected/)).toBeInTheDocument();
   }, T);
 
-  knownDefect(
-    "UI-LIFE-07",
-    "completing a manual transaction never stores `variance`, so the list shows no variance line",
+  it(
+    "UI-LIFE-07 — completing a manual transaction never stores `variance`, so the list shows no variance line",
     async () => {
       // observed: stored doc has no `variance`; row prints only -$120.00. The modal preview showed +$20.00.
       const app = await mountTx({ transactions: [projectedManual()] });
@@ -449,9 +438,8 @@ describe("variance and notes", () => {
     expect((within(dlg).getByLabelText(/Notes/) as HTMLInputElement).value).toBe("paid by card");
   }, T);
 
-  knownDefect(
-    "UI-LIFE-08",
-    "a note cannot be removed: clearing the field and saving keeps the old note (undefined is dropped, not deleted)",
+  it(
+    "UI-LIFE-08 — a note cannot be removed: clearing the field and saving keeps the old note (undefined is dropped, not deleted)",
     async () => {
       // observed: stored notes stay "paid by card" after re-completing with an empty Notes field.
       const app = await mountTx({ transactions: [projectedManual()] });
@@ -464,9 +452,8 @@ describe("variance and notes", () => {
     T
   );
 
-  knownDefect(
-    "UI-LIFE-08b",
-    "Edit form: clearing the Notes textarea keeps the old note",
+  it(
+    "UI-LIFE-08b — Edit form: clearing the Notes textarea keeps the old note",
     async () => {
       const app = await mountTx({ transactions: [projectedManual({ notes: "remember milk" })] });
       await editManual(app, "m1", { notes: "" });
@@ -477,9 +464,8 @@ describe("variance and notes", () => {
 });
 
 describe("amount validation in the Complete modal", () => {
-  knownDefect(
-    "UI-LIFE-09",
-    "the Complete modal accepts a NEGATIVE actual amount (the manual form rejects <= 0), crediting the balance for an expense",
+  it(
+    "UI-LIFE-09 — the Complete modal accepts a NEGATIVE actual amount (the manual form rejects <= 0), crediting the balance for an expense",
     async () => {
       // observed: completing a 100 expense with -50 succeeds and the balance goes UP to 10,050.
       const app = await mountTx({ transactions: [projectedManual()] });

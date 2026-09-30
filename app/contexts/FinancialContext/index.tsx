@@ -17,6 +17,7 @@ import { useDailyBalances, useBillCoverage, useUpcomingBills } from "./hooks/use
 import { useViewDateRange } from "./hooks/useViewDateRange";
 import { useFinancialSubscriptions } from "./hooks/useFinancialSubscriptions";
 import { useFinancialActions } from "./hooks/useFinancialActions";
+import { sumLedger } from "@/lib/logic/balanceCalculator/ledgerMath";
 
 // ============================================================================
 // CONTEXT CREATION
@@ -96,6 +97,12 @@ export const FinancialProvider: React.FC<FinancialProviderProps> = ({ children }
     );
   }, [incomeSources, expenseRules, storedTransactions, viewDateRange, user?.uid, isInitialized]);
 
+  // The realized ledger, from ALL stored rows (never from the merged/windowed list)
+  const ledger = useMemo(() => {
+    const completed = storedTransactions.filter((t) => t.status === "completed");
+    return { completedCount: completed.length, sum: sumLedger(completed) };
+  }, [storedTransactions]);
+
   // Computed values
   const dailyBalances = useDailyBalances(userProfile, transactions, viewDateRange);
   const billCoverage = useBillCoverage(userProfile, transactions);
@@ -126,6 +133,8 @@ export const FinancialProvider: React.FC<FinancialProviderProps> = ({ children }
     incomeSources,
     expenseRules,
     transactions,
+    storedTransactions,
+    ledger,
     viewDateRange,
     setViewDateRange,
     dailyBalances,

@@ -57,10 +57,6 @@ test.describe("complete a projected occurrence (write txn -> adjust balance -> .
   });
 
   test("rejected balance write must not leave a completed transaction without its balance change", async ({ page }) => {
-    knownDefect(
-      "E2E-ROB-01",
-      "transaction doc is stored as completed (Gym 50) but balance stays 1000 (expected 950): writes are sequential, not atomic"
-    );
     await seedGym(page);
     await setFault(page, { code: "unavailable", collections: [COLLECTIONS.users], times: 1 });
     const modal = await openTransaction(page, "Gym");
@@ -71,10 +67,6 @@ test.describe("complete a projected occurrence (write txn -> adjust balance -> .
   });
 
   test("retrying after a rejected balance write must not create a second completed transaction", async ({ page }) => {
-    knownDefect(
-      "E2E-ROB-02",
-      "retry stores a duplicate completed 'Gym' for the same occurrence (2 docs, balance 950 vs 900 expected)"
-    );
     await seedGym(page);
     await setFault(page, { code: "unavailable", collections: [COLLECTIONS.users], times: 1 });
     const modal = await openTransaction(page, "Gym");
@@ -100,10 +92,6 @@ test.describe("complete a projected occurrence (write txn -> adjust balance -> .
 
 test.describe("complete / edit a stored (manual) transaction (adjust balance -> update doc)", () => {
   test("rejected transaction update must not leave the balance changed while the doc is unchanged", async ({ page }) => {
-    knownDefect(
-      "E2E-ROB-03",
-      "balance drops 1000 -> 940 although 'Manual Bill' is still projected (balance adjusted before the doc write)"
-    );
     await seedAndLogin(
       page,
       { user: BALANCE_1000, transactions: [transaction({ id: "m1", name: "Manual Bill", scheduledDate: "2026-03-12", projectedAmount: 60 })] },
@@ -118,7 +106,6 @@ test.describe("complete / edit a stored (manual) transaction (adjust balance -> 
   });
 
   test("rejected amount change on a completed transaction must not shift the balance", async ({ page }) => {
-    knownDefect("E2E-ROB-03", "balance 940 -> 920 for a +20 amount change whose doc write was rejected (doc still 60)");
     await seedAndLogin(
       page,
       {
@@ -214,7 +201,6 @@ test.describe("rules, balance and reset", () => {
   });
 
   test("a failed reset must not delete part of the data", async ({ page }) => {
-    knownDefect("E2E-ROB-05", "income source + expense rule are already deleted when the transactions delete fails; UI only says it failed");
     await seedForReset(page);
     await setFault(page, { code: "unavailable", collections: [COLLECTIONS.transactions] });
     await resetAll(page);

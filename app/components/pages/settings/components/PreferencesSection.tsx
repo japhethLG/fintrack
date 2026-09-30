@@ -8,6 +8,7 @@ import { Button, Card, Icon, Alert } from "@/components/common";
 import { Form, FormInput, FormSelect } from "@/components/formElements";
 import { useAuth } from "@/contexts/AuthContext";
 import { updateUserProfile } from "@/lib/firebase/firestore";
+import type { UserProfile } from "@/lib/types";
 import {
   CURRENCY_OPTIONS,
   DATE_FORMAT_OPTIONS,
@@ -25,6 +26,17 @@ const preferencesSchema = yup.object({
 
 type PreferencesForm = yup.InferType<typeof preferencesSchema>;
 
+const DEFAULT_WARNING_THRESHOLD = 500;
+
+/** Form values for the stored preferences; a stored 0 is a real threshold, not "missing". */
+const valuesFrom = (preferences: Partial<UserProfile["preferences"]> | undefined): PreferencesForm => ({
+  currency: preferences?.currency || "PHP",
+  dateFormat: preferences?.dateFormat || "MM/DD/YYYY",
+  startOfWeek: String(preferences?.startOfWeek ?? 0),
+  theme: preferences?.theme || "dark",
+  defaultWarningThreshold: String(preferences?.defaultWarningThreshold ?? DEFAULT_WARNING_THRESHOLD),
+});
+
 const PreferencesSection: React.FC = () => {
   const { user, userProfile } = useAuth();
   const [isSaving, setIsSaving] = useState(false);
@@ -32,30 +44,22 @@ const PreferencesSection: React.FC = () => {
   const [success, setSuccess] = useState(false);
 
   const methods = useForm<PreferencesForm>({
-    defaultValues: {
-      currency: userProfile?.preferences?.currency || "PHP",
-      dateFormat: userProfile?.preferences?.dateFormat || "MM/DD/YYYY",
-      startOfWeek: String(userProfile?.preferences?.startOfWeek ?? 0),
-      theme: userProfile?.preferences?.theme || "dark",
-      defaultWarningThreshold: String(userProfile?.preferences?.defaultWarningThreshold || 500),
-    },
+    defaultValues: valuesFrom(userProfile?.preferences),
     resolver: yupResolver(preferencesSchema),
   });
 
   const { reset, formState } = methods;
   const { isDirty } = formState;
 
+  // Re-sync the form only when the STORED PREFERENCES change (another device, or our own save).
+  // Keyed on their value, not on the profile object: any other profile update (a balance
+  // override, a new display name, a profile picture) used to re-run this and throw away
+  // unsaved edits (UI-BAL-46). Fields the user has edited keep their values either way.
+  const storedPreferences = JSON.stringify(userProfile?.preferences ?? null);
   useEffect(() => {
-    if (userProfile?.preferences) {
-      reset({
-        currency: userProfile.preferences.currency || "PHP",
-        dateFormat: userProfile.preferences.dateFormat || "MM/DD/YYYY",
-        startOfWeek: String(userProfile.preferences.startOfWeek ?? 0),
-        theme: userProfile.preferences.theme || "dark",
-        defaultWarningThreshold: String(userProfile.preferences.defaultWarningThreshold || 500),
-      });
-    }
-  }, [userProfile, reset]);
+    const stored = JSON.parse(storedPreferences) as UserProfile["preferences"] | null;
+    if (stored) reset(valuesFrom(stored), { keepDirtyValues: true });
+  }, [storedPreferences, reset]);
 
   const handleSave = async (values: PreferencesForm) => {
     if (!user) return;
@@ -71,7 +75,11 @@ const PreferencesSection: React.FC = () => {
           dateFormat: values.dateFormat,
           startOfWeek: parseInt(values.startOfWeek) as 0 | 1,
           theme: values.theme as "dark" | "light",
-          defaultWarningThreshold: parseFloat(values.defaultWarningThreshold) || 500,
+          // `|| 500` turned a threshold of 0 into 500 (UI-OBS-03, UI-BAL-24/25); only a
+          // non-number falls back to the default
+          defaultWarningThreshold: Number.isFinite(parseFloat(values.defaultWarningThreshold))
+            ? parseFloat(values.defaultWarningThreshold)
+            : DEFAULT_WARNING_THRESHOLD,
         },
       });
       setSuccess(true);

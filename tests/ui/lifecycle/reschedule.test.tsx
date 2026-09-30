@@ -143,9 +143,8 @@ describe("revert keeps a custom date (the modal promises it)", () => {
     expect(merged(app).some((t) => t.scheduledDate === "2026-01-24" && t.status === "projected")).toBe(true);
   }, T);
 
-  knownDefect(
-    "UI-LIFE-25",
-    "weekly rule: reschedule -> complete -> revert forgets the moved date (the modal says it will be preserved)",
+  it(
+    "UI-LIFE-25 — weekly rule: reschedule -> complete -> revert forgets the moved date (the modal says it will be preserved)",
     async () => {
       // Gym every Monday: Jan 5, 12, 19. Move Jan 12 to Thu Jan 22, complete it, revert it.
       // observed: the row is back on Jan 12 (no override is written for week-based occurrence ids).
@@ -165,9 +164,8 @@ describe("revert keeps a custom date (the modal promises it)", () => {
     T
   );
 
-  knownDefect(
-    "UI-LIFE-25b",
-    "bi-weekly rule: the moved date is also lost on revert",
+  it(
+    "UI-LIFE-25b — bi-weekly rule: the moved date is also lost on revert",
     async () => {
       // Payroll every 2 weeks from Fri Jan 2 (Jan 2, 16, 30). Move Jan 16 -> Jan 20, complete, revert.
       const app = await mountAll({
@@ -196,9 +194,8 @@ describe("reschedule and the other override fields", () => {
     expect(-rowMoney(app, nth(app, "Rent", 0).id)[0]).toBe(1_300);
   }, T);
 
-  knownDefect(
-    "UI-LIFE-26",
-    "dragging an occurrence REPLACES its override: an amount/notes override is silently dropped",
+  it(
+    "UI-LIFE-26 — dragging an occurrence REPLACES its override: an amount/notes override is silently dropped",
     async () => {
       // observed: after the drag occurrenceOverrides['rent_2026-01'] = { scheduledDate } only, the row
       // goes back to -1,200. Correct: date changes, amount 1,300 and the note stay.
@@ -211,9 +208,8 @@ describe("reschedule and the other override fields", () => {
     T
   );
 
-  knownDefect(
-    "UI-LIFE-14b",
-    "completing an occurrence that has an amount override stores the RULE's amount as projectedAmount, not the 1,300 the row showed",
+  it(
+    "UI-LIFE-14b — completing an occurrence that has an amount override stores the RULE's amount as projectedAmount, not the 1,300 the row showed",
     async () => {
       // observed: stored projectedAmount 1200 (source.amount). The row said -1,300.
       const app = await mountAll({ expenseRules: [withOverride()] });

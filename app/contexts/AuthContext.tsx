@@ -16,7 +16,7 @@ import {
   createUserProfile,
   deleteAllUserData,
   deleteSelectiveUserData,
-  deleteUserProfile,
+  deleteAccountData,
   subscribeToUserProfile,
   migrateToInitialBalance,
 } from "@/lib/firebase/firestore";
@@ -55,8 +55,13 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
 
   useEffect(() => {
     let unsubscribeProfile: (() => void) | null = null;
+    // Each auth event gets a number. The profile set-up below awaits the network, and a
+    // newer event (another user signed in, sign-out) must win: a slow set-up for the
+    // PREVIOUS user must never subscribe that user's profile under the new session.
+    let latestAuthEvent = 0;
 
     const unsubscribeAuth = onAuthStateChanged(async (user) => {
+      const authEvent = ++latestAuthEvent;
       setUser(user);
 
       // Clean up previous profile subscription
@@ -74,6 +79,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
         } catch (error) {
           console.error("Error creating user profile or running migration:", error);
         }
+
+        if (authEvent !== latestAuthEvent) return; // superseded while setting up
 
         // Subscribe to real-time profile updates
         unsubscribeProfile = subscribeToUserProfile(user.uid, (profile) => {
@@ -114,14 +121,24 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
   const deleteAccount = async () => {
     if (!user) throw new Error("No user logged in");
 
-    // Delete all user data from Firestore
-    await deleteAllUserData(user.uid);
+    const uid = user.uid;
 
-    // Delete user profile document
-    await deleteUserProfile(user.uid);
-
-    // Delete Firebase Auth user (must be done last)
+    // ORDER (UI-BAL-23). The login goes FIRST: it is the step Firebase refuses when the
+    // session is not recent ("requires-recent-login") or the network fails, and while it has
+    // not succeeded nothing has been touched, so the user keeps a whole account and can
+    // retry. Deleting the data first left a signed-in, empty account behind whenever this
+    // step failed. The data then goes in one atomic batch (profile document included).
     await deleteCurrentUser();
+
+    try {
+      await deleteAccountData(uid);
+    } catch (error) {
+      const reason = error instanceof Error ? error.message : String(error);
+      throw new Error(
+        `Your sign-in was deleted, but your stored data could not be removed (${reason}). ` +
+          "Contact support to have it erased."
+      );
+    }
 
     // Clear local state
     setUserProfile(null);

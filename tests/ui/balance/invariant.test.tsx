@@ -141,9 +141,8 @@ describe("invariant: rule-based gestures through TransactionModal", () => {
 });
 
 describe("invariant: manual transactions (Add Manual Transaction form)", () => {
-  knownDefect(
-    "UI-BAL-01",
-    "adding a COMPLETED manual expense never moves the balance (MUT-4)",
+  it(
+    "UI-BAL-01 — adding a COMPLETED manual expense never moves the balance (MUT-4)",
     async () => {
       // observed: stored/displayed 10,000 after a completed 400 expense; Settings computes 9,600
       // and shows "Balance mismatch detected: $400".
@@ -166,9 +165,8 @@ describe("invariant: manual transactions (Add Manual Transaction form)", () => {
     60_000
   );
 
-  knownDefect(
-    "UI-BAL-02",
-    "add-then-delete of a completed manual expense leaves the balance 2x the amount too high",
+  it(
+    "UI-BAL-02 — add-then-delete of a completed manual expense leaves the balance 2x the amount too high",
     async () => {
       // observed: 10,400 (add applies nothing, delete adds 400 back). correct: 10,000.
       const app = await renderApp({
@@ -218,9 +216,8 @@ describe("invariant: manual transactions (Add Manual Transaction form)", () => {
     await expectBalanceInvariant(app, { balance: 10_120, completedCount: 1 }, "amount edited");
   }, 60_000);
 
-  knownDefect(
-    "UI-BAL-03",
-    "flipping a completed manual INCOME to an EXPENSE (same amount) does not move the balance (MUT-5)",
+  it(
+    "UI-BAL-03 — flipping a completed manual INCOME to an EXPENSE (same amount) does not move the balance (MUT-5)",
     async () => {
       // observed: current stays 10,100 (no branch fires, amounts are equal); ledger says 10,000 - 100 = 9,900,
       // Settings shows "Balance mismatch detected: $200".
@@ -242,9 +239,8 @@ describe("invariant: manual transactions (Add Manual Transaction form)", () => {
     60_000
   );
 
-  knownDefect(
-    "UI-BAL-04",
-    "flipping a completed manual income (100) to an expense of 120 moves the balance the WRONG way (+20 instead of -220)",
+  it(
+    "UI-BAL-04 — flipping a completed manual income (100) to an expense of 120 moves the balance the WRONG way (+20 instead of -220)",
     async () => {
       // observed: 10,120 (delta computed from the OLD type: 120 - 100 = +20). correct: 10,000 - 120 = 9,880.
       const app = await renderApp({
@@ -363,7 +359,7 @@ describe("invariant: the Settings balance controls", () => {
     expect(storedBalance(app)).toBe(0);
   }, 60_000);
 
-  it("Override Current Balance stores exactly what was typed, closes the form, and leaves the ledger untouched", async () => {
+  it("Override Current Balance stores exactly what was typed, closes the form, and leaves the transactions untouched", async () => {
     const app = await renderApp({
       ui: <Screens only={["settings", "dashboard", "forecast"]} />,
       today: TODAY,
@@ -378,7 +374,14 @@ describe("invariant: the Settings balance controls", () => {
     await app.settle();
     const doc = app.store.__get<{ currentBalance: number; initialBalance: number }>("users", app.uid)!;
     expect(doc.currentBalance).toBe(12_345.67);
-    expect(doc.initialBalance).toBe(10_000);
+    // REWRITTEN (write-path stream, UI-BAL-05 + the "override vs adjustment entry" DECISION).
+    // This pinned initialBalance 10,000 after the override, i.e. a current balance that the
+    // ledger cannot explain (the mismatch banner then offered a button that undid the
+    // correction). The override now keeps the invariant by letting the BASELINE absorb the
+    // correction: 12,345.67 = initialBalance + SUM(no completed rows) => initialBalance 12,345.67.
+    // No transaction is invented, so nothing in the ledger changed.
+    expect(doc.initialBalance).toBe(12_345.67);
+    expect(app.store.__count("transactions")).toBe(0);
     expect(settingsCurrent(screenEl("settings"))).toBe(12_345.67);
     expect(dashboardCurrent()).toBe(12_345.67);
     expect(settings.queryByLabelText("Override Current Balance")).not.toBeInTheDocument();
@@ -405,9 +408,8 @@ describe("invariant: the Settings balance controls", () => {
     expect(within(screenEl("dashboard")).getByText("Negative balance!")).toBeInTheDocument();
   }, 60_000);
 
-  knownDefect(
-    "UI-BAL-05",
-    "Override Current Balance immediately trips the app's own 'Balance mismatch' banner (MUT-12)",
+  it(
+    "UI-BAL-05 — Override Current Balance immediately trips the app's own 'Balance mismatch' banner (MUT-12)",
     async () => {
       // observed: after overriding to 12,345.67 the banner quotes "$2,345.67" and offers a button that
       // silently undoes the correction. The user's stated invariant (current == initial + Σ completed)
@@ -491,10 +493,14 @@ describe("invariant: two paychecks that share an occurrenceId", () => {
   const completeThreeMarchPaychecks = async (app: Awaited<ReturnType<typeof renderApp>>) => {
     const march = () =>
       app.financial().transactions.filter((t) => t.scheduledDate.startsWith("2026-03"));
-    // Preconditions: this seed produces three March rows, and the last two carry ONE occurrenceId
+    // Preconditions: this seed produces three March rows. REWRITTEN (write-path stream): the
+    // last two used to carry ONE occurrenceId (the collision this scenario was built around).
+    // Identity now comes from the LOGICAL date (engine stream, R2): the Sunday-15th payday
+    // that "after" moves to Mon 16 is slot 1 of [15, 30] and the 30th is slot 2, so the ids
+    // are distinct and these rows cannot shadow each other.
     expect(march().map((t) => t.scheduledDate)).toEqual(["2026-03-02", "2026-03-16", "2026-03-30"]);
-    expect(march()[1].occurrenceId).toBeTruthy();
-    expect(march()[1].occurrenceId).toBe(march()[2].occurrenceId);
+    expect(march()[1].occurrenceId).toBe("inc-1_2026-03-1");
+    expect(march()[2].occurrenceId).toBe("inc-1_2026-03-2");
     await completeViaModal(app, march()[0], { amount: 28_000 });
     await completeViaModal(app, findTxn(app, (t) => t.scheduledDate === "2026-03-16"), { amount: 25_000 });
     await completeViaModal(app, findTxn(app, (t) => t.scheduledDate === "2026-03-30"), { amount: 30_000 });
@@ -503,9 +509,8 @@ describe("invariant: two paychecks that share an occurrenceId", () => {
     expect(storedBalance(app)).toBe(93_000);
   };
 
-  knownDefect(
-    "UI-BAL-06",
-    "Settings' derived balance drops one of two completed paychecks that share an occurrenceId",
+  it(
+    "UI-BAL-06 — Settings' derived balance drops one of two completed paychecks that share an occurrenceId",
     async () => {
       // observed: "Computed from 2 transactions" $68,000 and a mismatch banner quoting $25,000,
       // although all three paychecks are stored as completed and the balance is 93,000.
@@ -518,9 +523,8 @@ describe("invariant: two paychecks that share an occurrenceId", () => {
     120_000
   );
 
-  knownDefect(
-    "UI-BAL-07",
-    "clicking Recalculate Balance after the collision permanently writes a balance 25,000 too low",
+  it(
+    "UI-BAL-07 — clicking Recalculate Balance after the collision permanently writes a balance 25,000 too low",
     async () => {
       // observed: users.currentBalance 93,000 -> 68,000 on one click. correct: unchanged.
       const app = await renderApp({ ui: <Screens only={["settings"]} />, today: "2026-04-05", seed: paySeed });
@@ -534,9 +538,8 @@ describe("invariant: two paychecks that share an occurrenceId", () => {
     120_000
   );
 
-  knownDefect(
-    "UI-BAL-08",
-    "after completing all three paychecks the merged list shows a completed row FEWER and a phantom projected duplicate",
+  it(
+    "UI-BAL-08 — after completing all three paychecks the merged list shows a completed row FEWER and a phantom projected duplicate",
     async () => {
       // observed March rows: [03-02 completed, 03-30 completed, 03-30 projected]; the completed 03-16 row is gone.
       const app = await renderApp({ ui: <Screens only={["settings"]} />, today: "2026-04-05", seed: paySeed });
@@ -609,9 +612,8 @@ describe("invariant: sources, devices and concurrency", () => {
     expect(forecastCurrent()).toBeCloseTo(4_242.42, 2);
   }, 40_000);
 
-  knownDefect(
-    "UI-BAL-42",
-    "two completions in flight at once (two tabs/devices) lose one of the two balance updates (read-modify-write, no increment)",
+  it(
+    "UI-BAL-42 — two completions in flight at once (two tabs/devices) lose one of the two balance updates (read-modify-write, no increment)",
     async () => {
       // observed: users.currentBalance 8,800 - the +3,000 salary was overwritten by the rent's -1,200 based on a stale read.
       // correct: 10,000 + 3,000 - 1,200 = 11,800. (Driven through the context action the modal calls; one tab's single

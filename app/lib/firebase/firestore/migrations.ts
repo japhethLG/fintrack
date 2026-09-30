@@ -113,7 +113,7 @@ const DELETE_ORDER: DeletableDataType[] = [
 const deleteUserData = async (
   userId: string,
   types: DeletableDataType[],
-  options: { resetBalance: boolean }
+  options: { resetBalance: boolean; deleteProfile?: boolean }
 ): Promise<void> => {
   const refs: DocumentReference[] = [];
   for (const type of DELETE_ORDER.filter((candidate) => types.includes(candidate))) {
@@ -126,18 +126,23 @@ const deleteUserData = async (
     chunks.push(refs.slice(i, i + MAX_BATCH_OPERATIONS));
   }
   if (chunks.length === 0) chunks.push([]);
-  // the balance reset needs a slot in the last batch
-  if (options.resetBalance && chunks[chunks.length - 1].length >= MAX_BATCH_OPERATIONS) {
+  // the balance reset / profile delete needs a slot in the last batch
+  const lastBatchWrite = options.resetBalance || options.deleteProfile;
+  if (lastBatchWrite && chunks[chunks.length - 1].length >= MAX_BATCH_OPERATIONS) {
     chunks.push([]);
   }
 
   let deleted = 0;
   for (let index = 0; index < chunks.length; index++) {
-    const withReset = options.resetBalance && index === chunks.length - 1;
-    if (chunks[index].length === 0 && !withReset) continue;
+    const isLast = index === chunks.length - 1;
+    const withReset = !!options.resetBalance && isLast;
+    const withProfileDelete = !!options.deleteProfile && isLast;
+    if (chunks[index].length === 0 && !withReset && !withProfileDelete) continue;
     const batch = writeBatch(db);
     chunks[index].forEach((ref) => batch.delete(ref));
-    if (withReset) {
+    if (withProfileDelete) {
+      batch.delete(doc(db, "users", userId));
+    } else if (withReset) {
       batch.update(doc(db, "users", userId), {
         currentBalance: 0,
         initialBalance: 0,
@@ -162,6 +167,15 @@ const deleteUserData = async (
  */
 export const deleteAllUserData = async (userId: string): Promise<void> => {
   await deleteUserData(userId, DELETE_ORDER, { resetBalance: true });
+};
+
+/**
+ * Delete everything of a user, profile document included (account deletion). The profile
+ * goes in the same final batch as the last documents, so a usual account is removed
+ * all-or-nothing.
+ */
+export const deleteAccountData = async (userId: string): Promise<void> => {
+  await deleteUserData(userId, DELETE_ORDER, { resetBalance: false, deleteProfile: true });
 };
 
 /**

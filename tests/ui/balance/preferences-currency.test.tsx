@@ -105,9 +105,8 @@ describe("saving preferences", () => {
     expect(prefsOf(app).defaultWarningThreshold).toBe(500);
   });
 
-  knownDefect(
-    "UI-BAL-24",
-    "a stored threshold of 0 is displayed as 500 in the Preferences form",
+  it(
+    "UI-BAL-24 — a stored threshold of 0 is displayed as 500 in the Preferences form",
     async () => {
       // observed: the input reads "500" for a profile whose defaultWarningThreshold is 0 (`|| 500`)
       const app = await renderApp({
@@ -121,9 +120,8 @@ describe("saving preferences", () => {
     }
   );
 
-  knownDefect(
-    "UI-BAL-25",
-    "changing only the THEME silently rewrites a stored threshold of 0 to 500",
+  it(
+    "UI-BAL-25 — changing only the THEME silently rewrites a stored threshold of 0 to 500",
     async () => {
       // observed: after saving a theme change, users/user-1.preferences.defaultWarningThreshold === 500
       const app = await renderApp({
@@ -403,9 +401,8 @@ describe("cents, negative zero and large values on the balance screens", () => {
     expect(within(screenEl("dashboard")).getByText("Negative balance!")).toBeInTheDocument();
   }, 30_000);
 
-  knownDefect(
-    "UI-BAL-34",
-    "0.3 - 0.1 - 0.2 (completed through the modal) leaves a float residue that renders as '-$0.00' with a 'Negative balance!' warning",
+  it(
+    "UI-BAL-34 — 0.3 - 0.1 - 0.2 (completed through the modal) leaves a float residue that renders as '-$0.00' with a 'Negative balance!' warning",
     async () => {
       // observed: Dashboard "-$0.00" + "Negative balance!", Settings "-$0.00": the balance is exactly zero in money
       const app = await renderApp({

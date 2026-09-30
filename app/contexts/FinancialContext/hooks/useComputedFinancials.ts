@@ -3,6 +3,9 @@ import { UserProfile, Transaction, DayBalance, BillCoverageReport, UpcomingBill 
 import { calculateDailyBalances, getBillCoverageReport } from "@/lib/logic/balanceCalculator";
 import { parseDate } from "@/lib/utils/dateUtils";
 
+/** Used when a profile written by an earlier version has no preferences map. */
+const DEFAULT_WARNING_THRESHOLD = 500;
+
 /**
  * Hook to compute daily balances from transactions
  */
@@ -21,7 +24,7 @@ export function useDailyBalances(
       transactions,
       parseDate(viewDateRange.start),
       parseDate(viewDateRange.end),
-      userProfile.preferences.defaultWarningThreshold
+      userProfile.preferences?.defaultWarningThreshold ?? DEFAULT_WARNING_THRESHOLD
     );
   }, [userProfile, transactions, viewDateRange]);
 }

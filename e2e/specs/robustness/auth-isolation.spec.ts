@@ -90,7 +90,6 @@ test.describe("switching users in one browser", () => {
   });
 
   test("a transaction modal opened as Alice must not survive a switch to Bob", async ({ page, context }) => {
-    knownDefect("E2E-ROB-07", "Alice's transaction modal stays open (showing Alice's data) after the session became Bob's");
     await seedAndLogin(page, twoUsers(), { path: "/transactions" });
     await openTransaction(page, "Alice Coffee");
     const tab2 = await context.newPage();
@@ -101,7 +100,6 @@ test.describe("switching users in one browser", () => {
   });
 
   test("a stale Alice modal must not let Bob's session edit Alice's transaction or Bob's balance", async ({ page, context }) => {
-    knownDefect("E2E-ROB-07", "completing the stale modal changes Bob's balance 2222 -> 2159 and rewrites Alice's transaction (uid taken from the new session)");
     await seedAndLogin(page, twoUsers(), { path: "/transactions" });
     const modal = await openTransaction(page, "Alice Coffee");
     const tab2 = await context.newPage();

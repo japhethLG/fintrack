@@ -103,9 +103,8 @@ describe("cash loan: completing a payment", () => {
     expectInvariants(app, ["complete loan #1"]);
   }, T);
 
-  knownDefect(
-    "UI-LIFE-10",
-    "completing a loan payment never reduces loanConfig.currentBalance (principal stays 4,000)",
+  it(
+    "UI-LIFE-10 — completing a loan payment never reduces loanConfig.currentBalance (principal stays 4,000)",
     async () => {
       // observed: paymentsMade 1 but currentBalance 4000. Correct: 4,000 - principal(985.12) = 3,014.88.
       const app = await mountTx({ expenseRules: [loanRule()] });
@@ -116,9 +115,8 @@ describe("cash loan: completing a payment", () => {
     T
   );
 
-  knownDefect(
-    "UI-LIFE-10b",
-    "an EXTRA payment (1,500 instead of 1,025.12) reduces the loan principal by 1,500 - interest 40 = 1,460 (-> 2,540)",
+  it(
+    "UI-LIFE-10b — an EXTRA payment (1,500 instead of 1,025.12) reduces the loan principal by 1,500 - interest 40 = 1,460 (-> 2,540)",
     async () => {
       // observed: currentBalance unchanged at 4000.
       const app = await mountTx({ expenseRules: [loanRule()] });
@@ -159,9 +157,8 @@ describe("cash loan: completing a payment", () => {
     T
   );
 
-  knownDefect(
-    "UI-LIFE-13",
-    "a completed loan row loses its payment number: '(#1)' disappears once paid",
+  it(
+    "UI-LIFE-13 — a completed loan row loses its payment number: '(#1)' disappears once paid",
     async () => {
       // observed: no paymentBreakdown is stored on completion, so the row prints no '(#n)'.
       const app = await mountTx({ expenseRules: [loanRule()] });
@@ -174,9 +171,8 @@ describe("cash loan: completing a payment", () => {
     T
   );
 
-  knownDefect(
-    "UI-LIFE-14",
-    "the stored projectedAmount is the rule's flat amount, not the amortized payment the row showed",
+  it(
+    "UI-LIFE-14 — the stored projectedAmount is the rule's flat amount, not the amortized payment the row showed",
     async () => {
       // rule.amount = 1,000 (user-entered) but the schedule row shows 1,025.12.
       // observed: stored projectedAmount 1000, so re-opening the paid row says 'Expected -$1,000.00'.
@@ -189,9 +185,8 @@ describe("cash loan: completing a payment", () => {
     T
   );
 
-  knownDefect(
-    "UI-LIFE-15",
-    "completing a loan payment never stores `variance` (paid 1,100 vs scheduled 1,025.12 shows no variance)",
+  it(
+    "UI-LIFE-15 — completing a loan payment never stores `variance` (paid 1,100 vs scheduled 1,025.12 shows no variance)",
     async () => {
       // observed: stored doc has no variance field; the row prints only the amount.
       const app = await mountTx({ expenseRules: [loanRule()] });
@@ -258,9 +253,8 @@ describe("cash loan: paymentsMade counter under skip / revert cycles", () => {
     expectInvariants(app, ["complete", "revert", "complete"]);
   }, T);
 
-  knownDefect(
-    "UI-LIFE-18",
-    "skipping a COMPLETED loan payment reverses the cash but leaves paymentsMade at 1",
+  it(
+    "UI-LIFE-18 — skipping a COMPLETED loan payment reverses the cash but leaves paymentsMade at 1",
     async () => {
       // observed: balance back to 10,000, paymentsMade still 1 => the plan believes a payment was made.
       const app = await mountTx({ expenseRules: [loanRule()] });
@@ -273,9 +267,8 @@ describe("cash loan: paymentsMade counter under skip / revert cycles", () => {
     T
   );
 
-  knownDefect(
-    "UI-LIFE-19",
-    "paying a previously SKIPPED loan payment does not count it: paymentsMade stays 1 after two payments",
+  it(
+    "UI-LIFE-19 — paying a previously SKIPPED loan payment does not count it: paymentsMade stays 1 after two payments",
     async () => {
       // pay #1, skip #2, then change your mind and pay #2 (stored-row path). observed: 1, not 2.
       const app = await mountTx({ expenseRules: [loanRule()] });
@@ -337,9 +330,8 @@ describe("credit card payments", () => {
     expectInvariants(app, ["pay card 500"]);
   }, T);
 
-  knownDefect(
-    "UI-LIFE-20",
-    "paying 500 on a 5,000 card leaves creditConfig.currentBalance at 5,000",
+  it(
+    "UI-LIFE-20 — paying 500 on a 5,000 card leaves creditConfig.currentBalance at 5,000",
     async () => {
       // observed: 5000 (updateCreditBalance is never called). Correct: between 4,500 (payment
       // fully applied) and 4,550 (one month's 50 interest accrued first).
@@ -353,9 +345,8 @@ describe("credit card payments", () => {
     T
   );
 
-  knownDefect(
-    "UI-LIFE-21",
-    "after a 500 payment the NEXT minimum is still computed from the old balance (99.00 instead of <= 91.00)",
+  it(
+    "UI-LIFE-21 — after a 500 payment the NEXT minimum is still computed from the old balance (99.00 instead of <= 91.00)",
     async () => {
       // 2% minimum can never exceed 2% * 4,550 = 91.00 once 500 has been paid.
       // observed: Feb 15 still prints 99.00 (the schedule assumes the planned 100 was paid).
@@ -443,9 +434,8 @@ describe("installments", () => {
     expectInvariants(app, ["pay", "revert", "pay"]);
   }, T);
 
-  knownDefect(
-    "UI-LIFE-22",
-    "re-completing an already completed installment increments installmentsPaid again (and swallows the next payment)",
+  it(
+    "UI-LIFE-22 — re-completing an already completed installment increments installmentsPaid again (and swallows the next payment)",
     async () => {
       // pay #1 for 200, then reopen it and resubmit 210. observed: installmentsPaid 2 and the Feb 10
       // payment disappears from the projections. Correct: still 1 payment made.
@@ -460,9 +450,8 @@ describe("installments", () => {
     T
   );
 
-  knownDefect(
-    "UI-LIFE-22b",
-    "...and the Feb 10 instalment must still be projected after re-completing #1",
+  it(
+    "UI-LIFE-22b — ...and the Feb 10 instalment must still be projected after re-completing #1",
     async () => {
       const app = await mountTx({ expenseRules: [instRule()] });
       await completeTx(app, instRows(app)[0].id);
@@ -473,9 +462,8 @@ describe("installments", () => {
     T
   );
 
-  knownDefect(
-    "UI-LIFE-23",
-    "skipping a COMPLETED installment reverses the cash but leaves installmentsPaid at 1",
+  it(
+    "UI-LIFE-23 — skipping a COMPLETED installment reverses the cash but leaves installmentsPaid at 1",
     async () => {
       const app = await mountTx({ expenseRules: [instRule()] });
       await completeTx(app, instRows(app)[0].id);
@@ -500,9 +488,8 @@ describe("installments", () => {
     expectInvariants(app, ["skip", "pay", "revert"]);
   }, T);
 
-  knownDefect(
-    "UI-LIFE-24",
-    "reverting the LAST instalment (after it was paid from Skipped) makes it vanish: the plan is deactivated and never re-projects it",
+  it(
+    "UI-LIFE-24 — reverting the LAST instalment (after it was paid from Skipped) makes it vanish: the plan is deactivated and never re-projects it",
     async () => {
       // 2 x 200 plan. pay #1, skip #2, pay #2 (stored-row path -> rule flips isActive=false because
       // paid >= count), then Revert #2. observed: no projected row for #2 (rule inactive), so a

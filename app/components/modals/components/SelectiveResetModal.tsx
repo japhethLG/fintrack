@@ -110,8 +110,7 @@ const SelectiveResetModal: React.FC<IProps> = ({ closeModal, modalData }) => {
 
       {/* Warning */}
       <Alert variant="warning" className="mb-5">
-        This action cannot be undone. Transactions and balance history resets will also set your
-        balance to $0.
+        This action cannot be undone. Resetting transactions will also set your balance to $0.
       </Alert>
 
       {/* Options */}

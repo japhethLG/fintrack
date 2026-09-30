@@ -11,6 +11,7 @@ import {
   formSchema,
   getDefaultValues,
   transformToTransactionData,
+  transformToTransactionUpdates,
   getSmartStatus,
   type ManualTransactionFormValues,
 } from "./formHelpers";
@@ -24,7 +25,10 @@ import {
 interface IProps {
   initialData?: Transaction;
   prefilledDate?: string;
-  onSubmit: (data: Omit<Transaction, "id" | "userId" | "createdAt" | "updatedAt">) => Promise<void>;
+  /** A full transaction when creating; only the changed fields when editing. */
+  onSubmit: (
+    data: Partial<Omit<Transaction, "id" | "userId" | "createdAt" | "updatedAt">>
+  ) => Promise<void>;
   onCancel: () => void;
   onDelete?: () => Promise<void>;
   isEditing?: boolean;
@@ -69,7 +73,10 @@ const ManualTransactionForm: React.FC<IProps> = ({
     setIsSubmitting(true);
 
     try {
-      const transactionData = transformToTransactionData(values);
+      const transactionData =
+        isEditing && initialData
+          ? transformToTransactionUpdates(values, initialData)
+          : transformToTransactionData(values);
       await onSubmit(transactionData);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to save transaction");

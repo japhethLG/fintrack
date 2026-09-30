@@ -39,9 +39,8 @@ describe("display name", () => {
     expect(screen.getByText("Old Name")).toBeInTheDocument();
   });
 
-  knownDefect(
-    "UI-BAL-41",
-    "a whitespace-only display name passes validation and is saved as an EMPTY name",
+  it(
+    "UI-BAL-41 — a whitespace-only display name passes validation and is saved as an EMPTY name",
     async () => {
       // observed: users/user-1.displayName === "" and the row reads "Not set"
       const app = await renderApp({ route: "/settings", seed: { profile: { displayName: "Old Name" } } });

@@ -82,7 +82,6 @@ test.describe("returning user, 9 months of history", () => {
   });
 
   test("legacy profile WITH history: migrated initialBalance must be 2,000 (current - sum completed)", async ({ page }) => {
-    knownDefect("E2E-JRN-13", "migration copies currentBalance (18,200) into initialBalance; Settings then shows computed $34,400.00 and 'Balance mismatch detected: $16,200.00'");
     await seedAndLogin(page, history({ legacy: true }), { path: "/settings" });
     await expect(page.getByText("Balance Management")).toBeVisible();
     await expect.poll(async () => (await S.readUser(page)).initialBalance).toBeDefined();
@@ -91,7 +90,6 @@ test.describe("returning user, 9 months of history", () => {
   });
 
   test("'Recalculate Balance' on a legacy profile leaves the real balance at 18,200", async ({ page }) => {
-    knownDefect("E2E-JRN-14", "after the wrong migration, Recalculate Balance writes currentBalance = 34,400 (history counted twice)");
     await seedAndLogin(page, history({ legacy: true }), { path: "/settings" });
     await expect(page.getByText("Balance Management")).toBeVisible();
     await expect.poll(async () => (await S.readUser(page)).initialBalance).toBeDefined();

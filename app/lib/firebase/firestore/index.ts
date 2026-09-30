@@ -97,7 +97,12 @@ export type { OccurrenceBase } from "./transactions";
 // ============================================================================
 // BALANCE HISTORY OPERATIONS
 // ============================================================================
-export { saveBalanceSnapshot, getBalanceSnapshot, getBalanceHistory } from "./balanceHistory";
+export {
+  saveBalanceSnapshot,
+  getBalanceSnapshot,
+  getBalanceHistory,
+  countBalanceHistory,
+} from "./balanceHistory";
 
 // ============================================================================
 // ALERT OPERATIONS
@@ -111,6 +116,7 @@ export {
   deleteProjectedTransactions,
   deleteAllUserData,
   deleteSelectiveUserData,
+  deleteAccountData,
   ResetIncompleteError,
   migrateToInitialBalance,
   migratePendingToOverrides,

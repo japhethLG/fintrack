@@ -8,11 +8,12 @@ import { Button, Card, Icon, Alert } from "@/components/common";
 import { Form, FormInput } from "@/components/formElements";
 import { useAuth } from "@/contexts/AuthContext";
 import { useFinancial } from "@/contexts/FinancialContext";
-import { updateUserBalance, updateUserProfile } from "@/lib/firebase/firestore";
 import {
-  computeBalanceFromTransactions,
-  syncComputedBalance,
-} from "@/lib/logic/balanceCalculator/computedBalance";
+  overrideCurrentBalance,
+  recalculateBalance,
+  setInitialBalance,
+} from "@/lib/firebase/firestore";
+import { cleanMoney } from "@/lib/logic/balanceCalculator/ledgerMath";
 
 const balanceSchema = yup.object({
   newBalance: yup
@@ -33,7 +34,10 @@ type InitialBalanceForm = yup.InferType<typeof initialBalanceSchema>;
 
 const BalanceSection: React.FC = () => {
   const { user, userProfile } = useAuth();
-  const { transactions } = useFinancial();
+  // `ledger` counts ALL stored completed rows. The merged `transactions` list is windowed and
+  // mixes in projections; deriving the balance from it made the mismatch banner and
+  // "Recalculate Balance" wrong in both directions (UI-BAL-06/07/08).
+  const { ledger, isInitialized } = useFinancial();
   const [isEditingCurrent, setIsEditingCurrent] = useState(false);
   const [isEditingInitial, setIsEditingInitial] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -53,16 +57,14 @@ const BalanceSection: React.FC = () => {
     resolver: yupResolver(initialBalanceSchema),
   });
 
-  // Calculate computed balance and transaction count
+  // The balance the ledger implies: initialBalance + SUM(signed(completed stored rows))
   const { computedBalance, completedCount } = useMemo(() => {
     if (!userProfile) return { computedBalance: 0, completedCount: 0 };
-
-    const completed = transactions.filter((t) => t.status === "completed");
-
-    const computed = computeBalanceFromTransactions(userProfile.initialBalance || 0, transactions);
-
-    return { computedBalance: computed, completedCount: completed.length };
-  }, [userProfile, transactions]);
+    return {
+      computedBalance: cleanMoney((userProfile.initialBalance || 0) + ledger.sum),
+      completedCount: ledger.completedCount,
+    };
+  }, [userProfile, ledger]);
 
   const handleUpdateCurrentBalance = async (values: BalanceForm) => {
     if (!user) return;
@@ -72,7 +74,9 @@ const BalanceSection: React.FC = () => {
     setIsSaving(true);
 
     try {
-      await updateUserBalance(user.uid, parseFloat(values.newBalance));
+      // the baseline absorbs the correction (initialBalance = typed balance - completed history),
+      // so current == initial + SUM(completed) keeps holding and Recalculate cannot undo it
+      await overrideCurrentBalance(user.uid, parseFloat(values.newBalance));
       setSuccess(true);
       setIsEditingCurrent(false);
       currentBalanceMethods.reset({ newBalance: "" });
@@ -109,9 +113,8 @@ const BalanceSection: React.FC = () => {
     setIsSaving(true);
 
     try {
-      // Update initial balance and sync computed balance
-      await updateUserProfile(user.uid, { initialBalance: newInitialBalance });
-      await syncComputedBalance(user.uid, transactions);
+      // baseline and balance change together, from every stored completed row
+      await setInitialBalance(user.uid, newInitialBalance);
       setSuccess(true);
       setIsEditingInitial(false);
       setShowConfirmation(false);
@@ -132,7 +135,7 @@ const BalanceSection: React.FC = () => {
     setIsRecalculating(true);
 
     try {
-      await syncComputedBalance(user.uid, transactions);
+      await recalculateBalance(user.uid);
       setSuccess(true);
       setTimeout(() => setSuccess(false), 3000);
     } catch (err) {
@@ -164,9 +167,7 @@ const BalanceSection: React.FC = () => {
   };
 
   const newComputedBalance =
-    pendingInitialBalance !== null
-      ? computeBalanceFromTransactions(pendingInitialBalance, transactions)
-      : null;
+    pendingInitialBalance !== null ? cleanMoney(pendingInitialBalance + ledger.sum) : null;
 
   return (
     <Card padding="lg">
@@ -204,7 +205,9 @@ const BalanceSection: React.FC = () => {
               </p>
             </div>
             <div className="flex items-center justify-between text-xs text-gray-500">
-              <span>Computed from {completedCount} transactions</span>
+              <span>
+                Computed from {completedCount} transaction{completedCount === 1 ? "" : "s"}
+              </span>
               <span>{formatCurrency(computedBalance)}</span>
             </div>
             {userProfile?.balanceLastUpdatedAt && (
@@ -215,7 +218,7 @@ const BalanceSection: React.FC = () => {
           </div>
 
           {/* Recalculate Button */}
-          {Math.abs((userProfile?.currentBalance || 0) - computedBalance) > 0.01 && (
+          {isInitialized && Math.abs((userProfile?.currentBalance || 0) - computedBalance) > 0.01 && (
             <div className="p-3 bg-warning/10 border border-warning/30 rounded-lg">
               <p className="text-sm text-warning mb-2">
                 Balance mismatch detected:{" "}
@@ -239,7 +242,9 @@ const BalanceSection: React.FC = () => {
             <Form methods={currentBalanceMethods} onSubmit={handleUpdateCurrentBalance}>
               <div className="space-y-3">
                 <Alert variant="warning">
-                  Warning: This will override the computed balance. Use only for manual corrections.
+                  Warning: This will override the computed balance. Your starting balance is adjusted
+                  to match, so your transaction history still adds up and nothing you recorded
+                  changes. Use only for manual corrections.
                 </Alert>
                 <FormInput
                   inputName="newBalance"

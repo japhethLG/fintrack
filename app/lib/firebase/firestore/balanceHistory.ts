@@ -80,3 +80,11 @@ export const getBalanceHistory = async (
   return snapshot.docs.map((doc) => ({ id: doc.id, ...doc.data() }) as BalanceSnapshot);
 };
 
+
+/** How many balance snapshots a user has stored (what a reset of "Balance History" deletes). */
+export const countBalanceHistory = async (userId: string): Promise<number> => {
+  const snapshot = await getDocs(
+    query(collection(db, "balance_history"), where("userId", "==", userId))
+  );
+  return snapshot.size;
+};

@@ -140,7 +140,8 @@ describe.each([
   // ---- from COMPLETED
   it("completed -> re-completed with a new amount", () => walk([C(amt), C(alt)]), T);
   it("completed -> re-completed with a new date", () => walk([C(amt), C(undefined, "2026-01-28")]), T);
-  knownDefect("UI-LIFE-04", "completed -> skipped: the skipped row keeps printing the old actual amount", async () => { await walk([C(amt), S]); }, T);
+  it(
+    "UI-LIFE-04 — completed -> skipped: the skipped row keeps printing the old actual amount", async () => { await walk([C(amt), S]); }, T);
   it("completed -> reverted", () => walk([C(amt), R]), T);
   it("completed -> rescheduled (drag)", () => walk([C(amt), MV("2026-01-27")]), T);
 
@@ -186,14 +187,20 @@ describe("state machine: manual transaction (Coffee)", () => {
 
   // ---- from COMPLETED
   it("completed -> re-completed with new amount", () => walk([C(64.5), C(80)]), T);
-  knownDefect("UI-LIFE-04", "completed -> skipped: row keeps printing the old actual amount", async () => { await walk([C(64.5), S]); }, T);
-  knownDefect("UI-LIFE-04", "completed -> reverted (modal): row keeps printing the old actual amount", async () => { await walk([C(64.5), R]); }, T);
+  it(
+    "UI-LIFE-04 — completed -> skipped: row keeps printing the old actual amount", async () => { await walk([C(64.5), S]); }, T);
+  it(
+    "UI-LIFE-04 — completed -> reverted (modal): row keeps printing the old actual amount", async () => { await walk([C(64.5), R]); }, T);
   it("completed -> deleted", () => walk([C(64.5), D]), T);
   it("completed -> edited: amount", () => walk([C(64.5), E({ amount: 90 })]), T);
-  knownDefect("UI-LIFE-01", "completed -> edited: type flipped leaves the balance unchanged", async () => { await walk([C(64.5), E({ type: "income", amount: 64.5 })]); }, T);
-  knownDefect("UI-LIFE-02", "completed -> edited: type flipped AND amount changed adjusts the balance with the wrong sign", async () => { await walk([C(64.5), E({ type: "income", amount: 70 })]); }, T);
-  knownDefect("UI-LIFE-04", "completed -> edited (form): status back to projected keeps the old actual amount", async () => { await walk([C(64.5), E({ status: "projected", amount: 50 })]); }, T);
-  knownDefect("UI-LIFE-04", "completed -> edited (form): status to skipped keeps the old actual amount", async () => { await walk([C(64.5), E({ status: "skipped", amount: 50 })]); }, T);
+  it(
+    "UI-LIFE-01 — completed -> edited: type flipped leaves the balance unchanged", async () => { await walk([C(64.5), E({ type: "income", amount: 64.5 })]); }, T);
+  it(
+    "UI-LIFE-02 — completed -> edited: type flipped AND amount changed adjusts the balance with the wrong sign", async () => { await walk([C(64.5), E({ type: "income", amount: 70 })]); }, T);
+  it(
+    "UI-LIFE-04 — completed -> edited (form): status back to projected keeps the old actual amount", async () => { await walk([C(64.5), E({ status: "projected", amount: 50 })]); }, T);
+  it(
+    "UI-LIFE-04 — completed -> edited (form): status to skipped keeps the old actual amount", async () => { await walk([C(64.5), E({ status: "skipped", amount: 50 })]); }, T);
   it("completed -> rescheduled (drag)", () => walk([C(64.5), { on, do: "reschedule", date: "2026-01-19" }]), T);
 
   // ---- from SKIPPED
@@ -204,9 +211,12 @@ describe("state machine: manual transaction (Coffee)", () => {
   it("skipped -> edited: type flipped", () => walk([S, E({ type: "income", amount: 50 })]), T);
 
   // ---- cycles
-  knownDefect("UI-LIFE-04", "complete -> revert -> complete: the reverted row prints the old actual amount", async () => { await walk([C(64.5), R, C(80)]); }, T);
-  knownDefect("UI-LIFE-04", "complete -> skip -> complete: the skipped row prints the old actual amount", async () => { await walk([C(64.5), S, C(70)]); }, T);
-  knownDefect("UI-LIFE-01", "complete -> edit(type flip) -> delete: balance is wrong after the flip", async () => { await walk([C(64.5), E({ type: "income", amount: 64.5 }), D]); }, T);
+  it(
+    "UI-LIFE-04 — complete -> revert -> complete: the reverted row prints the old actual amount", async () => { await walk([C(64.5), R, C(80)]); }, T);
+  it(
+    "UI-LIFE-04 — complete -> skip -> complete: the skipped row prints the old actual amount", async () => { await walk([C(64.5), S, C(70)]); }, T);
+  it(
+    "UI-LIFE-01 — complete -> edit(type flip) -> delete: balance is wrong after the flip", async () => { await walk([C(64.5), E({ type: "income", amount: 64.5 }), D]); }, T);
 });
 
 // ---------------------------------------------------------------------------
@@ -305,9 +315,8 @@ describe("seeded random walks (30 gestures, invariants after every step)", () =>
     expect(trace.length).toBe(30);
   }, 240_000);
 
-  knownDefect(
-    "UI-LIFE-WALK",
-    "the unrestricted, strict random walk (manual Edit included, stale rows NOT tolerated) violates an invariant",
+  it(
+    "UI-LIFE-WALK — the unrestricted, strict random walk (manual Edit included, stale rows NOT tolerated) violates an invariant",
     async () => {
       const trace = await randomWalk({ seed: 5, steps: 30, allow: () => true });
       expect(trace.length).toBe(30);

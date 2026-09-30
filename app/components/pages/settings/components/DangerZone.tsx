@@ -1,11 +1,12 @@
 "use client";
 
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button, Card, Icon, Alert } from "@/components/common";
 import { useAuth } from "@/contexts/AuthContext";
 import { useFinancial } from "@/contexts/FinancialContext";
 import { DeletableDataType } from "@/lib/types";
+import { countBalanceHistory } from "@/lib/firebase/firestore";
 import { useModal } from "@/components/modals";
 
 const DATA_LABELS: Record<DeletableDataType, string> = {
@@ -20,20 +21,47 @@ const DangerZone: React.FC = () => {
   const router = useRouter();
   const { openModal, closeModal } = useModal();
   const { user, resetSelectiveFinancialData, deleteAccount } = useAuth();
-  const { incomeSources, expenseRules, transactions, alerts } = useFinancial();
+  const { incomeSources, expenseRules, storedTransactions, alerts } = useFinancial();
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
 
+  // Nothing in the app subscribes to balance snapshots, so their number is read on demand
+  const [balanceHistoryCount, setBalanceHistoryCount] = useState(0);
+  const uid = user?.uid;
+  useEffect(() => {
+    if (!uid) return;
+    let cancelled = false;
+    countBalanceHistory(uid)
+      .then((count) => {
+        if (!cancelled) setBalanceHistoryCount(count);
+      })
+      .catch(() => {
+        /* the count is informational; a failed read must not break Settings */
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [uid]);
+
+  // What a reset would delete: STORED documents. The merged transaction list also holds
+  // projections generated on the fly, which are not documents and cannot be deleted
+  // (UI-OBS-04, UI-BAL-20/22).
   const dataCounts = useMemo(
     () => ({
       income_sources: incomeSources.length,
       expense_rules: expenseRules.length,
-      transactions: transactions.length,
-      balance_history: 0,
+      transactions: storedTransactions.length,
+      balance_history: balanceHistoryCount,
       alerts: alerts.length,
     }),
-    [alerts.length, expenseRules.length, incomeSources.length, transactions.length]
+    [
+      alerts.length,
+      balanceHistoryCount,
+      expenseRules.length,
+      incomeSources.length,
+      storedTransactions.length,
+    ]
   );
 
   const resetSuccess = (message: string) => {
@@ -77,10 +105,11 @@ const DangerZone: React.FC = () => {
               try {
                 await resetSelectiveFinancialData(types);
                 closeModal("ConfirmModal");
+                if (types.includes("balance_history")) setBalanceHistoryCount(0);
 
                 // Show contextual success message
-                const deletedTransactions =
-                  types.includes("transactions") || types.includes("balance_history");
+                // (only deleting transactions resets the balance; snapshots are not part of it)
+                const deletedTransactions = types.includes("transactions");
                 const deletedRules =
                   types.includes("income_sources") || types.includes("expense_rules");
 
@@ -158,7 +187,7 @@ const DangerZone: React.FC = () => {
               <h4 className="font-medium text-white">Reset Financial Data</h4>
               <p className="text-sm text-gray-400 mt-1">
                 Choose exactly what to delete or pick "All Financial Data" to wipe everything.
-                Balance resets to $0 when transactions or balance history are removed.
+                Balance resets to $0 when transactions are removed.
               </p>
             </div>
             <Button

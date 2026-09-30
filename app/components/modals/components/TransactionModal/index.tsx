@@ -19,6 +19,7 @@ import {
 import {
   completeTransactionSchema,
   getDefaultValues,
+  notesForSave,
   type CompleteTransactionFormValues,
 } from "./formHelpers";
 
@@ -85,13 +86,13 @@ const TransactionModal: React.FC<IProps> = ({ closeModal, modalData }) => {
             status: "completed",
             actualAmount: parseFloat(values.actualAmount),
             actualDate: values.actualDate,
-            notes: values.notes?.trim() || undefined,
+            notes: notesForSave(values.notes, transaction),
           });
         } else if (values.mode === "skip") {
           // Mark manual transaction as skipped
           await updateManualTransaction(transaction.id, {
             status: "skipped",
-            notes: values.notes?.trim() || undefined,
+            notes: notesForSave(values.notes, transaction),
           });
         } else if (values.mode === "revert") {
           // Revert manual transaction to projected
@@ -110,10 +111,10 @@ const TransactionModal: React.FC<IProps> = ({ closeModal, modalData }) => {
           await markTransactionComplete(transaction.id, {
             actualAmount: parseFloat(values.actualAmount),
             actualDate: values.actualDate,
-            notes: values.notes?.trim() || undefined,
+            notes: notesForSave(values.notes, transaction),
           });
         } else if (values.mode === "skip") {
-          await markTransactionSkipped(transaction.id, values.notes?.trim() || undefined);
+          await markTransactionSkipped(transaction.id, notesForSave(values.notes, transaction));
         } else if (values.mode === "revert") {
           await revertTransactionToProjected(transaction.id);
         }

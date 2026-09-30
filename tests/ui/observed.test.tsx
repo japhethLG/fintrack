@@ -70,9 +70,8 @@ describe("Settings page", () => {
     }
   );
 
-  knownDefect(
-    "UI-OBS-03",
-    "Saving a Low Balance Warning Threshold of 0 stores 500 (falsy `|| 500` fallback)",
+  it(
+    "UI-OBS-03 — Saving a Low Balance Warning Threshold of 0 stores 500 (falsy `|| 500` fallback)",
     async () => {
       // observed: users/user-1.preferences.defaultWarningThreshold === 500 after saving 0
       const app = await renderApp({ route: "/settings" });
@@ -113,9 +112,8 @@ describe("Settings page", () => {
     return screen.findByRole("dialog");
   };
 
-  knownDefect(
-    "UI-OBS-04",
-    "Selective Reset counts derived projections as deletable Transactions (1 stored row shows as 5 items)",
+  it(
+    "UI-OBS-04 — Selective Reset counts derived projections as deletable Transactions (1 stored row shows as 5 items)",
     async () => {
       // observed: "Projected and completed items • 5 items" — 1 stored + 4 generated projections
       const app = await renderApp({ route: "/settings", today: "2026-01-15", seed: resetSeed });
@@ -125,9 +123,8 @@ describe("Settings page", () => {
     }
   );
 
-  knownDefect(
-    "UI-OBS-05",
-    "Selective Reset always shows 0 Balance History items even when snapshots are stored",
+  it(
+    "UI-OBS-05 — Selective Reset always shows 0 Balance History items even when snapshots are stored",
     async () => {
       // observed: "Daily balance snapshots • 0 items" with 1 stored balance_history document
       const app = await renderApp({ route: "/settings", today: "2026-01-15", seed: resetSeed });

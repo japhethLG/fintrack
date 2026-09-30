@@ -50,7 +50,6 @@ test.describe("loan paid for 4 months (8,000 @ 12% APR, 8 months, first payment 
   });
 
   test("after 4 payments: balance 4,079.59, 4 payments still projected, next EMI 1,045.52, Upcoming Bills lists Jul 15", async ({ page }) => {
-    knownDefect("E2E-JRN-16", "loan balance stays $8,000 (Progress 0%), Total Debt $8,000, Upcoming Bills 'No bills due', 0 Pending on Transactions: the 4 remaining payments vanish");
     await page.clock.setFixedTime(new Date("2026-03-15T12:00:00Z"));
     await seedAndLogin(page, seed(), { path: "/calendar" });
     await expect(page.getByRole("heading", { name: "Financial Calendar", level: 1 })).toBeVisible();
@@ -106,7 +105,6 @@ test.describe("installment plan and credit card journeys", () => {
   });
 
   test("0% card 1,000 paid 400 twice: Total Debt falls to 200 (1,000 - 800)", async ({ page }) => {
-    knownDefect("E2E-JRN-17", "creditConfig.currentBalance is never reduced: Total Debt stays $1,000 after 800 was paid (and the card can never reach zero)");
     await page.clock.setFixedTime(new Date("2026-03-25T12:00:00Z"));
     await seedAndLogin(page, {
       user: userProfile({ currentBalance: 5000, initialBalance: 5000, ...usd }),

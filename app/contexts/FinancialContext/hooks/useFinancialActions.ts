@@ -81,9 +81,9 @@ export function useFinancialActions({
   const updateProfile = useCallback(
     async (updates: Partial<UserProfile["preferences"]>) => {
       if (!user) return;
-      await updateProfileAction(user.uid, userProfile, updates);
+      await updateProfileAction(user.uid, updates);
     },
-    [user, userProfile]
+    [user]
   );
 
   const setCurrentBalance = useCallback(

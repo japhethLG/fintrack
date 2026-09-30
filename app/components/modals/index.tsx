@@ -1,6 +1,7 @@
 "use client";
 
-import React, { createContext, useContext, useState, useCallback } from "react";
+import React, { createContext, useContext, useState, useCallback, useEffect, useRef } from "react";
+import { useAuth } from "@/contexts/AuthContext";
 import { cn } from "@/lib/utils/cn";
 import type { IBaseModalProps } from "./BaseModal";
 import { BaseModal } from "./BaseModal";
@@ -133,6 +134,19 @@ export function ModalProvider(props: IModalProviderProps): React.ReactElement {
       },
     }));
   }, []);
+
+  // A modal belongs to the session that opened it. When the signed-in user changes (sign-out,
+  // another tab signing in as someone else) every open modal is closed, so a stale
+  // "Mark Complete" can never act on the new user's account (E2E-ROB-07).
+  const { user } = useAuth();
+  const uid = user?.uid ?? null;
+  const previousUid = useRef(uid);
+  useEffect(() => {
+    if (previousUid.current !== uid) {
+      previousUid.current = uid;
+      closeAllModals();
+    }
+  }, [uid, closeAllModals]);
 
   return (
     <ModalContext.Provider value={{ openModal, closeModal, closeAllModals, hideModal, showModal }}>

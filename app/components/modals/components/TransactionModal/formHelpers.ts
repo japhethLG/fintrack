@@ -38,7 +38,11 @@ export const completeTransactionSchema = yup.object({
   mode: yup.string().oneOf(["complete", "skip", "revert", "delete"]).required(),
   actualAmount: yup.string().when("mode", {
     is: "complete",
-    then: (schema) => schema.required("Amount is required"),
+    // a negative actual would CREDIT the account for an expense (UI-LIFE-09)
+    then: (schema) =>
+      schema
+        .required("Amount is required")
+        .test("non-negative", "Amount cannot be negative", (value) => !(parseFloat(value ?? "") < 0)),
     otherwise: (schema) => schema.optional(),
   }),
   actualDate: yup.string().when("mode", {
@@ -52,3 +56,15 @@ export const completeTransactionSchema = yup.object({
   category: yup.string().optional(),
   scheduledDate: yup.string().optional(),
 });
+
+/**
+ * What to send as `notes` when saving from this dialog. Only `undefined` means "leave the
+ * note alone"; an empty string CLEARS it. So a note the user emptied is sent as "" (it used
+ * to be dropped, which made a note impossible to remove: UI-LIFE-08), text is sent as typed,
+ * and an untouched empty field stays `undefined` so no empty note is invented.
+ */
+export const notesForSave = (typed: string | undefined, transaction: Transaction): string | undefined => {
+  const trimmed = (typed ?? "").trim();
+  if (trimmed !== "") return trimmed;
+  return transaction.notes ? "" : undefined;
+};

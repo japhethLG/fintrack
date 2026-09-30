@@ -221,16 +221,16 @@ describe("legacy profile without initialBalance (migrateToInitialBalance)", () =
   //   +20,000 income (Jan 2) and -2,000 expense (Jan 5) = +18,000 net.
   //   currentBalance 23,000 therefore implies a starting balance of 23,000 - 18,000 = 5,000.
   const legacy = {
-    profile: { currentBalance: 23_000, initialBalance: undefined },
+    // (no `balanceModelVersion`: a document written before the versioned balance model)
+    profile: { currentBalance: 23_000, initialBalance: undefined, balanceModelVersion: undefined },
     transactions: [
       makeCompletedTransaction({ id: "a", type: "income", projectedAmount: 20_000, scheduledDate: "2026-01-02" }),
       makeCompletedTransaction({ id: "b", type: "expense", projectedAmount: 2_000, scheduledDate: "2026-01-05" }),
     ],
   };
 
-  knownDefect(
-    "UI-BAL-11",
-    "the migration seeds initialBalance from a currentBalance that already includes history, so Settings shows a permanent mismatch (Path B)",
+  it(
+    "UI-BAL-11 — the migration seeds initialBalance from a currentBalance that already includes history, so Settings shows a permanent mismatch (Path B)",
     async () => {
       // observed: initialBalance 23,000 -> "Computed from 2 transactions: $41,000", banner quotes $18,000
       const app = await renderApp({ route: "/settings", today: "2026-01-15", seed: legacy });
@@ -245,9 +245,8 @@ describe("legacy profile without initialBalance (migrateToInitialBalance)", () =
     }
   );
 
-  knownDefect(
-    "UI-BAL-12",
-    "…and pressing Recalculate Balance on that mismatch writes a balance 18,000 too HIGH (Path B)",
+  it(
+    "UI-BAL-12 — …and pressing Recalculate Balance on that mismatch writes a balance 18,000 too HIGH (Path B)",
     async () => {
       // observed: users.currentBalance 23,000 -> 41,000 with one click
       const app = await renderApp({ route: "/settings", today: "2026-01-15", seed: legacy });
@@ -261,12 +260,16 @@ describe("legacy profile without initialBalance (migrateToInitialBalance)", () =
     }
   );
 
-  it("the migration writes exactly once (initialBalance + updatedAt) on the first login", async () => {
+  it("the migration writes exactly once (initialBalance + version stamp + updatedAt) on the first login", async () => {
     const app = await renderApp({ route: "/settings", today: "2026-01-15", seed: legacy });
     const writes = app.store.__opsFor("users");
     expect(writes).toHaveLength(1);
     expect(writes[0].op).toBe("update");
-    expect(Object.keys(writes[0].data ?? {}).sort()).toEqual(["initialBalance", "updatedAt"]);
+    // REWRITTEN (write-path stream, decision D1 "versioned" rebase): the one-time write also
+    // stamps `balanceModelVersion`, which is what makes it run once and lets later logins skip
+    // it. The old expectation listed only ["initialBalance", "updatedAt"].
+    expect(Object.keys(writes[0].data ?? {}).sort()).toEqual(["balanceModelVersion", "initialBalance", "updatedAt"]);
+    expect(writes[0].data?.balanceModelVersion).toBe(1);
     // the balance itself was not touched
     expect(storedBalance(app)).toBe(23_000);
   });
@@ -302,11 +305,47 @@ describe("legacy profile without initialBalance (migrateToInitialBalance)", () =
     expect(settingsComputed()).toBe(23_000);
   });
 
+  it("a profile the OLD migration already seeded (initialBalance = currentBalance, history double counted) is rebased once, keeping the balance", async () => {
+    // What production profiles that logged in before this fix look like: the old migration wrote
+    // initialBalance = currentBalance = 23,000 although 18,000 of history is already inside it.
+    // Rebase: initialBalance = 23,000 - (20,000 - 2,000) = 5,000; currentBalance stays 23,000.
+    const app = await renderApp({
+      ui: <Screens only={["settings", "dashboard"]} />,
+      today: "2026-01-15",
+      seed: { ...legacy, profile: { currentBalance: 23_000, initialBalance: 23_000, balanceModelVersion: undefined } },
+    });
+    expect(profileOf(app, "user-1")?.initialBalance).toBe(5_000);
+    expect(storedBalance(app)).toBe(23_000);
+    await expectBalanceInvariant(app, { balance: 23_000, completedCount: 2 }, "rebased");
+    // idempotent: a further login writes nothing
+    const opsAfterFirst = app.store.__ops.length;
+    await relogin(app);
+    expect(app.store.__ops.length).toBe(opsAfterFirst);
+  }, 40_000);
+
+  it("the rebase logs the discrepancy the old model had with console.info", async () => {
+    const { vi } = await import("vitest");
+    const info = vi.spyOn(console, "info").mockImplementation(() => {});
+    try {
+      await renderApp({
+        route: "/settings",
+        today: "2026-01-15",
+        seed: { ...legacy, profile: { currentBalance: 23_000, initialBalance: 23_000, balanceModelVersion: undefined } },
+      });
+      const line = info.mock.calls.map((c) => String(c[0])).find((m) => m.includes("rebased initialBalance"));
+      // old implied balance 23,000 + 18,000 = 41,000, i.e. 18,000 off the 23,000 the user sees
+      expect(line).toContain("23000 -> 5000");
+      expect(line).toContain("the old model implied 41000, off by 18000");
+    } finally {
+      info.mockRestore();
+    }
+  }, 40_000);
+
   it("a legacy profile with NO history migrates correctly: baseline = balance, nothing to reconcile", async () => {
     const app = await renderApp({
       ui: <Screens only={["settings", "dashboard", "forecast"]} />,
       today: "2026-01-15",
-      seed: { profile: { currentBalance: 640.25, initialBalance: undefined } },
+      seed: { profile: { currentBalance: 640.25, initialBalance: undefined, balanceModelVersion: undefined } },
     });
     expect(profileOf(app, "user-1")?.initialBalance).toBe(640.25);
     await expectBalanceInvariant(app, { balance: 640.25, completedCount: 0 }, "legacy, no history");

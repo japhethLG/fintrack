@@ -362,7 +362,7 @@ const CalendarView: React.FC = () => {
     }
   }, [viewMode, currentDate, dailyBalances, calendarWeekDays]);
 
-  const warningThreshold = userProfile?.preferences.defaultWarningThreshold ?? 0;
+  const warningThreshold = userProfile?.preferences?.defaultWarningThreshold ?? 0;
   const rangeClosing = periodBalance.closingBalance;
   const rangeStatus =
     rangeClosing !== null && rangeClosing !== undefined

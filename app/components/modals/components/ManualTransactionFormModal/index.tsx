@@ -30,14 +30,16 @@ const ManualTransactionFormModal: React.FC<IProps> = ({ modalData, closeModal })
   const isEditing = !!modalData?.transaction;
 
   const handleSubmit = async (
-    transactionData: Omit<Transaction, "id" | "userId" | "createdAt" | "updatedAt">
+    transactionData: Partial<Omit<Transaction, "id" | "userId" | "createdAt" | "updatedAt">>
   ) => {
     if (isEditing && modalData?.transaction) {
-      // Update existing manual transaction
+      // Update existing manual transaction (only the fields the user changed)
       await updateManualTransaction(modalData.transaction.id, transactionData);
     } else {
-      // Create new manual transaction
-      await addManualTransaction(transactionData);
+      // Create new manual transaction (the form hands over a complete one)
+      await addManualTransaction(
+        transactionData as Omit<Transaction, "id" | "userId" | "createdAt" | "updatedAt">
+      );
     }
 
     modalData?.onSuccess?.();

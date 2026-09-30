@@ -247,9 +247,8 @@ describe("mutation: pay the first Car Loan instalment (Mar 20, 564.88)", () => {
     }
   );
 
-  knownDefect(
-    "UI-DISP-39",
-    "Total Debt on the Expenses page does not drop after a loan instalment is paid",
+  it(
+    "UI-DISP-39 — Total Debt on the Expenses page does not drop after a loan instalment is paid",
     async () => {
       // paying 564.88 with 120.00 interest (12,000 x 1%) reduces the loan principal by 444.88.
       // observed: $14,200 before and after.  correct: 14,200 - 444.88 = 13,755.12

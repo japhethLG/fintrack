@@ -15,7 +15,8 @@ type EditMode = "none" | "displayName" | "email" | "password";
 
 // Form schemas
 const displayNameSchema = yup.object({
-  displayName: yup.string().required("Display name is required").min(1, "Display name is required"),
+  // trimmed BEFORE the required check: a name of spaces is no name (UI-BAL-41)
+  displayName: yup.string().trim().required("Display name is required"),
 });
 
 const emailSchema = yup.object({

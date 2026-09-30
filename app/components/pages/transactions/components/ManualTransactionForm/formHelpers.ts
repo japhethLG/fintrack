@@ -95,6 +95,41 @@ export const transformToTransactionData = (
 };
 
 /**
+ * The changes an EDIT makes: only what the user actually changed, compared with what the
+ * form showed when it opened. The form pre-fills "Amount" with the ACTUAL amount of a
+ * completed row and "Date" with its scheduled date, so sending every field back rewrote
+ * projectedAmount with the actual amount (losing the variance) and reset actualDate to the
+ * scheduled date on a note-only save (UI-LIFE-06/06b). `undefined` fields are left alone by
+ * the write path; an emptied note is sent as "" so it clears (UI-LIFE-08b).
+ */
+export const transformToTransactionUpdates = (
+  values: ManualTransactionFormValues,
+  initial: Transaction
+): Partial<Omit<Transaction, "id" | "userId" | "createdAt" | "updatedAt">> => {
+  const shown = getDefaultValues(initial);
+  const amount = parseFloat(values.amount);
+  const updates: Partial<Omit<Transaction, "id" | "userId" | "createdAt" | "updatedAt">> = {};
+
+  if (values.name.trim() !== shown.name) updates.name = values.name.trim();
+  if (values.type !== shown.type) updates.type = values.type;
+  if (values.category !== shown.category) updates.category = values.category;
+  if ((values.notes ?? "").trim() !== (shown.notes ?? "")) updates.notes = (values.notes ?? "").trim();
+
+  const amountChanged = amount !== parseFloat(shown.amount);
+  const dateChanged = values.scheduledDate !== shown.scheduledDate;
+  if (amountChanged) updates.projectedAmount = amount;
+  if (dateChanged) updates.scheduledDate = values.scheduledDate;
+  if (values.status !== shown.status) updates.status = values.status;
+
+  if (values.status === "completed") {
+    const becomingCompleted = initial.status !== "completed";
+    if (amountChanged || becomingCompleted) updates.actualAmount = amount;
+    if (dateChanged || becomingCompleted) updates.actualDate = values.scheduledDate;
+  }
+  return updates;
+};
+
+/**
  * Get smart default status based on selected date
  */
 export const getSmartStatus = (date: string): TransactionStatus => {

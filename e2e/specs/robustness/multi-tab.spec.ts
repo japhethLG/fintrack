@@ -6,7 +6,6 @@ const GYM = fixedExpense({ id: "r1", name: "Gym", amount: 50, startDate: "2026-0
 const seed = { user: userProfile({ currentBalance: 1000, initialBalance: 1000 }), expenseRules: [GYM] };
 
 test("completing the same occurrence from a stale second tab must not double-count", async ({ page, context }) => {
-  knownDefect("E2E-ROB-11", "second tab's still-open modal creates a second completed 'Gym' doc for r1_2026-03 (balance 900 vs 950 expected)");
   await seedAndLogin(page, seed, { path: "/calendar" });
   const tab2 = await context.newPage();
   await tab2.goto("/calendar");

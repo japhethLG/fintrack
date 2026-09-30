@@ -221,10 +221,6 @@ test.describe("drag a projected occurrence to another day", () => {
   });
 
   test("the same occurrence's other overrides (amount, notes) survive being moved", async ({ page }) => {
-    knownDefect(
-      "E2E-CAL-01",
-      "dragging an occurrence replaces its whole override with {scheduledDate}: a 650 amount override and its note are wiped (amount snaps back to the rule's 500)"
-    );
     await boot(page, {
       incomeSources: [payday({ occurrenceOverrides: { ...OTHER_OVERRIDES, "payday_2026-03": { amount: 650, notes: "bonus" } } })],
     });
@@ -335,10 +331,6 @@ test.describe("complete and revert a rescheduled occurrence", () => {
   });
 
   test("weekly: reverting a completed, moved occurrence keeps its custom date", async ({ page }) => {
-    knownDefect(
-      "E2E-CAL-02",
-      "revert can only rebuild the 'expected' date for monthly/daily ids; for a weekly rule the moved date is dropped and the item snaps back to its pattern date"
-    );
     // Weekly income on Fridays (dayOfWeek 5), start 3/13: Fridays 3/13, 3/20, 3/27. ISO weeks W11, W12, W13.
     await boot(page, {
       incomeSources: [
@@ -367,10 +359,6 @@ test.describe("complete and revert a rescheduled occurrence", () => {
   });
 
   test("complete + revert of a NEVER-moved monthly occurrence leaves no override behind", async ({ page }) => {
-    knownDefect(
-      "E2E-CAL-04",
-      "revert rebuilds the expected date from startDate's day-of-month (1) instead of dayOfMonth (13), so it writes a spurious {scheduledDate} override for an item nobody moved"
-    );
     // Rule starts on the 1st but pays on the 13th: the March item sits on its pattern date (3/13).
     await boot(page, { incomeSources: [payday({ startDate: "2026-03-01", occurrenceOverrides: {} })] });
     await openTxnFromCell(page, monthCell(page, "2026-03", "2026-03-13"), "Payday");
@@ -379,7 +367,11 @@ test.describe("complete and revert a rescheduled occurrence", () => {
     await revertInDialog(page);
     await expect.poll(() => storedTxns(page)).toEqual([]);
     await expect(monthCell(page, "2026-03", "2026-03-13").getByText("Payday")).toBeVisible();
-    expect(await overridesOf(page, "income_sources", "payday")).toBeUndefined(); // nothing was moved => nothing to remember
+    // nothing was moved => nothing to remember. REWRITTEN (write-path stream): was
+    // `toBeUndefined()`, but this scenario seeds `occurrenceOverrides: {}` and completing the
+    // occurrence deletes its key from that map (Firestore's deleteField leaves the empty map),
+    // so the stored value is `{}`, never undefined. The intent is "no entries", asserted exactly.
+    expect(Object.keys((await overridesOf(page, "income_sources", "payday")) ?? {})).toEqual([]);
   });
 
   test("an occurrence moved into the next month keeps its own identity when completed there", async ({ page }) => {

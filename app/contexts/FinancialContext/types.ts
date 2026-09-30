@@ -44,6 +44,18 @@ export interface FinancialContextValue {
 
   // Transactions (merged: stored + computed projections)
   transactions: Transaction[];
+  /**
+   * Every STORED row of the user (manual rows of any status, completed and skipped rule
+   * rows). The merged `transactions` list is windowed and mixes in projections; money that
+   * is already realized (and what a reset deletes) must be counted from THIS list.
+   */
+  storedTransactions: Transaction[];
+  /**
+   * The realized ledger: how many stored rows are completed and their signed sum.
+   * `initialBalance + ledger.sum` is the balance the profile's `currentBalance` must equal
+   * (overdue, still-projected rows do not count until they are completed: decision D5).
+   */
+  ledger: { completedCount: number; sum: number };
   addManualTransaction: (
     transaction: Omit<Transaction, "id" | "userId" | "createdAt" | "updatedAt">
   ) => Promise<Transaction>;

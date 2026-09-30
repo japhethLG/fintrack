@@ -65,8 +65,10 @@ describe("transient messages", () => {
 
   it("a failed balance write is reported and the stored balance is unchanged", async () => {
     const app = await renderApp({ route: "/settings", today: TODAY, seed: { profile: { currentBalance: 700, initialBalance: 700 } } });
-    const { updateDoc } = await import("firebase/firestore");
-    (updateDoc as unknown as import("vitest").Mock).mockRejectedValueOnce(new Error("Write rejected"));
+    // REWRITTEN (write-path stream): the override is now one transaction, which does not go
+    // through `updateDoc`, so the rejection is injected at the store (commit-time, nothing
+    // applied) instead of by mocking updateDoc. The behaviour asserted is unchanged.
+    app.store.__injectFault({ collection: "users", error: new Error("Write rejected") });
     await app.user.click(screen.getByRole("button", { name: /Override Current Balance/ }));
     await app.user.type(screen.getByLabelText("Override Current Balance"), "1");
     await app.user.click(screen.getByRole("button", { name: "Override Balance" }));
@@ -77,9 +79,8 @@ describe("transient messages", () => {
 });
 
 describe("wording", () => {
-  knownDefect(
-    "UI-BAL-45",
-    "'Computed from 1 transactions' (singular count, plural noun)",
+  it(
+    "UI-BAL-45 — 'Computed from 1 transactions' (singular count, plural noun)",
     async () => {
       await renderApp({
         route: "/settings",
@@ -96,9 +97,8 @@ describe("wording", () => {
 });
 
 describe("the Preferences form and live profile updates", () => {
-  knownDefect(
-    "UI-BAL-46",
-    "any profile update (here: a balance override) silently throws away unsaved Preferences edits",
+  it(
+    "UI-BAL-46 — any profile update (here: a balance override) silently throws away unsaved Preferences edits",
     async () => {
       // observed: Currency EUR (unsaved) snaps back to USD and 'Save Preferences' vanishes after an override
       const app = await renderApp({ ui: <Screens only={["settings"]} />, today: TODAY });
@@ -131,9 +131,8 @@ describe("the Preferences form and live profile updates", () => {
 });
 
 describe("profiles written by earlier versions of the app", () => {
-  knownDefect(
-    "UI-BAL-47",
-    "a profile document without a `preferences` map crashes the whole app as soon as any transaction exists",
+  it(
+    "UI-BAL-47 — a profile document without a `preferences` map crashes the whole app as soon as any transaction exists",
     async () => {
       // observed: TypeError: Cannot read properties of undefined (reading 'defaultWarningThreshold')
       // (useDailyBalances / Calendar dereference profile.preferences unguarded, while Settings and
