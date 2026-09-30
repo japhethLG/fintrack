@@ -449,9 +449,27 @@ describe("invariant: the Settings balance controls", () => {
     await expectBalanceInvariant(app, { balance: 10_000, completedCount: 0 }, "after recalc");
   }, 60_000);
 
-  it.todo(
-    "DECISION: should an override adjust initialBalance (baseline shifts), record an 'adjustment' ledger entry, or stay a bare stored number that Recalculate can discard?"
-  );
+  it("DECIDED: an override shifts the baseline (no adjustment entry), so Recalculate cannot discard it", async () => {
+    // Resolves the former DECISION todo. History: +500 income completed, initial 1,000 => current 1,500.
+    // Override to 2,000: initial = 2,000 - 500 = 1,500; nothing is added to transactions.
+    const app = await renderApp({
+      ui: <Screens only={["settings"]} />,
+      today: TODAY,
+      seed: {
+        profile: { currentBalance: 1_500, initialBalance: 1_000 },
+        transactions: [makeManualTransaction({ id: "i1", type: "income", status: "completed", projectedAmount: 500, actualAmount: 500, scheduledDate: "2026-01-05", actualDate: "2026-01-05" })],
+      },
+    });
+    const settings = within(screenEl("settings"));
+    await app.user.click(settings.getByRole("button", { name: /Override Current Balance/ }));
+    await app.user.type(settings.getByLabelText("Override Current Balance"), "2000");
+    await app.user.click(settings.getByRole("button", { name: "Override Balance" }));
+    await settings.findByText("Balance updated successfully!");
+    await app.settle();
+    expect(app.store.__get<{ initialBalance: number }>("users", app.uid)?.initialBalance).toBe(1_500);
+    expect(app.store.__count("transactions")).toBe(1);
+    await expectBalanceInvariant(app, { balance: 2_000, completedCount: 1 }, "override with history");
+  }, 60_000);
 
   it("the mismatch banner appears only for differences above one cent and quotes the absolute difference", async () => {
     // current 10,000.005 vs computed 10,000: half a cent -> no banner

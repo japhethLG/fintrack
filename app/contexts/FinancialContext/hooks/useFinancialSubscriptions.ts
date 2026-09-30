@@ -1,4 +1,4 @@
-import { useEffect, Dispatch, SetStateAction } from "react";
+import { useEffect, useRef, Dispatch, SetStateAction } from "react";
 import { User } from "firebase/auth";
 import { UserProfile, IncomeSource, ExpenseRule, Transaction, Alert } from "@/lib/types";
 import {
@@ -36,10 +36,17 @@ export function useFinancialSubscriptions({
   setIsLoading,
   setIsInitialized,
 }: UseFinancialSubscriptionsParams) {
+  // The uid whose data is currently in state. When it changes (user A -> B) A's lists are dropped
+  // BEFORE B's are subscribed, so a first render for B can never pair B's profile with A's
+  // transactions (the realized ledger and the balance would briefly disagree). A refreshed auth
+  // object for the SAME uid (token refresh) keeps the data on screen.
+  const loadedUid = useRef<string | null>(null);
+
   useEffect(() => {
     if (authLoading) return;
 
     if (!user) {
+      loadedUid.current = null;
       // Reset state on logout
       setUserProfile(null);
       setIncomeSources([]);
@@ -49,6 +56,15 @@ export function useFinancialSubscriptions({
       setIsLoading(false);
       setIsInitialized(true);
       return;
+    }
+
+    if (loadedUid.current !== user.uid) {
+      loadedUid.current = user.uid;
+      setUserProfile(null);
+      setIncomeSources([]);
+      setExpenseRules([]);
+      setStoredTransactions([]);
+      setAlerts([]);
     }
 
     setIsLoading(true);

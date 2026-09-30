@@ -216,7 +216,7 @@ describe("messages and copy around the reset", () => {
         seed: { ...world(), profile: { currentBalance: 9_000, initialBalance: 10_000, preferences: { currency: "PHP" } } },
       });
       const dialog = await openSelectiveReset(app);
-      const warning = within(dialog).getByText(/Transactions and balance history resets will also set your balance to/);
+      const warning = within(dialog).getByText(/Resetting transactions will also set your balance to/);
       expect(warning.textContent).toContain("₱0");
       expect(within(dialog).getByText(/Everything below \(resets balance to/).textContent).toContain("₱0");
     },
@@ -231,7 +231,7 @@ describe("messages and copy around the reset", () => {
         route: "/settings",
         seed: { profile: { currentBalance: 1, initialBalance: 1, preferences: { currency: "PHP" } } },
       });
-      const blurb = screen.getByText(/Balance resets to .* when transactions or balance history are removed/);
+      const blurb = screen.getByText(/Balance resets to .* when transactions are removed/);
       expect(blurb.textContent).toContain("₱0");
     }
   );
