@@ -64,7 +64,9 @@ describe("wizard -> persisted rule -> calendar month summary (January 2026)", ()
       });
       expect(d.previewCards()[0]).toBe(d.label("2026-01-05")); // precondition: the user was promised Jan 5
       const doc = await d.finishExpense(app);
-      expect(doc.scheduleConfig).toEqual({}); // precondition: the persisted cause
+      // REWRITTEN precondition: it pinned the persisted CAUSE ({} -> the engine billed the 1st). One shared
+      // buildScheduleConfig now persists the start date's own day and month: Mon Jan 5 -> day 5, January (0).
+      expect(doc.scheduleConfig).toEqual({ dayOfMonth: 5, monthOfYear: 0 });
       await onCalendar(app, { expenseRules: [doc as never] });
       expect(moneyNear("Expenses", { occurrence: 0 })).toBe(-300);
     }

@@ -16,6 +16,9 @@ import { INCOME_CATEGORIES } from "@/lib/constants";
 import { useCurrency } from "@/lib/hooks/useCurrency";
 import FormStepIndicator from "../../../expenses/components/ExpenseRuleForm/components/FormStepIndicator";
 import SchedulePreview from "../../../expenses/components/ExpenseRuleForm/components/SchedulePreview";
+import ValidationIssues from "../../../expenses/components/ExpenseRuleForm/components/ValidationIssues";
+import { useFollowStartDate } from "@/lib/hooks/useFollowStartDate";
+import { ordinal } from "@/lib/logic/ruleSchedule";
 import {
   INCOME_SOURCE_TYPES,
   FREQUENCY_OPTIONS,
@@ -26,6 +29,8 @@ import {
   incomeSourceSchema,
   getDefaultValues,
   buildScheduleConfig,
+  buildIncomePayload,
+  collectIncomeIssues,
   type IncomeSourceFormValues,
 } from "./formHelpers";
 import { cn } from "@/lib/utils/cn";
@@ -77,7 +82,7 @@ const IncomeSourceForm: React.FC<IProps> = ({
 
   const methods = useForm<IncomeSourceFormValues>({
     defaultValues: getDefaultValues(initialData),
-    resolver: yupResolver(incomeSourceSchema) as Resolver<IncomeSourceFormValues>,
+    resolver: yupResolver(incomeSourceSchema) as unknown as Resolver<IncomeSourceFormValues>,
     mode: "onChange",
   });
 
@@ -101,9 +106,28 @@ const IncomeSourceForm: React.FC<IProps> = ({
   const name = watch("name");
   const isVariableAmount = watch("isVariableAmount");
   const category = watch("category");
-  const dayOfMonth = watch("dayOfMonth");
+
+  // Day of Week / Day of Month follow the start date until the user sets them (an edit keeps the stored ones).
+  useFollowStartDate({
+    startDate,
+    implicit: {
+      dayOfMonth: initialData?.dayOfMonth === undefined,
+      dayOfWeek: initialData?.dayOfWeek === undefined,
+    },
+    get: () => methods.getValues(),
+    set: (patch) => {
+      if (patch.dayOfMonth !== undefined) setValue("dayOfMonth", patch.dayOfMonth);
+      if (patch.dayOfWeek !== undefined) setValue("dayOfWeek", patch.dayOfWeek);
+    },
+  });
 
   const totalSteps = 4;
+
+  // Everything that must be fixed before this source can be saved. It gates the Schedule step's Continue
+  // and the Create/Save button.
+  const allValues = watch() as IncomeSourceFormValues;
+  const issues = collectIncomeIssues(allValues);
+  const gatesOnIssues = step >= 3;
 
   // Get fields for current step validation
   const currentStepFields = useMemo(() => getFieldsForStep(step), [step]);
@@ -127,8 +151,8 @@ const IncomeSourceForm: React.FC<IProps> = ({
       }
       return !!value;
     });
-    return allFieldsValid && !hasStepErrors;
-  }, [watchedValues, currentStepFields, hasStepErrors]); // eslint-disable-line react-hooks/exhaustive-deps
+    return allFieldsValid && !hasStepErrors && !(gatesOnIssues && issues.length > 0);
+  }, [watchedValues, currentStepFields, hasStepErrors, gatesOnIssues, issues.length]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Validate current step fields before proceeding
   const validateAndProceed = useCallback(async () => {
@@ -160,26 +184,16 @@ const IncomeSourceForm: React.FC<IProps> = ({
 
   const handleSubmit = async (values: IncomeSourceFormValues) => {
     setError(null);
+
+    const blocking = collectIncomeIssues(values);
+    if (blocking.length > 0) {
+      setError(blocking[0].message);
+      return;
+    }
+
     setIsSubmitting(true);
-
     try {
-      const formData: IncomeSourceFormData = {
-        name: values.name.trim(),
-        sourceType: values.sourceType,
-        amount: parseFloat(values.amount),
-        isVariableAmount: values.isVariableAmount,
-        frequency: values.frequency,
-        startDate: values.startDate,
-        endDate: values.hasEndDate ? values.endDate : undefined,
-        scheduleConfig: buildScheduleConfig(values),
-        weekendAdjustment: values.weekendAdjustment,
-        category: values.category,
-        notes: values.notes?.trim() || undefined,
-        color: values.color,
-        isActive: true,
-      };
-
-      await onSubmit(formData);
+      await onSubmit(buildIncomePayload(values));
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to save income source");
     } finally {
@@ -198,7 +212,11 @@ const IncomeSourceForm: React.FC<IProps> = ({
   const categoryOptions = INCOME_CATEGORIES.map((c) => ({ value: c, label: c }));
 
   return (
-    <Form methods={methods} onSubmit={handleSubmit}>
+    // Enter inside an input submits the <form>; only the last step may save
+    <Form
+      methods={methods}
+      onSubmit={(values) => (step === totalSteps ? handleSubmit(values) : undefined)}
+    >
       <div className="space-y-6">
         <FormStepIndicator currentStep={step} totalSteps={totalSteps} />
 
@@ -330,10 +348,12 @@ const IncomeSourceForm: React.FC<IProps> = ({
                         key={day}
                         className="bg-primary/20 text-primary px-3 py-1 rounded-lg border border-primary/30 flex items-center gap-2"
                       >
-                        {day}th
+                        <span>{ordinal(day)}</span>
                         <Icon
                           name="close"
                           size="sm"
+                          role="button"
+                          aria-label={`Remove ${ordinal(day)}`}
                           className="cursor-pointer hover:text-white"
                           onClick={() => handleRemoveSpecificDay(day)}
                         />
@@ -385,7 +405,9 @@ const IncomeSourceForm: React.FC<IProps> = ({
                   }))}
                 />
                 <p className="text-xs text-gray-500 mt-1">
-                  What happens if a payment date falls on a weekend?
+                  {frequency === "daily"
+                    ? "A daily schedule pays every day, so this has no effect."
+                    : "What happens if a payment date falls on a weekend?"}
                 </p>
               </div>
             </div>
@@ -395,10 +417,10 @@ const IncomeSourceForm: React.FC<IProps> = ({
               startDate={startDate}
               endDate={endDate}
               hasEndDate={hasEndDate}
-              specificDays={specificDays}
               weekendAdjustment={weekendAdjustment}
-              dayOfMonth={dayOfMonth || undefined}
+              scheduleConfig={buildScheduleConfig(allValues)}
             />
+            <ValidationIssues issues={issues} />
           </div>
         )}
 
@@ -462,6 +484,8 @@ const IncomeSourceForm: React.FC<IProps> = ({
               label="Notes (Optional)"
               placeholder="Any additional notes..."
             />
+
+            <ValidationIssues issues={issues} />
 
             {error && (
               <div className="p-4 bg-danger/20 border border-danger/30 rounded-lg text-danger">

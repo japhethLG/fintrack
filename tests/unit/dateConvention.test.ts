@@ -119,41 +119,7 @@ interface Allowed {
   reason: string;
 }
 
-const FORM_STREAM =
-  "owned by a later expense-form work stream (ExpenseRuleForm is out of scope for the engine-dates stream); remove when the form uses getTodayKey()/parseDate and the engine for its preview";
-const FORM = "components/pages/expenses/components/ExpenseRuleForm";
-
 const ALLOWED: Allowed[] = [
-  {
-    file: `${FORM}/components/SchedulePreview.tsx`,
-    text: "dates.push(new Date(date));",
-    reason: FORM_STREAM + " (clones a Date)",
-  },
-  {
-    file: `${FORM}/components/SchedulePreview.tsx`,
-    text: "addOccurrence(new Date(date));",
-    reason: FORM_STREAM + " (clones a Date)",
-  },
-  {
-    file: `${FORM}/components/SchedulePreview.tsx`,
-    text: "monthCursor.setMonth(monthCursor.getMonth() + 1);",
-    reason: FORM_STREAM + " (the preview re-implements stepping; it should call the engine)",
-  },
-  {
-    file: `${FORM}/components/SchedulePreview.tsx`,
-    text: "current.setMonth(current.getMonth() + 3);",
-    reason: FORM_STREAM + " (the preview re-implements stepping; it should call the engine)",
-  },
-  {
-    file: `${FORM}/formHelpers.ts`,
-    text: 'startDate: initialData?.startDate || new Date().toISOString().split("T")[0],',
-    reason: FORM_STREAM + " (UTC 'today' default, UI-RULE-30)",
-  },
-  {
-    file: `${FORM}/formHelpers.ts`,
-    text: 'loanStartDate: initialData?.loanStartDate || new Date().toISOString().split("T")[0],',
-    reason: FORM_STREAM + " (UTC 'today' default)",
-  },
   {
     file: "lib/logic/creditCardCalculator/payoffCalculator.ts",
     text: "date: new Date(startDate),",

@@ -26,7 +26,13 @@ const ExpenseTypeStep: React.FC = () => {
               expenseType === type.value && "border-primary bg-primary/10"
             )}
             padding="sm"
-            onClick={() => setValue("expenseType", type.value as ExpenseType)}
+            onClick={() => {
+              setValue("expenseType", type.value as ExpenseType);
+              // loans, cards and installment plans are always monthly, whatever was picked before
+              if (["cash_loan", "credit_card", "installment"].includes(type.value)) {
+                setValue("frequency", "monthly");
+              }
+            }}
           >
             <h4 className="font-bold text-white">{type.label}</h4>
             <p className="text-xs text-gray-400 mt-1">{type.description}</p>

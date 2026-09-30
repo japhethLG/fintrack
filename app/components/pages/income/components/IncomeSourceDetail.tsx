@@ -7,6 +7,7 @@ import { cn } from "@/lib/utils/cn";
 import { useCurrency } from "@/lib/hooks/useCurrency";
 import { SOURCE_TYPE_ICONS, FREQUENCY_LABELS } from "../constants";
 import { parseDate } from "@/lib/utils/dateUtils";
+import { describeSchedule } from "@/lib/logic/ruleSchedule";
 
 interface IProps {
   source: IncomeSource;
@@ -15,36 +16,12 @@ interface IProps {
   onToggleActive: (isActive: boolean) => void;
 }
 
-const getOrdinalSuffix = (n: number) => {
-  const s = ["th", "st", "nd", "rd"];
-  const v = n % 100;
-  return s[(v - 20) % 10] || s[v] || s[0];
-};
-
-const getDayName = (day: number) => {
-  return ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"][day];
-};
-
 const IncomeSourceDetail: React.FC<IProps> = ({ source, onEdit, onDelete, onToggleActive }) => {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const { formatCurrency } = useCurrency();
 
-  const getScheduleDescription = () => {
-    switch (source.frequency) {
-      case "semi-monthly":
-        const days = source.scheduleConfig.specificDays || [];
-        return `On the ${days.map((d) => `${d}${getOrdinalSuffix(d)}`).join(" and ")} of each month`;
-      case "weekly":
-        return `Every ${getDayName(source.scheduleConfig.dayOfWeek || 0)}`;
-      case "bi-weekly":
-        return `Every 2 weeks on ${getDayName(source.scheduleConfig.dayOfWeek || 0)}`;
-      case "monthly":
-        const dayOfMonth = source.scheduleConfig.dayOfMonth || 1;
-        return `On the ${dayOfMonth}${getOrdinalSuffix(dayOfMonth)} of each month`;
-      default:
-        return FREQUENCY_LABELS[source.frequency];
-    }
-  };
+  const getScheduleDescription = () =>
+    describeSchedule(source.frequency, source.scheduleConfig, source.startDate, FREQUENCY_LABELS[source.frequency]);
 
   return (
     <Card padding="lg">

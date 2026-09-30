@@ -14,6 +14,7 @@ import {
 } from "@/components/common";
 import { useCurrency } from "@/lib/hooks/useCurrency";
 import IncomeSourceForm from "./components/IncomeSourceForm";
+import { incomeSourceToFormValues } from "./components/IncomeSourceForm/formHelpers";
 import IncomeSourceCard from "./components/IncomeSourceCard";
 import IncomeSourceDetail from "./components/IncomeSourceDetail";
 import { getMonthlyMultiplier, INCOME_FILTER_OPTIONS } from "./constants";
@@ -159,27 +160,7 @@ const IncomeManager: React.FC = () => {
       {showForm ? (
         <Card padding="lg">
           <IncomeSourceForm
-            initialData={
-              editingSource
-                ? {
-                    name: editingSource.name,
-                    sourceType: editingSource.sourceType,
-                    amount: editingSource.amount.toString(),
-                    isVariableAmount: editingSource.isVariableAmount,
-                    frequency: editingSource.frequency,
-                    startDate: editingSource.startDate,
-                    endDate: editingSource.endDate || "",
-                    hasEndDate: !!editingSource.endDate,
-                    weekendAdjustment: editingSource.weekendAdjustment,
-                    specificDays: editingSource.scheduleConfig.specificDays || [15, 30],
-                    dayOfWeek: editingSource.scheduleConfig.dayOfWeek ?? 0,
-                    dayOfMonth: editingSource.scheduleConfig.dayOfMonth ?? 1,
-                    category: editingSource.category,
-                    notes: editingSource.notes || "",
-                    color: editingSource.color || "#22c55e",
-                  }
-                : undefined
-            }
+            initialData={editingSource ? incomeSourceToFormValues(editingSource) : undefined}
             onSubmit={editingSource ? handleEditSource : handleCreateSource}
             onCancel={() => {
               setShowForm(false);

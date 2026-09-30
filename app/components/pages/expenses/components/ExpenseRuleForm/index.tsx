@@ -6,7 +6,9 @@ import { yupResolver } from "@hookform/resolvers/yup";
 import { Button } from "@/components/common";
 import { Form } from "@/components/formElements";
 import { ExpenseRuleFormData } from "@/lib/types";
+import { useFollowStartDate } from "@/lib/hooks/useFollowStartDate";
 import FormStepIndicator from "./components/FormStepIndicator";
+import ValidationIssues from "./components/ValidationIssues";
 import ExpenseTypeStep from "./steps/ExpenseTypeStep";
 import DetailsStep from "./steps/DetailsStep";
 import ScheduleStep from "./steps/ScheduleStep";
@@ -14,10 +16,9 @@ import ReviewStep from "./steps/ReviewStep";
 import {
   expenseRuleSchema,
   getDefaultValues,
-  buildScheduleConfig,
-  calculateLoanPlan,
-  calculateInstallmentAmount,
-  calculateCreditCardPayment,
+  buildExpenseRulePayload,
+  collectExpenseIssues,
+  SOFT_ERROR_TYPES,
   type ExpenseRuleFormValues,
 } from "./formHelpers";
 
@@ -25,7 +26,10 @@ import {
 // STEP FIELD MAPPING
 // ============================================================================
 
-const getFieldsForStep = (step: number, expenseType: string): (keyof ExpenseRuleFormValues)[] => {
+type Field = keyof ExpenseRuleFormValues;
+
+/** Fields that must be filled in before a step's Continue is enabled. */
+const getFieldsForStep = (step: number, expenseType: string): Field[] => {
   switch (step) {
     case 1:
       return ["expenseType"];
@@ -34,7 +38,7 @@ const getFieldsForStep = (step: number, expenseType: string): (keyof ExpenseRule
         return ["name", "loanPrincipal", "loanInterestRate", "loanTermMonths", "category"];
       }
       if (expenseType === "credit_card") {
-        return ["name", "creditBalance", "creditApr", "category"];
+        return ["name", "creditBalance", "creditApr", "creditDueDate", "category"];
       }
       if (expenseType === "installment") {
         return ["name", "installmentTotal", "installmentCount", "category"];
@@ -50,6 +54,24 @@ const getFieldsForStep = (step: number, expenseType: string): (keyof ExpenseRule
       return [];
   }
 };
+
+/** Optional fields whose validation errors also stop a step's Continue (when they are not "soft"). */
+const OPTIONAL_CHECKED: Record<string, Field[]> = {
+  cash_loan: ["loanCurrentBalance"],
+  credit_card: [
+    "creditLimit",
+    "creditMinPaymentPercent",
+    "creditMinPaymentFloor",
+    "creditStatementDate",
+    "creditFixedPayment",
+  ],
+  installment: ["installmentInterestRate"],
+};
+
+const getCheckedFields = (step: number, expenseType: string): Field[] => [
+  ...getFieldsForStep(step, expenseType),
+  ...(step === 2 ? (OPTIONAL_CHECKED[expenseType] ?? []) : []),
+];
 
 const isNumericField = (field: string): boolean => {
   return ["amount", "loanPrincipal", "creditBalance", "installmentTotal"].includes(field);
@@ -82,19 +104,35 @@ const ExpenseRuleForm: React.FC<IProps> = ({
 
   const methods = useForm<ExpenseRuleFormValues>({
     defaultValues: getDefaultValues(initialData),
-    resolver: yupResolver(expenseRuleSchema) as Resolver<ExpenseRuleFormValues>,
+    resolver: yupResolver(expenseRuleSchema) as unknown as Resolver<ExpenseRuleFormValues>,
     mode: "onChange",
   });
 
   // Destructure formState properly to enable Proxy subscription
   const {
     watch,
+    setValue,
     trigger,
     formState: { errors },
   } = methods;
 
   // Watch expense type for conditional logic
   const expenseType = watch("expenseType");
+  const startDate = watch("startDate");
+
+  // Day of Week / Day of Month follow the start date until the user sets them (an edit keeps the stored ones).
+  useFollowStartDate({
+    startDate,
+    implicit: {
+      dayOfMonth: initialData?.dayOfMonth === undefined,
+      dayOfWeek: initialData?.dayOfWeek === undefined,
+    },
+    get: () => methods.getValues(),
+    set: (patch) => {
+      if (patch.dayOfMonth !== undefined) setValue("dayOfMonth", patch.dayOfMonth);
+      if (patch.dayOfWeek !== undefined) setValue("dayOfWeek", patch.dayOfWeek);
+    },
+  });
 
   // Calculate step count based on expense type
   const totalSteps = useMemo(() => {
@@ -112,20 +150,29 @@ const ExpenseRuleForm: React.FC<IProps> = ({
     return 3;
   }, [expenseType]);
 
-  // Get fields for current step validation
-  const currentStepFields = useMemo(() => getFieldsForStep(step, expenseType), [step, expenseType]);
+  // Fields that gate / validate the current step
+  const requiredFields = useMemo(() => getFieldsForStep(step, expenseType), [step, expenseType]);
+  const checkedFields = useMemo(() => getCheckedFields(step, expenseType), [step, expenseType]);
 
-  // Subscribe to form changes to update button state reactively
-  const watchedValues = watch(currentStepFields);
+  // Subscribe to every value so the button state and the issue list update as the user types
+  const allValues = watch() as ExpenseRuleFormValues;
 
-  // Check if current step fields have errors
-  const hasStepErrors = currentStepFields.some((field) => !!errors[field]);
+  // Everything that must be fixed before this rule can be saved. It gates the Schedule step's Continue and
+  // the final Create/Save button; earlier steps only show the problems inline.
+  const issues = collectExpenseIssues(allValues);
+  const gatesOnIssues = step >= 3 || step === totalSteps;
 
-  // Check if user can proceed to next step (recomputes when watchedValues change)
-  const canProceed = useMemo(() => {
-    const values = methods.getValues();
-    const allFieldsValid = currentStepFields.every((field) => {
-      const value = values[field];
+  // Hard errors on the step's fields (soft ones show inline but only block from the Schedule step on)
+  const isHardError = (field: Field) => {
+    const fieldError = errors[field];
+    return !!fieldError && !SOFT_ERROR_TYPES.has(String(fieldError.type));
+  };
+  const hasStepErrors = checkedFields.some(isHardError);
+
+  // Check if user can proceed to next step (recomputes as values change)
+  const canProceed = (() => {
+    const allFieldsValid = requiredFields.every((field) => {
+      const value = allValues[field];
       if (isNumericField(field)) {
         return value && parseFloat(value as string) > 0;
       }
@@ -134,124 +181,34 @@ const ExpenseRuleForm: React.FC<IProps> = ({
       }
       return !!value;
     });
-    return allFieldsValid && !hasStepErrors;
-  }, [watchedValues, currentStepFields, hasStepErrors]); // eslint-disable-line react-hooks/exhaustive-deps
+    return allFieldsValid && !hasStepErrors && !(gatesOnIssues && issues.length > 0);
+  })();
 
   // Validate current step fields before proceeding
   const validateAndProceed = useCallback(async () => {
-    const isValid = await trigger(currentStepFields);
-    if (isValid && step < totalSteps) {
+    await trigger(checkedFields);
+    const fresh = methods.formState.errors;
+    const blocked = checkedFields.some((field) => {
+      const fieldError = fresh[field];
+      return !!fieldError && !SOFT_ERROR_TYPES.has(String(fieldError.type));
+    });
+    if (!blocked && step < totalSteps) {
       setStep(step + 1);
     }
-  }, [trigger, currentStepFields, step, totalSteps]);
+  }, [trigger, checkedFields, methods, step, totalSteps]);
 
   const handleSubmit = async (values: ExpenseRuleFormValues) => {
     setError(null);
+
+    const blocking = collectExpenseIssues(values);
+    if (blocking.length > 0) {
+      setError(blocking[0].message);
+      return;
+    }
+
     setIsSubmitting(true);
-
     try {
-      // Calculate final amount based on expense type
-      let finalAmount = parseFloat(values.amount) || 0;
-
-      if (
-        values.expenseType === "cash_loan" &&
-        values.loanPrincipal &&
-        values.loanInterestRate &&
-        values.loanTermMonths
-      ) {
-        // The saved payment is the same number the Details step and the projections use:
-        // computed from the current balance and term by the loan's calculation type.
-        finalAmount = calculateLoanPlan(values)?.payment ?? 0;
-      } else if (values.expenseType === "credit_card" && values.creditBalance) {
-        // Use fixed payment amount if strategy is "fixed", otherwise calculate minimum
-        if (values.creditPaymentStrategy === "fixed" && values.creditFixedPayment) {
-          finalAmount = parseFloat(values.creditFixedPayment);
-        } else if (values.creditPaymentStrategy === "full_balance") {
-          finalAmount = parseFloat(values.creditBalance);
-        } else {
-          finalAmount = calculateCreditCardPayment(
-            parseFloat(values.creditBalance),
-            parseFloat(values.creditApr),
-            parseFloat(values.creditMinPaymentPercent),
-            parseFloat(values.creditMinPaymentFloor) || 0,
-            values.creditMinPaymentMethod
-          );
-        }
-      } else if (
-        values.expenseType === "installment" &&
-        values.installmentTotal &&
-        values.installmentCount
-      ) {
-        finalAmount = calculateInstallmentAmount(
-          parseFloat(values.installmentTotal),
-          parseInt(values.installmentCount),
-          values.installmentHasInterest,
-          values.installmentInterestRate ? parseFloat(values.installmentInterestRate) : undefined
-        );
-      }
-
-      const formData: ExpenseRuleFormData = {
-        name: values.name.trim(),
-        expenseType: values.expenseType,
-        category: values.category,
-        amount: finalAmount,
-        isVariableAmount: values.expenseType === "variable" ? true : values.isVariableAmount,
-        frequency: values.expenseType === "one-time" ? "one-time" : values.frequency,
-        startDate: values.startDate,
-        endDate: values.hasEndDate ? values.endDate : undefined,
-        scheduleConfig: buildScheduleConfig(values),
-        weekendAdjustment: values.weekendAdjustment,
-        notes: values.notes?.trim() || undefined,
-        isPriority: values.isPriority,
-        isActive: true,
-      };
-
-      // Add type-specific config
-      if (values.expenseType === "cash_loan" && finalAmount > 0) {
-        formData.loanConfig = {
-          principalAmount: parseFloat(values.loanPrincipal),
-          currentBalance: parseFloat(values.loanCurrentBalance || values.loanPrincipal),
-          interestRate: parseFloat(values.loanInterestRate),
-          termMonths: parseInt(values.loanTermMonths),
-          monthlyPayment: finalAmount,
-          calculationType: values.loanCalculationType,
-          loanStartDate: values.loanStartDate,
-          firstPaymentDate: values.startDate,
-          paymentsMade: 0,
-        };
-      }
-
-      if (values.expenseType === "credit_card") {
-        formData.creditConfig = {
-          creditLimit: parseFloat(values.creditLimit),
-          currentBalance: parseFloat(values.creditBalance),
-          apr: parseFloat(values.creditApr),
-          minimumPaymentPercent: parseFloat(values.creditMinPaymentPercent),
-          minimumPaymentFloor: parseFloat(values.creditMinPaymentFloor),
-          minimumPaymentMethod: values.creditMinPaymentMethod,
-          statementDate: parseInt(values.creditStatementDate),
-          dueDate: parseInt(values.creditDueDate),
-          paymentStrategy: values.creditPaymentStrategy,
-          ...(values.creditPaymentStrategy === "fixed" && values.creditFixedPayment
-            ? { fixedPaymentAmount: parseFloat(values.creditFixedPayment) }
-            : {}),
-        };
-      }
-
-      if (values.expenseType === "installment" && finalAmount > 0) {
-        formData.installmentConfig = {
-          totalAmount: parseFloat(values.installmentTotal),
-          installmentCount: parseInt(values.installmentCount),
-          installmentAmount: finalAmount,
-          installmentsPaid: 0,
-          hasInterest: values.installmentHasInterest,
-          ...(values.installmentHasInterest && values.installmentInterestRate
-            ? { interestRate: parseFloat(values.installmentInterestRate) }
-            : {}),
-        };
-      }
-
-      await onSubmit(formData);
+      await onSubmit(buildExpenseRulePayload(values));
     } catch (err) {
       setError(err instanceof Error ? err.message : "Failed to save expense rule");
     } finally {
@@ -268,7 +225,8 @@ const ExpenseRuleForm: React.FC<IProps> = ({
   };
 
   return (
-    <Form methods={methods} onSubmit={handleSubmit}>
+    // Enter inside an input submits the <form>; only the last step may save
+    <Form methods={methods} onSubmit={(values) => (step === totalSteps ? handleSubmit(values) : undefined)}>
       <div className="space-y-6">
         <FormStepIndicator currentStep={step} totalSteps={totalSteps} />
 
@@ -276,6 +234,13 @@ const ExpenseRuleForm: React.FC<IProps> = ({
         {step === 2 && <DetailsStep />}
         {step === 3 && <ScheduleStep totalSteps={totalSteps} />}
         {step === 4 && <ReviewStep error={error} />}
+
+        {gatesOnIssues && <ValidationIssues issues={issues} />}
+        {error && step !== 4 && (
+          <div className="p-4 bg-danger/20 border border-danger/30 rounded-lg text-danger">
+            {error}
+          </div>
+        )}
 
         {/* Navigation */}
         <div className="flex justify-between pt-6 border-t border-gray-800">

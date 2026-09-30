@@ -198,7 +198,8 @@ export async function applyIncomeSchedule(app: AppHandle, spec: IncomeSpec) {
   if (spec.specificDays) {
     // clear the defaults through the chips' close icons, then add the requested days
     for (const chip of screen.queryAllByText(/^\d+(st|nd|rd|th)$/)) {
-      await app.user.click(within(chip).getByText("close"));
+      // the ordinal is its own element (so its text is exactly "1st"); the remove icon is its sibling
+      await app.user.click(within(chip.parentElement!).getByText("close"));
     }
     for (const day of spec.specificDays) {
       await app.user.type(screen.getByPlaceholderText("Day (1-31)"), String(day));
@@ -349,7 +350,8 @@ export async function applyExpenseSchedule(app: AppHandle, spec: ExpenseSpec) {
   if (spec.dayOfMonth !== undefined) await fill(app, /^Day of Month/, spec.dayOfMonth);
   if (spec.specificDays) {
     for (const chip of screen.queryAllByText(/^\d+(st|nd|rd|th)$/)) {
-      await app.user.click(within(chip).getByText("close"));
+      // the ordinal is its own element (so its text is exactly "1st"); the remove icon is its sibling
+      await app.user.click(within(chip.parentElement!).getByText("close"));
     }
     for (const day of spec.specificDays) {
       await app.user.type(screen.getByPlaceholderText("Day (1-31)"), String(day));

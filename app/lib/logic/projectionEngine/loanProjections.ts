@@ -3,9 +3,9 @@
  */
 
 import { ExpenseRule, LoanConfig, Transaction } from "@/lib/types";
-import { addMonths, parseDate } from "@/lib/utils/dateUtils";
+import { parseDate } from "@/lib/utils/dateUtils";
 import { AmortizationStep, calculateAmortizationSchedule } from "../amortization";
-import { adjustForWeekend } from "./dateUtils";
+import { adjustForWeekend, monthlyPaymentDate } from "./dateUtils";
 import { generateOccurrenceId } from "./occurrenceIdGenerator";
 import { createProjectedTransaction } from "./transactionFactory";
 
@@ -41,7 +41,8 @@ export const getLoanStatus = (loanConfig: LoanConfig): LoanStatus => {
  *
  * - The schedule starts from `currentBalance` over the remaining term
  *   (`termMonths - paymentsMade`), dated from the ORIGINAL anchor
- *   (`rule.startDate`) advanced by `paymentsMade` months.
+ *   (`rule.startDate`) advanced by `paymentsMade` months, on the rule's
+ *   `scheduleConfig.dayOfMonth` when it has one (see `monthlyPaymentDate`).
  * - An amortized loan pays its stored `monthlyPayment` (the contract); flat and
  *   reducing-balance loans pay what their formula says.
  * - Past the term with a balance still owed, one payment for the outstanding
@@ -66,7 +67,7 @@ const buildRemainingSchedule = (
       made,
       steps: [
         {
-          date: addMonths(anchor, made),
+          date: monthlyPaymentDate(anchor, rule.scheduleConfig?.dayOfMonth, made),
           payment: balance + interest,
           principal: balance,
           interest,
@@ -76,7 +77,7 @@ const buildRemainingSchedule = (
     };
   }
 
-  const steps = calculateAmortizationSchedule({
+  const schedule = calculateAmortizationSchedule({
     principal: balance,
     annualRate,
     termMonths: term - made,
@@ -86,6 +87,11 @@ const buildRemainingSchedule = (
     calculationType: loanConfig.calculationType,
     interestBasis: loanConfig.principalAmount,
   });
+  // The schedule's own dates follow the start date's day; the rule's Day of Month (when set) decides the day.
+  const steps = schedule.map((step, index) => ({
+    ...step,
+    date: monthlyPaymentDate(anchor, rule.scheduleConfig?.dayOfMonth, made + index),
+  }));
   return { steps, made };
 };
 

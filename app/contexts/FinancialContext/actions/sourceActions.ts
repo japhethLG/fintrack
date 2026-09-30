@@ -5,11 +5,13 @@ import {
   ExpenseRuleFormData,
   OccurrenceOverride,
 } from "@/lib/types";
+import { deleteField } from "firebase/firestore";
 import {
   addIncomeSource,
   updateIncomeSource,
   deleteIncomeSource,
   addExpenseRule,
+  getExpenseRule,
   updateExpenseRule,
   deleteExpenseRule,
   setIncomeSourceOverride,
@@ -35,6 +37,85 @@ export async function createIncomeSourceAction(
   });
 }
 
+// ============================================================================
+// EDIT PAYLOADS
+//
+// A form edit sends the WHOLE form, so three things must not happen by accident:
+//   - a cleared optional value must be REMOVED (the Firestore layer drops `undefined`, so a
+//     present-but-undefined `endDate` / `notes` is translated to `deleteField()` here);
+//   - activation is changed by the Activate / Deactivate button only, never by an edit;
+//   - nested progress (`paymentsMade`, `installmentsPaid`) and any config field the form does not manage
+//     survive, because a top-level key in an update REPLACES the whole nested object.
+// ============================================================================
+
+/** Stored values an edit may clear by sending the key with the value `undefined`. */
+const CLEARABLE_KEYS = ["endDate", "notes"] as const;
+
+const withClearedValues = <T extends object>(data: T): Record<string, unknown> => {
+  const update: Record<string, unknown> = { ...(data as Record<string, unknown>) };
+  for (const key of CLEARABLE_KEYS) {
+    if (key in data && update[key] === undefined) update[key] = deleteField();
+  }
+  return update;
+};
+
+/** The update an income-source edit writes. */
+export function buildIncomeSourceUpdate(
+  data: Partial<IncomeSourceFormData>
+): Record<string, unknown> {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const { isActive, ...rest } = data;
+  return withClearedValues(rest);
+}
+
+/**
+ * The update an expense-rule edit writes, merged over the stored rule `existing`:
+ * `loanConfig` / `installmentConfig` / `creditConfig` keep every stored field the form did not send, the
+ * progress counters always come from the stored rule, and a config that no longer applies (the type was
+ * changed in the wizard) is removed.
+ */
+export function buildExpenseRuleUpdate(
+  existing: ExpenseRule | null,
+  data: Partial<ExpenseRuleFormData>
+): Record<string, unknown> {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const { isActive, ...rest } = data;
+  const update = withClearedValues(rest);
+
+  if (data.loanConfig) {
+    update.loanConfig = {
+      ...existing?.loanConfig,
+      ...data.loanConfig,
+      paymentsMade: existing?.loanConfig?.paymentsMade ?? data.loanConfig.paymentsMade ?? 0,
+    };
+  }
+  if (data.installmentConfig) {
+    update.installmentConfig = {
+      ...existing?.installmentConfig,
+      ...data.installmentConfig,
+      installmentsPaid:
+        existing?.installmentConfig?.installmentsPaid ?? data.installmentConfig.installmentsPaid ?? 0,
+    };
+  }
+  if (data.creditConfig) {
+    const merged: Record<string, unknown> = { ...existing?.creditConfig, ...data.creditConfig };
+    if (!("fixedPaymentAmount" in data.creditConfig)) delete merged.fixedPaymentAmount;
+    update.creditConfig = merged;
+  }
+
+  // Changing the type drops the previous type's config instead of leaving it to be projected
+  if (data.expenseType) {
+    if (data.expenseType !== "cash_loan" && existing?.loanConfig) update.loanConfig = deleteField();
+    if (data.expenseType !== "credit_card" && existing?.creditConfig) {
+      update.creditConfig = deleteField();
+    }
+    if (data.expenseType !== "installment" && existing?.installmentConfig) {
+      update.installmentConfig = deleteField();
+    }
+  }
+  return update;
+}
+
 /**
  * Update an existing income source
  */
@@ -42,7 +123,7 @@ export async function editIncomeSourceAction(
   id: string,
   data: Partial<IncomeSourceFormData>
 ): Promise<void> {
-  await updateIncomeSource(id, data);
+  await updateIncomeSource(id, buildIncomeSourceUpdate(data) as Partial<IncomeSourceFormData>);
 }
 
 /**
@@ -89,7 +170,11 @@ export async function editExpenseRuleAction(
   id: string,
   data: Partial<ExpenseRuleFormData>
 ): Promise<void> {
-  await updateExpenseRule(id, data);
+  const existing = await getExpenseRule(id);
+  await updateExpenseRule(
+    id,
+    buildExpenseRuleUpdate(existing, data) as Partial<ExpenseRuleFormData>
+  );
 }
 
 /**

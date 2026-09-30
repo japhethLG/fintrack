@@ -6,7 +6,12 @@ import { FormInput, FormSelect, FormCheckbox, FormDatePicker } from "@/component
 import { Button, Icon } from "@/components/common";
 import { FREQUENCY_OPTIONS, DAYS_OF_WEEK, WEEKEND_ADJUSTMENT_OPTIONS } from "../constants";
 import SchedulePreview from "../components/SchedulePreview";
-import type { ExpenseRuleFormValues } from "../formHelpers";
+import { ordinal, toWholeNumber } from "@/lib/logic/ruleSchedule";
+import {
+  buildScheduleConfig,
+  getEffectiveFrequency,
+  type ExpenseRuleFormValues,
+} from "../formHelpers";
 
 interface IProps {
   totalSteps: number;
@@ -23,8 +28,8 @@ const ScheduleStep: React.FC<IProps> = ({ totalSteps }) => {
   const hasEndDate = useWatch({ control, name: "hasEndDate" });
   const specificDays = useWatch({ control, name: "specificDays" }) || [];
   const weekendAdjustment = useWatch({ control, name: "weekendAdjustment" });
-  const dayOfMonth = useWatch({ control, name: "dayOfMonth" });
-  const creditDueDate = useWatch({ control, name: "creditDueDate" });
+  // The whole form: the preview is built from the same values (and the same builder) as the saved rule
+  const values = useWatch({ control }) as ExpenseRuleFormValues;
 
   const handleAddSpecificDay = () => {
     const day = parseInt(newSpecificDay);
@@ -43,6 +48,14 @@ const ScheduleStep: React.FC<IProps> = ({ totalSteps }) => {
       specificDays.filter((d: number) => d !== day)
     );
   };
+
+  // A loan or installment plan has a fixed number of payments
+  const maxPayments =
+    expenseType === "cash_loan"
+      ? toWholeNumber(values.loanTermMonths)
+      : expenseType === "installment"
+        ? toWholeNumber(values.installmentCount)
+        : undefined;
 
   const filteredFrequencyOptions = FREQUENCY_OPTIONS.filter((f) =>
     expenseType === "cash_loan" || expenseType === "credit_card" || expenseType === "installment"
@@ -125,10 +138,12 @@ const ScheduleStep: React.FC<IProps> = ({ totalSteps }) => {
                   key={day}
                   className="bg-danger/20 text-danger px-3 py-1 rounded-lg border border-danger/30 flex items-center gap-2"
                 >
-                  {day}th
+                  <span>{ordinal(day)}</span>
                   <Icon
                     name="close"
                     size="sm"
+                    role="button"
+                    aria-label={`Remove ${ordinal(day)}`}
                     className="cursor-pointer hover:text-white"
                     onClick={() => handleRemoveSpecificDay(day)}
                   />
@@ -182,16 +197,13 @@ const ScheduleStep: React.FC<IProps> = ({ totalSteps }) => {
 
       {expenseType !== "one-time" && (
         <SchedulePreview
-          frequency={frequency}
+          frequency={getEffectiveFrequency(values)}
           startDate={startDate}
           endDate={endDate}
           hasEndDate={hasEndDate}
-          specificDays={specificDays}
           weekendAdjustment={weekendAdjustment}
-          dayOfMonth={dayOfMonth || undefined}
-          creditDueDate={
-            expenseType === "credit_card" && creditDueDate ? parseInt(creditDueDate) : undefined
-          }
+          scheduleConfig={buildScheduleConfig(values)}
+          maxOccurrences={maxPayments}
         />
       )}
     </div>
