@@ -202,9 +202,22 @@ export const openTxnFromCell = async (page: Page, cell: Locator, name: string): 
   return d;
 };
 
-export const completeInDialog = async (page: Page, o: { amount?: number } = {}): Promise<void> => {
+/**
+ * Complete the open transaction. Paying ahead of the date defaults Actual Date to today (MANUAL-k), so a
+ * test about WHICH occurrence gets completed passes `actualDate` (YYYY-MM-DD) to say it was paid on its day.
+ */
+export const completeInDialog = async (page: Page, o: { amount?: number; actualDate?: string } = {}): Promise<void> => {
   const d = txnDialog(page);
   if (o.amount !== undefined) await d.getByLabel("Actual Amount").fill(String(o.amount));
+  if (o.actualDate !== undefined) {
+    const field = d.locator("#actualDate");
+    await field.click();
+    await field.press("Control+a");
+    await field.pressSequentially(o.actualDate);
+    // typed text is only committed when a day is picked: pick it in the open panel (cells carry the date as title)
+    await page.locator(`.ant-picker-dropdown:not(.ant-picker-dropdown-hidden) td[title="${o.actualDate}"]`).click();
+    await expect(field).toHaveValue(o.actualDate);
+  }
   await d.getByRole("button", { name: "Mark Complete" }).click();
   await expect(d).toBeHidden();
 };

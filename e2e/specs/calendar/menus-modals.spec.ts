@@ -118,8 +118,7 @@ test.describe("transaction dialog", () => {
     await sidebar(page).getByText("Payday", { exact: true }).click();
     await txnDialog(page).getByLabel("Actual Amount").fill("450");
     await expect(txnDialog(page)).toContainText("-$50.00 variance");
-    await txnDialog(page).getByRole("button", { name: "Mark Complete" }).click();
-    await expect(txnDialog(page)).toBeHidden();
+    await completeInDialog(page, { actualDate: "2026-03-13" }); // paid on its day: Actual Date now defaults to today when paying ahead (MANUAL-k)
     const [t] = await storedTxns(page);
     expect([t.projectedAmount, t.actualAmount, t.scheduledDate, t.actualDate]).toEqual([500, 450, "2026-03-13", "2026-03-13"]);
     expect(await userBalance(page)).toBe(1450);

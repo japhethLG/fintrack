@@ -75,12 +75,12 @@ test.describe("semi-monthly [15,30], weekend 'after' (Sun 3/15 -> Mon 3/16, Mon 
   test("completing both paydays shows both completed (2 / 2) and keeps the opening balance", async ({ page }) => {
     await boot(page, semi());
     await openTxnFromCell(page, monthCell(page, "2026-03", "2026-03-16"), "Semi");
-    await completeInDialog(page);
+    await completeInDialog(page, { actualDate: "2026-03-16" }); // paid on its day: Actual Date now defaults to today when paying ahead (MANUAL-k)
     // Precondition (works today): one completed, one projected.
     await expect(summaryTile(page, "Transactions")).toHaveText("1 / 2");
     expect(await daysShowing(page, "2026-03", "Semi")).toEqual(["2026-03-16", "2026-03-30"]);
     await openTxnFromCell(page, monthCell(page, "2026-03", "2026-03-30"), "Semi");
-    await completeInDialog(page);
+    await completeInDialog(page, { actualDate: "2026-03-30" });
     // Balance is 1000 + 100 + 100 in Firestore (this part is right) ...
     expect((await storedTxns(page)).length).toBe(2);
     // ... and the calendar must agree: each payday once, both completed, opening unchanged.
@@ -130,7 +130,7 @@ test.describe("monthly on the 1st, weekend 'before' (Sat Aug 1 is paid Fri Jul 3
     await navigateToMonth(page, "2026-08", "2026-07");
     await expect(monthCell(page, "2026-07", "2026-07-31").getByText("First")).toBeVisible();
     await openTxnFromCell(page, monthCell(page, "2026-07", "2026-07-31"), "First");
-    await completeInDialog(page);
+    await completeInDialog(page, { actualDate: "2026-07-31" }); // paid on its day: Actual Date now defaults to today when paying ahead (MANUAL-k)
     const [done] = await storedTxns(page);
     expect(done.occurrenceId).toBe("m1_2026-08");
     expect(await daysShowing(page, "2026-07", "First")).toEqual(["2026-07-01", "2026-07-31"]);
@@ -177,7 +177,7 @@ test.describe("daily, weekend 'after' (daily rules ignore the weekend setting: e
   test("completing one day's payment leaves one item on that day, stored under that day's own id", async ({ page }) => {
     await boot(page, dailyAfter());
     await openTxnFromCell(page, monthCell(page, "2026-03", "2026-03-16"), "Daily");
-    await completeInDialog(page);
+    await completeInDialog(page, { actualDate: "2026-03-16" }); // paid on its day: Actual Date now defaults to today when paying ahead (MANUAL-k)
     await expect(summaryTile(page, "Transactions")).toHaveText("1 / 21");
     expect(await monthChipNames(monthCell(page, "2026-03", "2026-03-16"))).toEqual(["Daily"]);
     await expect(monthCell(page, "2026-03", "2026-03-16")).not.toContainText("more");

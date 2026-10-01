@@ -305,7 +305,7 @@ test.describe("complete and revert a rescheduled occurrence", () => {
 
     const dialog = await openTxnFromCell(page, monthCell(page, "2026-03", "2026-03-25"), "Payday");
     await expect(dialog).toContainText("Wed, Mar 25, 2026"); // scheduled date shown = the moved date
-    await completeInDialog(page);
+    await completeInDialog(page, { actualDate: "2026-03-25" }); // paid on its day: Actual Date now defaults to today when paying ahead (MANUAL-k)
 
     const [done] = await storedTxns(page);
     expect([done.status, done.scheduledDate, done.actualDate, done.occurrenceId, done.actualAmount]).toEqual([
@@ -328,6 +328,17 @@ test.describe("complete and revert a rescheduled occurrence", () => {
     expect((await overridesOf(page, "income_sources", "payday"))?.["payday_2026-03"]).toEqual({ scheduledDate: "2026-03-25" });
   });
 
+  test("paying ahead of the date records today as the actual date, and the payment shows on today (MANUAL-k)", async ({ page }) => {
+    await boot(page); // today is Tue 3/10; Payday is due Fri 3/13
+    await openTxnFromCell(page, monthCell(page, "2026-03", "2026-03-13"), "Payday");
+    await expect(txnDialog(page).locator("#actualDate")).toHaveValue("2026-03-10");
+    await completeInDialog(page);
+    const [done] = await storedTxns(page);
+    expect([done.scheduledDate, done.actualDate, done.occurrenceId]).toEqual(["2026-03-13", "2026-03-10", "payday_2026-03"]);
+    expect(await daysShowing(page, "2026-03", "Payday")).toEqual(["2026-03-10"]); // filed on the day it was paid, once
+    expect(await userBalance(page)).toBe(1500);
+  });
+
   test("weekly: reverting a completed, moved occurrence keeps its custom date", async ({ page }) => {
     // Weekly income on Fridays (dayOfWeek 5), start 3/13: Fridays 3/13, 3/20, 3/27. ISO weeks W11, W12, W13.
     await boot(page, {
@@ -346,7 +357,7 @@ test.describe("complete and revert a rescheduled occurrence", () => {
     await dragTo(page, monthCell(page, "2026-03", "2026-03-13").getByText("Weekly Gig"), monthCell(page, "2026-03", "2026-03-24"));
     await expect(monthCell(page, "2026-03", "2026-03-24").getByText("Weekly Gig")).toBeVisible();
     await openTxnFromCell(page, monthCell(page, "2026-03", "2026-03-24"), "Weekly Gig");
-    await completeInDialog(page);
+    await completeInDialog(page, { actualDate: "2026-03-24" }); // paid on its day: Actual Date now defaults to today when paying ahead (MANUAL-k)
     await expect(monthCell(page, "2026-03", "2026-03-24").getByText("Weekly Gig")).toBeVisible();
     await openTxnFromCell(page, monthCell(page, "2026-03", "2026-03-24"), "Weekly Gig");
     await revertInDialog(page);
@@ -360,7 +371,7 @@ test.describe("complete and revert a rescheduled occurrence", () => {
     // Rule starts on the 1st but pays on the 13th: the March item sits on its pattern date (3/13).
     await boot(page, { incomeSources: [payday({ startDate: "2026-03-01", occurrenceOverrides: {} })] });
     await openTxnFromCell(page, monthCell(page, "2026-03", "2026-03-13"), "Payday");
-    await completeInDialog(page);
+    await completeInDialog(page, { actualDate: "2026-03-13" }); // paid on its day: Actual Date now defaults to today when paying ahead (MANUAL-k)
     await openTxnFromCell(page, monthCell(page, "2026-03", "2026-03-13"), "Payday");
     await revertInDialog(page);
     await expect.poll(() => storedTxns(page)).toEqual([]);
@@ -378,7 +389,7 @@ test.describe("complete and revert a rescheduled occurrence", () => {
     await expect(summaryTile(page, "Income")).toHaveText("+$0.00");
     await navigateToMonth(page, "2026-03", "2026-04");
     await openTxnFromCell(page, monthCell(page, "2026-04", "2026-04-01"), "Payday");
-    await completeInDialog(page);
+    await completeInDialog(page, { actualDate: "2026-04-01" }); // paid on its day: Actual Date now defaults to today when paying ahead (MANUAL-k)
     const [done] = await storedTxns(page);
     // It is still MARCH's payday (identity), realised on 4/1 ...
     expect([done.occurrenceId, done.scheduledDate, done.actualDate]).toEqual(["payday_2026-03", "2026-04-01", "2026-04-01"]);
