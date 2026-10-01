@@ -14,6 +14,7 @@ import {
 import { IncomeSourceFormData } from "@/lib/types";
 import { INCOME_CATEGORIES } from "@/lib/constants";
 import { useCurrency } from "@/lib/hooks/useCurrency";
+import { useDatePreferences } from "@/lib/hooks/useDatePreferences";
 import FormStepIndicator from "../../../expenses/components/ExpenseRuleForm/components/FormStepIndicator";
 import SchedulePreview from "../../../expenses/components/ExpenseRuleForm/components/SchedulePreview";
 import ValidationIssues from "../../../expenses/components/ExpenseRuleForm/components/ValidationIssues";
@@ -36,7 +37,6 @@ import {
   type IncomeSourceFormValues,
 } from "./formHelpers";
 import { cn } from "@/lib/utils/cn";
-import { parseDate } from "@/lib/utils/dateUtils";
 
 // ============================================================================
 // STEP FIELD MAPPING
@@ -77,6 +77,7 @@ const IncomeSourceForm: React.FC<IProps> = ({
   isEditing = false,
 }) => {
   const { currencySymbol, formatCurrency } = useCurrency();
+  const { formatDate: formatDisplayDate } = useDatePreferences();
   const [step, setStep] = useState(1);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -479,13 +480,13 @@ const IncomeSourceForm: React.FC<IProps> = ({
                 <div>
                   <p className="text-xs text-gray-400">Start Date</p>
                   <p className="text-white font-medium">
-                    {parseDate(startDate).toLocaleDateString()}
+                    {formatDisplayDate(startDate)}
                   </p>
                 </div>
                 <div>
                   <p className="text-xs text-gray-400">End Date</p>
                   <p className="text-white font-medium">
-                    {hasEndDate && endDate ? parseDate(endDate).toLocaleDateString() : "Ongoing"}
+                    {hasEndDate && endDate ? formatDisplayDate(endDate) : "Ongoing"}
                   </p>
                 </div>
                 <div>

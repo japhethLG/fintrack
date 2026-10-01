@@ -5,11 +5,13 @@ import { useFormContext, useWatch } from "react-hook-form";
 import { FormInput, FormSelect, FormDatePicker } from "@/components/formElements";
 import { EXPENSE_CATEGORY_LABELS } from "@/lib/constants";
 import { useCurrency } from "@/lib/hooks/useCurrency";
+import { useDatePreferences } from "@/lib/hooks/useDatePreferences";
 import { LOAN_CALCULATION_TYPES } from "../constants";
 import { calculateLoanPlan, type ExpenseRuleFormValues } from "../formHelpers";
 
 const LoanDetailsForm: React.FC = () => {
   const { formatCurrency, currencySymbol } = useCurrency();
+  const { formatDate: formatDisplayDate } = useDatePreferences();
   const { control } = useFormContext<ExpenseRuleFormValues>();
 
   const loanPrincipal = useWatch({ control, name: "loanPrincipal" });
@@ -184,7 +186,7 @@ const LoanDetailsForm: React.FC = () => {
                 {amortizationPreview.map((row, i) => (
                   <tr key={i} className="border-t border-gray-800">
                     <td className="py-2 text-white">#{i + 1}</td>
-                    <td className="py-2 text-gray-300">{row.date.toLocaleDateString()}</td>
+                    <td className="py-2 text-gray-300">{formatDisplayDate(row.date)}</td>
                     <td className="py-2 text-right text-white">
                       {formatCurrency(row.principal, {
                         minimumFractionDigits: 2,

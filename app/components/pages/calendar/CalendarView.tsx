@@ -22,10 +22,10 @@ import { formatDate, getTodayKey, isSameDay, parseDate, startOfDay } from "@/lib
 import { rowDate } from "@/lib/logic/balanceCalculator/openItems";
 import { useCurrency } from "@/lib/hooks/useCurrency";
 import { useMediaQuery } from "@/lib/hooks/useMediaQuery";
+import { useDatePreferences } from "@/lib/hooks/useDatePreferences";
 import { getBalanceStatus } from "@/lib/logic/balanceCalculator/utils";
 import { summarizePeriod } from "@/lib/logic/healthScore";
 import { useModal } from "@/components/modals";
-import { WEEKDAYS, WEEKDAYS_SHORT } from "./constants";
 import type { CalendarDay } from "./types";
 import DayCell from "./components/DayCell";
 import WeekDayCell from "./components/WeekDayCell";
@@ -82,6 +82,9 @@ const CalendarView: React.FC = () => {
   } = useFinancial();
   const { openModal } = useModal();
   const { formatCurrency } = useCurrency();
+  // Settings > Preferences: which day a week starts on, and day-before-month dates (MANUAL-L5)
+  const { weekdayLabels, weekColumn, weekStart: startOfWeekOf, formatDayMonth, formatDayMonthYear } =
+    useDatePreferences();
   // 7 columns on a phone leave ~50px per day: amounts print compact there (MANUAL-M4)
   const isCompact = useMediaQuery("(max-width: 767px)");
 
@@ -107,7 +110,7 @@ const CalendarView: React.FC = () => {
 
     const firstDay = new Date(year, month, 1);
     const lastDay = new Date(year, month + 1, 0);
-    const startDay = firstDay.getDay();
+    const startDay = weekColumn(firstDay); // leading days from the previous month
     const daysInMonth = lastDay.getDate();
 
     const days: CalendarDay[] = [];
@@ -156,18 +159,15 @@ const CalendarView: React.FC = () => {
     }
 
     return days;
-  }, [currentDate, dailyBalances]);
+  }, [currentDate, dailyBalances, weekColumn]);
 
   // Calculate week days for week view
   const calendarWeekDays = useMemo((): CalendarDay[] => {
     const today = startOfDay(new Date());
     const days: CalendarDay[] = [];
 
-    // Get the start of the week (Sunday) containing currentDate
-    const current = new Date(currentDate.getTime());
-    const dayOfWeek = current.getDay();
-    const weekStart = new Date(current);
-    weekStart.setDate(current.getDate() - dayOfWeek);
+    // The start of the week (the preferred first day) containing currentDate
+    const weekStart = startOfWeekOf(currentDate);
 
     // Generate 7 days
     for (let i = 0; i < 7; i++) {
@@ -184,21 +184,15 @@ const CalendarView: React.FC = () => {
     }
 
     return days;
-  }, [currentDate, dailyBalances]);
+  }, [currentDate, dailyBalances, startOfWeekOf]);
 
   // Week date range for header
   const weekDateRange = useMemo(() => {
     if (calendarWeekDays.length === 0) return "";
     const start = calendarWeekDays[0].date;
     const end = calendarWeekDays[6].date;
-    const startStr = start.toLocaleDateString("en-US", { month: "short", day: "numeric" });
-    const endStr = end.toLocaleDateString("en-US", {
-      month: "short",
-      day: "numeric",
-      year: "numeric",
-    });
-    return `${startStr} - ${endStr}`;
-  }, [calendarWeekDays]);
+    return `${formatDayMonth(start)} - ${formatDayMonthYear(end)}`;
+  }, [calendarWeekDays, formatDayMonth, formatDayMonthYear]);
 
   // Selected day details
   const selectedDayKey = selectedDate ? formatDate(selectedDate) : null;
@@ -218,9 +212,7 @@ const CalendarView: React.FC = () => {
         start = calendarWeekDays[0].date;
         end = calendarWeekDays[6].date;
       } else {
-        const dayOfWeek = currentDate.getDay();
-        start = new Date(currentDate.getTime());
-        start.setDate(currentDate.getDate() - dayOfWeek);
+        start = startOfWeekOf(currentDate);
         end = new Date(start);
         end.setDate(start.getDate() + 6);
       }
@@ -248,7 +240,7 @@ const CalendarView: React.FC = () => {
       period,
       transactions: rangeTransactions,
     };
-  }, [viewMode, currentDate, transactions, calendarWeekDays]);
+  }, [viewMode, currentDate, transactions, calendarWeekDays, startOfWeekOf]);
 
   // Navigation
   const goToPrevMonth = () => {
@@ -274,9 +266,7 @@ const CalendarView: React.FC = () => {
     const newDate = new Date(currentDate.getTime());
     newDate.setDate(currentDate.getDate() - 7);
     // Update view date range to include the new week (expands if needed)
-    const dayOfWeek = newDate.getDay();
-    const weekStart = new Date(newDate.getTime());
-    weekStart.setDate(newDate.getDate() - dayOfWeek);
+    const weekStart = startOfWeekOf(newDate);
     const weekEnd = new Date(weekStart);
     weekEnd.setDate(weekStart.getDate() + 6);
     setViewDateRange(formatDate(weekStart), formatDate(weekEnd));
@@ -287,9 +277,7 @@ const CalendarView: React.FC = () => {
     const newDate = new Date(currentDate.getTime());
     newDate.setDate(currentDate.getDate() + 7);
     // Update view date range to include the new week (expands if needed)
-    const dayOfWeek = newDate.getDay();
-    const weekStart = new Date(newDate.getTime());
-    weekStart.setDate(newDate.getDate() - dayOfWeek);
+    const weekStart = startOfWeekOf(newDate);
     const weekEnd = new Date(weekStart);
     weekEnd.setDate(weekStart.getDate() + 6);
     setViewDateRange(formatDate(weekStart), formatDate(weekEnd));
@@ -369,8 +357,8 @@ const CalendarView: React.FC = () => {
       return {
         openingBalance: firstDayBalance?.openingBalance ?? null,
         closingBalance: lastDayBalance?.closingBalance ?? null,
-        startDateLabel: firstDay.toLocaleDateString("en-US", { month: "short", day: "numeric" }),
-        endDateLabel: lastDay.toLocaleDateString("en-US", { month: "short", day: "numeric" }),
+        startDateLabel: formatDayMonth(firstDay),
+        endDateLabel: formatDayMonth(lastDay),
       };
     } else {
       // Week view
@@ -384,14 +372,11 @@ const CalendarView: React.FC = () => {
       return {
         openingBalance: firstDay.dayBalance?.openingBalance ?? null,
         closingBalance: lastDay.dayBalance?.closingBalance ?? null,
-        startDateLabel: firstDay.date.toLocaleDateString("en-US", {
-          month: "short",
-          day: "numeric",
-        }),
-        endDateLabel: lastDay.date.toLocaleDateString("en-US", { month: "short", day: "numeric" }),
+        startDateLabel: formatDayMonth(firstDay.date),
+        endDateLabel: formatDayMonth(lastDay.date),
       };
     }
-  }, [viewMode, currentDate, dailyBalances, calendarWeekDays]);
+  }, [viewMode, currentDate, dailyBalances, calendarWeekDays, formatDayMonth]);
 
   const warningThreshold = userProfile?.preferences?.defaultWarningThreshold ?? 0;
   const rangeClosing = periodBalance.closingBalance;
@@ -527,13 +512,13 @@ const CalendarView: React.FC = () => {
                 <>
                   {/* Weekday headers */}
                   <div className="grid grid-cols-7 border-b border-gray-800">
-                    {WEEKDAYS.map((day, index) => (
+                    {weekdayLabels.map((day) => (
                       <div
                         key={day}
                         className="p-1 lg:p-2 text-center text-xs lg:text-sm font-medium text-gray-400"
                       >
                         <span className="hidden sm:inline">{day}</span>
-                        <span className="sm:hidden">{WEEKDAYS_SHORT[index]}</span>
+                        <span className="sm:hidden">{day[0]}</span>
                       </div>
                     ))}
                   </div>
