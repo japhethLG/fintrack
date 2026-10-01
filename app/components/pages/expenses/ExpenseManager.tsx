@@ -211,9 +211,9 @@ const ExpenseManager: React.FC = () => {
             <p className={cn("text-lg lg:text-3xl font-bold", amountTone(debtOwed, "text-danger"))}>
               {formatCurrency(debtOwed)}
             </p>
-            <p className="text-[10px] lg:text-xs text-gray-500 mt-1" title={TOTAL_DEBT_NOTE}>
+            <span className="block text-[10px] lg:text-xs text-gray-500 mt-1" title={TOTAL_DEBT_NOTE}>
               {TOTAL_DEBT_NOTE}
-            </p>
+            </span>
           </Card>
           <Card padding="md">
             <p className="text-gray-400 text-xs lg:text-sm mb-1">Priority Bills</p>
