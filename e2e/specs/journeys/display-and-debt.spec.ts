@@ -55,7 +55,10 @@ test.describe("loan paid for 4 months (8,000 @ 12% APR, 8 months, first payment 
     await expect(page.getByRole("heading", { name: "Financial Calendar", level: 1 })).toBeVisible();
     await payMonths(page, FOUR);
     await S.gotoPage(page, "Expense Manager");
-    await expect(page.getByText("Total Debt").locator("xpath=following-sibling::p")).toHaveText("$4,079.60"); // 8,000 -> 7,034.48 -> 6,059.30 -> 5,074.38 -> 4,079.60 (1%/month, 1,045.52 paid each time; cents, like every amount)
+    await expect(page.getByText("Total Debt").locator("xpath=following-sibling::p")).toHaveText("$4,079.59");
+    // REWRITTEN (MANUAL-L2/L3): each month's interest is charged in whole cents, so the chain is
+    // 8,000 -> 7,034.48 (80.00) -> 6,059.30 (70.34) -> 5,074.37 (60.59) -> 4,079.59 (50.74), 1,045.52 paid each
+    // time. It read 4,079.60 when the fractional interest (60.593..., 50.743...) was carried along.
     await expect(page.getByText("Progress").locator("xpath=following-sibling::span")).toHaveText("49%");
     // REWRITTEN (decision: "Next N days" is exactly N days). Today is Jun 15, so Jul 15 is day 30 and is
     // outside "Next 30 days" (Jun 15 .. Jul 14): the widget is empty, and Jul 15 appears with 90 days.
