@@ -5,11 +5,12 @@
  * Fixture: currentBalance 1000, today Tue 2026-03-10.
  *   First  +100 monthly on the 1st,  start 2026-01-01
  *   Last   +10  monthly on the 31st (clamped to the month's last day), start 2026-01-31
- * Hand values (each month adds 110, nothing completed, the past months are overdue-but-projected and
- * therefore counted, per README):
- *   Jan opens 1000 closes 1110 | Feb 1110 -> 1220 | Mar 1220 -> 1330 | Apr 1330 -> 1440
- *   May 1440 -> 1550 | Jun 1550 -> 1660 | Jul 1660 -> 1770 | Aug 1770 -> 1880
- * (Jan opens at 1000 because the view window starts on 2026-01-01.)
+ * Hand values, decision D5 (docs/audit/fixes/display-numbers.md): nothing is completed, so the realized
+ * balance is 1000. The paydays before today (Jan 1, Jan 31, Feb 1, Feb 28, Mar 1) are OVERDUE: they are
+ * listed (the month's Income tile still counts them, +110) but move nothing, and an overdue income is not
+ * credited. From today (Mar 10) on each month adds 110 (the 1st +100, the last day +10).
+ *   Jan 1000 -> 1000 | Feb 1000 -> 1000 | Mar 1000 -> 1010 (only Mar 31's +10 is upcoming)
+ *   Apr 1010 -> 1120 | May 1120 -> 1230 | Jun 1230 -> 1340 | Jul 1340 -> 1450 | Aug 1450 -> 1560
  */
 import { test, expect, seedAndLogin, userProfile, incomeSource } from "../../index";
 import {
@@ -46,22 +47,22 @@ const boot = async (page: import("@playwright/test").Page) => {
 };
 
 const FIGURES: Record<string, [string, string]> = {
-  "2026-01": ["$1,000", "$1,110"],
-  "2026-02": ["$1,110", "$1,220"],
-  "2026-03": ["$1,220", "$1,330"],
-  "2026-04": ["$1,330", "$1,440"],
-  "2026-05": ["$1,440", "$1,550"],
-  "2026-06": ["$1,550", "$1,660"],
-  "2026-07": ["$1,660", "$1,770"],
-  "2026-08": ["$1,770", "$1,880"],
+  "2026-01": ["$1,000", "$1,000"],
+  "2026-02": ["$1,000", "$1,000"],
+  "2026-03": ["$1,000", "$1,010"],
+  "2026-04": ["$1,010", "$1,120"],
+  "2026-05": ["$1,120", "$1,230"],
+  "2026-06": ["$1,230", "$1,340"],
+  "2026-07": ["$1,340", "$1,450"],
+  "2026-08": ["$1,450", "$1,560"],
 };
 
 test("March: the 1st (a Sunday) and the 31st are both drawn, in every timezone", async ({ page }) => {
   await boot(page);
   expect(await daysShowing(page, "2026-03", "First")).toEqual(["2026-03-01"]);
   expect(await daysShowing(page, "2026-03", "Last")).toEqual(["2026-03-31"]);
-  await expect(periodFigure(page, "Opening")).toHaveText("$1,220");
-  await expect(periodFigure(page, "Closing")).toHaveText("$1,330");
+  await expect(periodFigure(page, "Opening")).toHaveText("$1,000");
+  await expect(periodFigure(page, "Closing")).toHaveText("$1,010");
 });
 
 test("walking back from March to January and forward to May: paydays on the 1st are never dropped and balances chain", async ({ page }) => {
@@ -107,17 +108,17 @@ test("the last day of every month is drawn and closing balances chain (Jun..Aug)
 test("year boundary: December 2026 -> January 2027 -> back, headings, weekday alignment and chained balances", async ({ page }) => {
   await boot(page);
   await navigateToMonth(page, "2026-03", "2026-12");
-  await expect(periodFigure(page, "Opening")).toHaveText("$2,210"); // Mar opens 1220; +110 per month for Mar..Nov = 9 * 110 = 990 => 2210
+  await expect(periodFigure(page, "Opening")).toHaveText("$1,890"); // Mar closes 1010; +110 per month for Apr..Nov = 8 * 110 = 880 => 1890
   await nextButton(page).click();
   await expect(viewedHeading(page)).toHaveText("January 2027");
   // Jan 1 2027 is a Friday: 5 leading cells (Dec 27..31) then the 1st is the 6th cell.
   expect(await daysShowing(page, "2027-01", "First")).toEqual(["2027-01-01"]);
   await expect(monthCell(page, "2027-01", "2027-01-01")).toContainText("1");
-  // Dec closing == Jan opening: Dec opens 2210, closes 2320.
-  await expect(periodFigure(page, "Opening")).toHaveText("$2,320");
+  // Dec closing == Jan opening: Dec opens 1890, closes 2000.
+  await expect(periodFigure(page, "Opening")).toHaveText("$2,000");
   await prevButton(page).click();
   await expect(viewedHeading(page)).toHaveText("December 2026");
-  await expect(periodFigure(page, "Closing")).toHaveText("$2,320");
+  await expect(periodFigure(page, "Closing")).toHaveText("$2,000");
 });
 
 test("week view: previous/next cross a month boundary, Today returns to the current week and selects today", async ({ page }) => {
@@ -130,9 +131,10 @@ test("week view: previous/next cross a month boundary, Today returns to the curr
   await expect(viewedHeading(page)).toHaveText("Mar 29 - Apr 4, 2026");
   expect(await weekChipNames(weekCell(page, "2026-03-31"))).toEqual(["Last"]);
   expect(await weekChipNames(weekCell(page, "2026-04-01"))).toEqual(["First"]);
-  // Mar 29 opening = 1000 + Jan(110) + Feb(110) + Mar 1 (100) = 1320; + Mar 31 (10) + Apr 1 (100) = 1430.
-  await expect(periodFigure(page, "Opening")).toHaveText("$1,320");
-  await expect(periodFigure(page, "Closing")).toHaveText("$1,430");
+  // Mar 29 opening = the realized 1000 (the past paydays are overdue and not credited, D5);
+  // + Mar 31 (10) + Apr 1 (100) = 1110.
+  await expect(periodFigure(page, "Opening")).toHaveText("$1,000");
+  await expect(periodFigure(page, "Closing")).toHaveText("$1,110");
   await prevButton(page).click();
   await prevButton(page).click();
   await prevButton(page).click();

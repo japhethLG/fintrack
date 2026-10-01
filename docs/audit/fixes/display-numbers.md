@@ -31,8 +31,9 @@ health runway, overdue alert) reads it.
   - after today: projects forward from `B - overdue owed + upcoming rows`;
   - an overdue row is listed on its own day, flagged ("overdue" badge on the row, a danger ring and an "Overdue" tooltip on the chip), but is in no day's totals and
     does not move its day. Identity on every day: `closing = opening + income - expenses - overdueOwed`;
-  - a completed row dated AFTER today (paid ahead of its due date; the Complete dialog defaults the date to the due date) is filed on today:
-    that is when the money left, which is what B already says;
+  - a completed row dated AFTER today (paid ahead of its due date; the Complete dialog defaults the date to the due date) stays listed and
+    totalled on its own day (a chip never hops away from its date), but its MONEY moves on today, which is what B already says. So today's
+    closing is B even then, and the identity above holds with that row counted on today;
   - a user with a balance and no rows sees B on every day (the hook no longer returns an empty map for zero rows; UI-DISP-14, UI-BAL-40).
 - **Runway / next crunch / health runway** are ONE walk (`walkRisk`): B, overdue expenses folded into day 0, completed rows never touched
   (BAL-2), the `dayExpenses > 0` gate gone, an already-overdrawn account reported today (`days 0`, shortfall = the deeper of "now" and
@@ -144,9 +145,9 @@ The remaining ones belong to the currency/formatting stream (UI-BAL-37/38, UI-DI
 
 Leftovers and risks:
 
-- **Future-dated completions**: a completed row dated after today is filed on today in the day grid (it was paid ahead of its date), but the
-  month/range tiles (`summarizePeriod`) still bucket it by `actualDate`. They agree except for such rows. A dialog that defaults the actual
-  date to today would remove the case.
+- **Future-dated completions**: a completed row dated after today is listed and totalled on its own day, but its money moves on today. On that
+  one day the panel's Income/Expenses tiles therefore do not add up to the day's opening-to-closing movement. A Complete dialog that defaults
+  the actual date to today would remove the case.
 - **Overdue older than the default window** (before the 1st of the month two months ago) is not tracked by the risk views or the overdue alert.
 - **Overdue income** is not credited anywhere in the projections; a user who is simply late recording a payday sees a lower projection until
   they complete it.

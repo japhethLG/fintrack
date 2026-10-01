@@ -88,14 +88,16 @@ test.describe("date labels and buckets (America/New_York shows the previous day)
     expect(texts[2]).toContain("Rent Apr 1");
   });
 
-  test("Income > Upcoming Payments headings are TUESDAY, MAR 31 / WEDNESDAY, APR 1 / THURSDAY, APR 30", async ({ page }, testInfo) => {
+  test("Income > Upcoming Payments headings are TUESDAY, MAR 31 / WEDNESDAY, APR 1 (Next 30 days ends Apr 29)", async ({ page }, testInfo) => {
     await at(page, tzOf(testInfo), "2026-03-31", "23:30");
     await seedAndLogin(page, household(), { path: "/income" });
     await expect(page.getByRole("heading", { name: "Income Management", level: 1 })).toBeVisible();
-    await expect(page.getByText("Total Expected").locator("xpath=following-sibling::span")).toHaveText("$3,000.00"); // 3 paydays Mar 31..Apr 30
+    // REWRITTEN (decision: "Next N days" is exactly N days): from Mar 31 the 30-day window ends Apr 29,
+    // so the Apr 30 payday (day 31) is out: 2 paydays = 2,000.
+    await expect(page.getByText("Total Expected").locator("xpath=following-sibling::span")).toHaveText("$2,000.00");
     const heads = await page.locator("h4.uppercase").allInnerTexts();
-    expect(heads, "three date groups").toHaveLength(3);
-    expect(heads.map((h) => h.toUpperCase())).toEqual(["TUESDAY, MAR 31", "WEDNESDAY, APR 1", "THURSDAY, APR 30"]);
+    expect(heads, "two date groups").toHaveLength(2);
+    expect(heads.map((h) => h.toUpperCase())).toEqual(["TUESDAY, MAR 31", "WEDNESDAY, APR 1"]);
   });
 
   test("Expenses > Upcoming Bills heading for the 1st is WEDNESDAY, APR 1", async ({ page }, testInfo) => {

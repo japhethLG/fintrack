@@ -10,7 +10,7 @@
  * Everything up to today is completed, nothing is overdue, so the balance the
  * user has TODAY is 18,200 on every screen.
  */
-import { test, expect, seedAndLogin, userProfile, incomeSource, fixedExpense, completedTransaction, knownDefect } from "../../index";
+import { test, expect, seedAndLogin, userProfile, incomeSource, fixedExpense, completedTransaction } from "../../index";
 import * as S from "./support";
 
 const months = ["2025-07", "2025-08", "2025-09", "2025-10", "2025-11", "2025-12", "2026-01", "2026-02", "2026-03"];
@@ -56,14 +56,12 @@ test.describe("returning user, 9 months of history", () => {
   });
 
   test("Calendar closing balance of today is 18,200 (history older than the view window is not lost)", async ({ page }) => {
-    knownDefect("E2E-JRN-11", "Calendar Today closing shows $7,400 = 2,000 + only the 3 in-window months; the 6 pre-window months (+10,800) are subtracted from the opening balance and never added back");
     await seedAndLogin(page, history({ legacy: false }), { path: "/calendar" });
     await expect(page.getByRole("heading", { name: "Financial Calendar", level: 1 })).toBeVisible();
     expect(S.parseMoney(await S.calendarTodayClosingText(page))).toBe(18_200);
   });
 
   test("Calendar March opening balance is 16,400 (2,000 + 8 months x 1,800) and stays right after reload", async ({ page }) => {
-    knownDefect("E2E-JRN-12", "Monthly Balance Overview opening for Mar 1 shows $5,600 (= 2,000 + Jan + Feb in-window only) instead of $16,400");
     // Mar 1 opening = 2,000 + 6 x 1,800 (2025) + 2 x 1,800 (Jan, Feb 2026) = 16,400
     await seedAndLogin(page, history({ legacy: false }), { path: "/calendar" });
     await expect(page.getByRole("heading", { name: "Financial Calendar", level: 1 })).toBeVisible();

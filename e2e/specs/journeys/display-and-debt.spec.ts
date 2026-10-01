@@ -57,7 +57,12 @@ test.describe("loan paid for 4 months (8,000 @ 12% APR, 8 months, first payment 
     await S.gotoPage(page, "Expense Manager");
     await expect(page.getByText("Total Debt").locator("xpath=following-sibling::p")).toHaveText("$4,080");
     await expect(page.getByText("Progress").locator("xpath=following-sibling::span")).toHaveText("49%");
-    await expect(page.locator("h4.uppercase")).toHaveText(/THURSDAY, JUL 16|WEDNESDAY, JUL 15/i);
+    // REWRITTEN (decision: "Next N days" is exactly N days). Today is Jun 15, so Jul 15 is day 30 and is
+    // outside "Next 30 days" (Jun 15 .. Jul 14): the widget is empty, and Jul 15 appears with 90 days.
+    await expect(page.locator("h4.uppercase")).toHaveCount(0);
+    await page.getByRole("combobox").filter({ hasText: "Next 30 days" }).click();
+    await page.getByRole("option", { name: "Next 90 days" }).click();
+    await expect(page.locator("h4.uppercase").first()).toHaveText(/THURSDAY, JUL 16|WEDNESDAY, JUL 15/i);
     await S.gotoPage(page, "Transactions");
     await expect(page.getByText("Pending", { exact: true }).locator("xpath=following-sibling::p")).toHaveText("3");
     // REWRITTEN (write-path stream, with a derivation). The loan still has 4 payments to make
@@ -128,7 +133,6 @@ test.describe("installment plan and credit card journeys", () => {
   });
 
   test("Total Debt is the same on Expenses and Forecast: 12,000 loan + 5,000 card + 1,200 installment = 18,200", async ({ page }) => {
-    knownDefect("E2E-JRN-18", "Forecast 'Total Debt' shows $17,000 (installment plans left out) while Expenses shows $18,200");
     await seedAndLogin(page, {
       user: userProfile({ currentBalance: 5000, initialBalance: 5000, ...usd }),
       expenseRules: [cashLoan(), creditCard(), installment()].map((r) => ({ ...r, startDate: "2026-03-10" })),

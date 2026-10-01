@@ -196,14 +196,14 @@ describe("overdue rows (D5): flagged, owed from today, never realized", () => {
       TODAY
     );
 
-    // a completed row dated after today was paid early: it is filed today (03-16), so 03-20 only has the 40
-    expect(day(balances, "2026-03-20").totalExpenses).toBe(40);
+    // the completed 100 is listed on 03-20 too (total 140), but only the 40 is still projected
+    expect(day(balances, "2026-03-20").totalExpenses).toBe(140);
     expect(day(balances, "2026-03-20").projectedExpenses).toBe(40);
   });
 });
 
-describe("a row paid before its date is filed on the day it was paid (today)", () => {
-  it("moves the money today, not on its due date", () => {
+describe("a row paid before its date moves its money on the day it was paid (today)", () => {
+  it("is listed on its due date but moves the balance today", () => {
     // B = 800 after paying a 200 bill early (due 03-20, paid today 03-16).
     const early = makeCompletedTransaction({
       id: "early",
@@ -218,9 +218,10 @@ describe("a row paid before its date is filed on the day it was paid (today)", (
     expect(closings(balances, ["2026-03-15", "2026-03-16", "2026-03-20", "2026-03-21"])).toEqual([
       1_000, 800, 800, 800,
     ]);
-    expect(day(balances, "2026-03-16").transactions.map((t) => t.id)).toEqual(["early"]);
-    expect(day(balances, "2026-03-16").totalExpenses).toBe(200);
-    expect(day(balances, "2026-03-20").transactions).toEqual([]);
+    // the chip and the day's total stay on the due date (03-20); today's closing is still the realized 800
+    expect(day(balances, "2026-03-20").transactions.map((t) => t.id)).toEqual(["early"]);
+    expect(day(balances, "2026-03-20").totalExpenses).toBe(200);
+    expect(day(balances, "2026-03-16").transactions).toEqual([]);
   });
 });
 

@@ -222,17 +222,29 @@ const assertViewIsConsistent = (view: DerivedView, window: Window): void => {
     // summed raw, not rounded: an invariant must not launder float noise away.
     // D5: an OVERDUE row (still projected, dated before today) is listed on its own day but moved
     // nothing, so it is not in that day's totals; what is owed is deducted on today (overdueOwed).
+    // A COMPLETED row dated after today was paid ahead of its date: it is listed on its own day but
+    // its money moved on today.
     const today = getTodayKey();
-    const rows = balance!.transactions.filter(
-      (t) => t.status !== "skipped" && !(t.status === "projected" && (t.actualDate || t.scheduledDate) < today)
-    );
+    const dateOf = (t: Transaction) => t.actualDate || t.scheduledDate;
+    const moved = (t: Transaction) =>
+      t.status === "completed" && dateOf(t) > today ? today : dateOf(t);
+    const rows = Array.from(daily.values())
+      .flatMap((b) => b.transactions)
+      .filter((t) => t.status !== "skipped" && !(t.status === "projected" && dateOf(t) < today))
+      .filter((t) => moved(t) === day);
     const sum = (type: Transaction["type"]) =>
       rows.filter((t) => t.type === type).reduce((total, t) => total + effective(t), 0);
     const income = sum("income");
     const expenses = sum("expense");
 
-    expect(balance!.totalIncome).toBeCloseTo(income, 6);
-    expect(balance!.totalExpenses).toBeCloseTo(expenses, 6);
+    // the day's own totals are what is LISTED on it (own date), not where the money moved
+    const listed = (type: Transaction["type"]) =>
+      balance!.transactions
+        .filter((t) => t.status !== "skipped" && !(t.status === "projected" && dateOf(t) < today))
+        .filter((t) => t.type === type)
+        .reduce((total, t) => total + effective(t), 0);
+    expect(balance!.totalIncome).toBeCloseTo(listed("income"), 6);
+    expect(balance!.totalExpenses).toBeCloseTo(listed("expense"), 6);
     expect(balance!.closingBalance).toBeCloseTo(
       balance!.openingBalance + income - expenses - (balance!.overdueOwed ?? 0),
       6
@@ -421,10 +433,8 @@ describe("overspend: the actual comes in above the projection", () => {
     await completeOccurrence(JAN_RENT_ID, 1_350);
 
     const after = snapshot();
-    // REWRITTEN (D5): the rent was paid today (01-01), ahead of its 01-05 due date, so the day
-    // that carries the money is 01-01; the merged row still reports its due date.
-    expect(after.daily.get("2026-01-01")!.totalExpenses).toBe(1_350);
-    expect(after.daily.get("2026-01-05")!.totalExpenses).toBe(0);
+    // the row is still listed (and totalled) on its due date; only its money moved earlier (01-01)
+    expect(after.daily.get("2026-01-05")!.totalExpenses).toBe(1_350);
     expect(rowOn(after, "2026-01-05").actualAmount).toBe(1_350);
   });
 
@@ -530,7 +540,7 @@ describe("correction: the recorded actual is edited, then moved to another day",
     // REWRITTEN (D5). 100 underspend against the 1200 projection, paid today (01-01):
     // 01-01 = 2,000 + 3,000 - 1,100 = 3,900; then 100 above the baseline: 6,900, 5,700, 8,700, 7,500.
     expect(closings(view)).toEqual([3_900, 3_900, 6_900, 5_700, 8_700, 7_500]);
-    expect(view.daily.get("2026-01-01")!.totalExpenses).toBe(1_100);
+    expect(view.daily.get("2026-01-05")!.totalExpenses).toBe(1_100);
     expect(view.transactions).toHaveLength(6);
   });
 
@@ -854,9 +864,8 @@ describe("reschedule: dragging an occurrence to a different day", () => {
     expect(view.transactions.filter((t) => t.occurrenceId === "exp-1_2026-03")).toHaveLength(1);
     expect(rowOn(view, "2026-03-20").status).toBe("completed");
     expect(view.daily.get("2026-03-05")!.totalExpenses).toBe(0);
-    // REWRITTEN (D5): paid on 01-01, ahead of its 03-20 date, the rent is filed on the day paid
-    expect(view.daily.get("2026-03-20")!.totalExpenses).toBe(0);
-    expect(view.daily.get("2026-01-01")!.totalExpenses).toBe(1_200);
+    // listed on its 03-20 date even though the money moved on 01-01 (paid ahead of its date, D5)
+    expect(view.daily.get("2026-03-20")!.totalExpenses).toBe(1_200);
   });
 });
 
@@ -1333,13 +1342,22 @@ describe("double-count guard", () => {
     const view = snapshot();
     // spelled out here rather than only inside the shared guard, because this is
     // the exact identity the calendar renders per day
+    // D5: a completed row dated after today (paid ahead of its date) is listed on its own day but its
+    // money moved on today; everything else moves on its own day.
+    const today = getTodayKey();
+    const dateOf = (t: Transaction) => t.actualDate || t.scheduledDate;
+    const movedOn = (t: Transaction) => (t.status === "completed" && dateOf(t) > today ? today : dateOf(t));
+    const allRows = Array.from(view.daily.values()).flatMap((b) => b.transactions).filter((t) => t.status !== "skipped");
     daysBetween(WINDOW.start, WINDOW.end).forEach((day) => {
       const balanceForDay = view.daily.get(day)!;
-      const net = balanceForDay.transactions
+      const listedNet = balanceForDay.transactions
         .filter((t) => t.status !== "skipped")
         .reduce((total, t) => total + (t.type === "income" ? effective(t) : -effective(t)), 0);
-      expect(net).toBeCloseTo(balanceForDay.totalIncome - balanceForDay.totalExpenses, 6);
-      expect(balanceForDay.closingBalance).toBeCloseTo(balanceForDay.openingBalance + net, 6);
+      expect(listedNet).toBeCloseTo(balanceForDay.totalIncome - balanceForDay.totalExpenses, 6);
+      const movedNet = allRows
+        .filter((t) => movedOn(t) === day)
+        .reduce((total, t) => total + (t.type === "income" ? effective(t) : -effective(t)), 0);
+      expect(balanceForDay.closingBalance).toBeCloseTo(balanceForDay.openingBalance + movedNet, 6);
     });
   });
 
@@ -1366,9 +1384,7 @@ describe("double-count guard", () => {
     const view = snapshot();
     expect(view.transactions).toHaveLength(6);
     expect(view.daily.get("2026-01-05")!.totalExpenses).toBe(0);
-    // REWRITTEN (D5): dated 01-06 but today is 01-01, so it is filed on the day it was paid
-    expect(view.daily.get("2026-01-06")!.totalExpenses).toBe(0);
-    expect(view.daily.get("2026-01-01")!.totalExpenses).toBe(900);
+    expect(view.daily.get("2026-01-06")!.totalExpenses).toBe(900);
     expect(balance()).toBe(1_100);
   });
 });

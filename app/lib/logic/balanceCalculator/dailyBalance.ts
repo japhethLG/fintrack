@@ -7,14 +7,16 @@
  *
  *   completed row  : already inside B. Realized history is "B minus everything completed after that
  *                    day". A completed row dated after today has already hit the account (it was
- *                    paid early), so it is filed on today.
+ *                    paid early): it stays LISTED and totalled on its own day, but its money moves
+ *                    on today, so today's closing is still the realized balance.
  *   upcoming row   : projected, dated today or later: applied on its own day (income first).
  *   overdue row    : projected, dated before today. Listed (flagged) on its own day but it does NOT
  *                    move the realized history and is not in that day's totals. Its EXPENSES are
  *                    owed now, so they are deducted on today (`overdueOwed`); overdue income has
  *                    not arrived and is not credited.
  *
- * Every day satisfies: closing = opening + totalIncome - totalExpenses - (overdueOwed on today).
+ * Every day satisfies: closing = opening + totalIncome - totalExpenses - (overdueOwed on today),
+ * except that a completed row dated after today counts on today instead of on its own day.
  *   skipped row    : nothing.
  *
  * Hence: today's OPENING balance is B (less anything completed today) and, when nothing is due or
@@ -60,20 +62,20 @@ export const calculateDailyBalances = (
 
   for (const t of transactions) {
     const own = rowDate(t);
-    // A COMPLETED row has already happened, so it is filed on its own day or today, whichever is
-    // earlier: paying a bill ahead of its due date moves the money (and shows the payment) on the
-    // day it was paid, which is what the realized balance already says.
-    const shown = t.status === "completed" && own > today ? today : own;
-    const list = rowsByDay.get(shown);
+    // Every row is LISTED and totalled on its own day (a chip never hops away from its date).
+    const list = rowsByDay.get(own);
     if (list) list.push(t);
-    else rowsByDay.set(shown, [t]);
+    else rowsByDay.set(own, [t]);
 
     if (t.status === "skipped") continue;
     const amount = amountOf(t);
     const signed = t.type === "income" ? amount : -amount;
 
     if (t.status === "completed") {
-      completedFlowByDay.set(shown, (completedFlowByDay.get(shown) ?? 0) + signed);
+      // A COMPLETED row has already happened: its money moved on its own day, or TODAY when it is
+      // dated later (paid ahead of its due date), which is what the realized balance already says.
+      const moved = own > today ? today : own;
+      completedFlowByDay.set(moved, (completedFlowByDay.get(moved) ?? 0) + signed);
     } else if (t.status === "projected" && own >= today) {
       openFlowByDay.set(own, (openFlowByDay.get(own) ?? 0) + signed);
     }

@@ -13,23 +13,20 @@ test.describe("brand-new user (no profile, no data)", () => {
     });
   }
 
-  test("pins today's behaviour: an empty account is graded 93/100 'Grade A' with a 'Great cash runway' insight", async ({ page }) => {
+  test("an empty account gets a neutral 'Not enough data yet' health card, not a 93/100 'Grade A'", async ({ page }) => {
+    // RESOLVED (it was a DECISION marker plus a test pinning "93/100 Grade A + Great cash runway"):
+    // with nothing recorded there is nothing to grade.
     await seedAndLogin(page, { user: userProfile({ currentBalance: 0, initialBalance: 0 }) }, { path: "/dashboard" });
-    await expect(page.getByRole("heading", { name: "93/100" })).toBeVisible();
-    await expect(page.getByText("Grade A")).toBeVisible();
-    await expect(page.getByText(/Great cash runway/)).toBeVisible();
+    await expect(page.getByText("Not enough data yet")).toBeVisible();
+    await expect(page.getByRole("heading", { name: "93/100" })).toHaveCount(0);
+    await expect(page.getByText("Grade A")).toHaveCount(0);
+    await expect(page.getByText(/Great cash runway/)).toHaveCount(0);
   });
 
-  test("DECISION: what should an empty account with 0 balance score?", async () => {
-    test.fixme(
-      true,
-      "DECISION: zero balance + zero data currently scores 93/100 Grade A ('Great cash runway! 90+ days covered', Forecast: '90+ days'). Product must decide: 'Not enough data' vs a neutral grade."
-    );
-  });
-
-  test("Forecast shows '90+ days' runway for an empty zero-balance account (pinned, see DECISION)", async ({ page }) => {
+  test("Forecast says 'Not enough data yet' for the runway of an empty zero-balance account, not '90+ days'", async ({ page }) => {
     await seedAndLogin(page, { user: userProfile({ currentBalance: 0, initialBalance: 0 }) }, { path: "/forecast" });
-    await expect(page.getByText("90+ days")).toBeVisible();
+    await expect(page.getByText("Not enough data yet")).toBeVisible();
+    await expect(page.getByText("90+ days")).toHaveCount(0);
   });
 });
 
