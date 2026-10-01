@@ -9,8 +9,12 @@
 
 import type { IncomeFrequency, ScheduleConfig } from "@/lib/types";
 import { addDays, addMonths, parseDate } from "@/lib/utils/dateUtils";
-import { calculateOccurrencesDetailed } from "./projectionEngine/occurrenceCalculator";
-import { MAX_WEEKEND_SHIFT_DAYS } from "./projectionEngine/dateUtils";
+import { calculateOccurrencesDetailed, type Occurrence } from "./projectionEngine/occurrenceCalculator";
+import {
+  MAX_WEEKEND_SHIFT_DAYS,
+  adjustForWeekend,
+  monthlyPaymentDate,
+} from "./projectionEngine/dateUtils";
 
 // ============================================================================
 // Small helpers
@@ -211,6 +215,11 @@ export interface SchedulePreviewInput {
 export interface SchedulePreview {
   /** Dates where the rule's occurrences LAND (weekend adjustment applied), ascending. */
   dates: Date[];
+  /**
+   * The same occurrences with the day each was nominally due (`logicalDate`); it differs from `date` when
+   * the weekend adjustment moved the payment (a Sunday 1 Nov payday paid on Friday 30 Oct).
+   */
+  occurrences: Occurrence[];
   /** The last day looked at: the end date (plus the weekend shift) or start + 3 months. */
   horizonEnd: Date | null;
 }
@@ -224,7 +233,7 @@ export interface SchedulePreview {
  */
 export const getSchedulePreview = (input: SchedulePreviewInput): SchedulePreview => {
   const start = startDateParts(input.startDate) ? parseDate(input.startDate) : null;
-  if (!start) return { dates: [], horizonEnd: null };
+  if (!start) return { dates: [], occurrences: [], horizonEnd: null };
 
   const end = input.hasEndDate && input.endDate ? parseDate(input.endDate) : null;
   const hasEnd = end !== null && !Number.isNaN(end.getTime());
@@ -244,11 +253,31 @@ export const getSchedulePreview = (input: SchedulePreviewInput): SchedulePreview
     horizonEnd
   );
 
-  let dates = occurrences.map((o) => o.date);
+  let shown = occurrences;
   if (input.maxOccurrences !== undefined && input.maxOccurrences >= 0) {
-    dates = dates.slice(0, Math.floor(input.maxOccurrences));
+    shown = shown.slice(0, Math.floor(input.maxOccurrences));
   }
-  return { dates, horizonEnd };
+  return { dates: shown.map((o) => o.date), occurrences: shown, horizonEnd };
+};
+
+/**
+ * The date of the LAST payment of a plan with a fixed number of monthly payments (an installment plan, a
+ * loan's term), placed exactly as the projection engine places it: `count - 1` months after the first
+ * payment (on the rule's Day of Month when it has one), moved for weekends when the rule asks.
+ * Null when the start date or the count cannot describe a plan.
+ */
+export const lastMonthlyPaymentDate = (
+  startDate: string,
+  dayOfMonth: unknown,
+  count: unknown,
+  weekendAdjustment: "before" | "after" | "none" | undefined
+): Date | null => {
+  const n = toWholeNumber(count);
+  if (!startDateParts(startDate) || n === undefined || n < 1) return null;
+  const logical = monthlyPaymentDate(parseDate(startDate), dayOfMonth, n - 1);
+  return weekendAdjustment === "before" || weekendAdjustment === "after"
+    ? adjustForWeekend(logical, weekendAdjustment)
+    : logical;
 };
 
 // ============================================================================

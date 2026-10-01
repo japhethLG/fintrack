@@ -7,6 +7,8 @@ import {
   IncomeFrequency,
   ScheduleConfig,
   LoanCalculationType,
+  LoanConfig,
+  CreditConfig,
   CreditPaymentStrategy,
   MinimumPaymentMethod,
 } from "@/lib/types";
@@ -16,6 +18,8 @@ import {
   sumScheduleInterest,
   type AmortizationStep,
 } from "@/lib/logic/amortization";
+import { buildPayoffSchedule, calculatePayoffSummary } from "@/lib/logic/creditCardCalculator";
+import { monthlyPaymentDate } from "@/lib/logic/projectionEngine/dateUtils";
 import { getTodayKey, parseDate } from "@/lib/utils/dateUtils";
 import {
   buildScheduleConfig as buildSharedScheduleConfig,
@@ -62,7 +66,15 @@ export interface ExpenseRuleFormValues {
   loanInterestRate: string;
   loanTermMonths: string;
   loanCalculationType: LoanCalculationType;
+  /**
+   * Carried through an edit untouched (no input). The one date that drives a loan's schedule is the
+   * First Payment Date (`startDate`); a new loan stores that same date here.
+   */
   loanStartDate: string;
+  /** An edit of a loan only: the monthly payment it was saved with, kept while the loan's terms are unchanged. */
+  loanStoredPayment?: number;
+  /** An edit of a loan only: the terms (`loanTermsKey`) that payment was saved with. */
+  loanStoredTerms?: string;
 
   // Credit config
   creditLimit: string;
@@ -124,7 +136,9 @@ export const getDefaultValues = (
     loanInterestRate: initialData?.loanInterestRate || "",
     loanTermMonths: initialData?.loanTermMonths || "",
     loanCalculationType: initialData?.loanCalculationType || "amortized",
-    loanStartDate: initialData?.loanStartDate || getTodayKey(),
+    loanStartDate: initialData?.loanStartDate || "",
+    loanStoredPayment: initialData?.loanStoredPayment,
+    loanStoredTerms: initialData?.loanStoredTerms,
     loanPaymentsMade: initialData?.loanPaymentsMade ?? 0,
 
     // Credit config
@@ -168,6 +182,10 @@ export const EXPENSE_MESSAGES = {
   day: "Day must be between 1 and 31",
   dueDateRequired: "Due date is required",
   fixedPayment: "Enter a fixed payment amount greater than 0",
+  amountPositive: "Amount must be greater than 0",
+  principalPositive: "Principal must be greater than 0",
+  balancePositive: "Current balance must be greater than 0",
+  totalPositive: "Total amount must be greater than 0",
 } as const;
 
 /**
@@ -201,7 +219,10 @@ export const expenseRuleSchema = yup.object({
   name: yup.string().required("Name is required").min(1, "Name is required"),
   amount: yup.string().when("expenseType", {
     is: (type: string) => ["fixed", "variable", "one-time"].includes(type),
-    then: (schema) => schema.required("Amount is required"),
+    then: (schema) =>
+      schema
+        .required("Amount is required")
+        .test("positive", EXPENSE_MESSAGES.amountPositive, blankOr((n) => n > 0)),
     otherwise: (schema) => schema.optional(),
   }),
   isVariableAmount: yup.boolean(),
@@ -222,7 +243,10 @@ export const expenseRuleSchema = yup.object({
   // Loan config
   loanPrincipal: yup.string().when("expenseType", {
     is: "cash_loan",
-    then: (schema) => schema.required("Principal amount is required"),
+    then: (schema) =>
+      schema
+        .required("Principal amount is required")
+        .test("positive", EXPENSE_MESSAGES.principalPositive, blankOr((n) => n > 0)),
     otherwise: (schema) => schema.optional(),
   }),
   loanCurrentBalance: yup.string().when("expenseType", {
@@ -269,7 +293,10 @@ export const expenseRuleSchema = yup.object({
     ),
   creditBalance: yup.string().when("expenseType", {
     is: "credit_card",
-    then: (schema) => schema.required("Current balance is required"),
+    then: (schema) =>
+      schema
+        .required("Current balance is required")
+        .test("positive", EXPENSE_MESSAGES.balancePositive, blankOr((n) => n > 0)),
     otherwise: (schema) => schema.optional(),
   }),
   creditApr: yup.string().when("expenseType", {
@@ -331,7 +358,10 @@ export const expenseRuleSchema = yup.object({
   // Installment config
   installmentTotal: yup.string().when("expenseType", {
     is: "installment",
-    then: (schema) => schema.required("Total amount is required"),
+    then: (schema) =>
+      schema
+        .required("Total amount is required")
+        .test("positive", EXPENSE_MESSAGES.totalPositive, blankOr((n) => n > 0)),
     otherwise: (schema) => schema.optional(),
   }),
   installmentCount: yup.string().when("expenseType", {
@@ -466,10 +496,63 @@ export type LoanPlanInput = Pick<
   | "loanInterestRate"
   | "loanTermMonths"
   | "loanCalculationType"
-  | "loanStartDate"
+  | "startDate"
 > & {
   /** Payments already made (an edit of a loan in progress): only the remaining term is amortized. */
   loanPaymentsMade?: number;
+  /** The loan's Day of Month, when it has one: the schedule's dates fall on it (as the engine dates them). */
+  dayOfMonth?: number | string;
+  /** An edit of a loan only: see `keptLoanPayment`. */
+  loanStoredPayment?: number;
+  loanStoredTerms?: string;
+};
+
+/** A number from form text, else NaN. */
+const num = (text: string | undefined): number => (text?.trim() ? Number(text) : NaN);
+
+/**
+ * The inputs that fix a loan's payment, normalised so "12000" and "12000.0" are the same: principal,
+ * current balance (blank = principal), rate, term and calculation type. Editing anything else (the name,
+ * the category, the schedule) leaves the payment alone.
+ */
+export const loanTermsKey = (
+  values: Pick<
+    ExpenseRuleFormValues,
+    | "loanPrincipal"
+    | "loanCurrentBalance"
+    | "loanInterestRate"
+    | "loanTermMonths"
+    | "loanCalculationType"
+  >
+): string => {
+  const principal = num(values.loanPrincipal);
+  const balance = values.loanCurrentBalance?.trim() ? num(values.loanCurrentBalance) : principal;
+  return [
+    principal,
+    balance,
+    num(values.loanInterestRate),
+    num(values.loanTermMonths),
+    values.loanCalculationType || "amortized",
+  ].join("|");
+};
+
+/**
+ * The payment a loan was saved with, while the user has not changed anything that fixes it (principal,
+ * current balance, rate, term, calculation type); otherwise `undefined` and the payment is worked out
+ * again from what is entered. A lender's payment is a contract: renaming a loan, or editing its schedule,
+ * must not re-price it from a balance that has drifted. Changing the balance IS a statement that the
+ * amount owed differs, so the payment is re-derived from the new balance over the remaining term, which
+ * is also what the wizard shows while the user types.
+ */
+export const keptLoanPayment = (
+  values: Pick<LoanPlanInput, "loanStoredPayment" | "loanStoredTerms"> &
+    Parameters<typeof loanTermsKey>[0]
+): number | undefined => {
+  const stored = values.loanStoredPayment;
+  if (typeof stored !== "number" || !Number.isFinite(stored) || stored <= 0) return undefined;
+  return values.loanStoredTerms !== undefined && values.loanStoredTerms === loanTermsKey(values)
+    ? stored
+    : undefined;
 };
 
 /**
@@ -489,18 +572,26 @@ export const calculateLoanPlan = (values: LoanPlanInput): LoanPlan | null => {
   const termMonths = made > 0 && made < totalTerm ? totalTerm - made : totalTerm;
   const calculationType = values.loanCalculationType || "amortized";
 
-  const payment = calculateLoanPayment(balance, annualRate, termMonths, calculationType, principal);
+  const kept = keptLoanPayment(values);
+  const payment =
+    kept ?? calculateLoanPayment(balance, annualRate, termMonths, calculationType, principal);
   if (!payment) return null;
 
-  const start = values.loanStartDate ? parseDate(values.loanStartDate) : new Date();
+  // The schedule is dated like the engine dates it: from the First Payment Date, on the Day of Month
+  const start = values.startDate ? parseDate(values.startDate) : new Date();
+  const anchor = Number.isNaN(start.getTime()) ? new Date() : start;
   const schedule = calculateAmortizationSchedule({
     principal: balance,
     annualRate,
     termMonths,
-    startDate: Number.isNaN(start.getTime()) ? new Date() : start,
+    monthlyPayment: kept,
+    startDate: anchor,
     calculationType,
     interestBasis: principal,
-  });
+  }).map((step, index) => ({
+    ...step,
+    date: monthlyPaymentDate(anchor, values.dayOfMonth, made + index),
+  }));
   return { balance, payment, schedule, totalInterest: sumScheduleInterest(schedule) };
 };
 
@@ -625,6 +716,60 @@ export const calculateRuleAmount = (values: ExpenseRuleFormValues): number => {
   return numberOr(values.amount, 0);
 };
 
+/** The `creditConfig` the wizard saves for a card (and the card figures it warns about). */
+export const buildCreditConfig = (values: ExpenseRuleFormValues): CreditConfig => {
+  const card = resolveCreditInputs(values);
+  return {
+    creditLimit: card.creditLimit,
+    currentBalance: card.currentBalance,
+    apr: card.apr,
+    minimumPaymentPercent: card.minimumPaymentPercent,
+    minimumPaymentFloor: card.minimumPaymentFloor,
+    minimumPaymentMethod: values.creditMinPaymentMethod,
+    statementDate: card.statementDate,
+    dueDate: card.dueDate,
+    paymentStrategy: values.creditPaymentStrategy,
+    ...(values.creditPaymentStrategy === "fixed" && card.fixedPayment
+      ? { fixedPaymentAmount: card.fixedPayment }
+      : {}),
+  };
+};
+
+/**
+ * Whether the card's payment never beats its interest (the card's detail view warns about the same
+ * thing: `isMinimumPaymentTrap`). The wizard shows it before the card is saved. False for a card with no
+ * balance to pay.
+ */
+export const isMinimumPaymentTrap = (values: ExpenseRuleFormValues): boolean => {
+  const config = buildCreditConfig(values);
+  if (!(config.currentBalance > 0)) return false;
+  return calculatePayoffSummary(config).isMinimumPaymentTrap;
+};
+
+/**
+ * How many payments the engine will generate for a plan with a known number of them, for the Schedule
+ * Preview (which would otherwise draw one a month for three months): a loan's remaining schedule, a card's
+ * payoff schedule (ONE payment for "Pay Full Balance"), an installment plan's count. Undefined = no limit.
+ */
+export const previewPaymentCount = (values: ExpenseRuleFormValues): number | undefined => {
+  switch (values.expenseType) {
+    case "cash_loan": {
+      const plan = calculateLoanPlan(values);
+      return plan ? plan.schedule.length : toWholeNumber(values.loanTermMonths);
+    }
+    case "credit_card": {
+      const config = buildCreditConfig(values);
+      if (!(config.currentBalance > 0)) return undefined;
+      // the engine drops a zero payment (both minimum-payment fields blank): it is no bill
+      return buildPayoffSchedule(config).filter((step) => step.payment >= 0.005).length;
+    }
+    case "installment":
+      return toWholeNumber(values.installmentCount);
+    default:
+      return undefined;
+  }
+};
+
 /**
  * The document the wizard saves, from the form's values. Created and edited rules go through the same
  * function. An edit carries `isActive`, `paymentsMade` and `installmentsPaid` through from the form's hidden
@@ -662,28 +807,16 @@ export const buildExpenseRulePayload = (values: ExpenseRuleFormValues): ExpenseR
       termMonths: wholeOr(values.loanTermMonths, 0),
       monthlyPayment: amount,
       calculationType: values.loanCalculationType,
-      loanStartDate: values.loanStartDate,
+      // One date drives the schedule: the first payment. A new loan's start date is that same day; an edit
+      // keeps the date the loan was already saved with.
+      loanStartDate: values.loanStartDate || values.startDate,
       firstPaymentDate: values.startDate,
       paymentsMade: values.loanPaymentsMade ?? 0,
     };
   }
 
   if (values.expenseType === "credit_card") {
-    const card = resolveCreditInputs(values);
-    payload.creditConfig = {
-      creditLimit: card.creditLimit,
-      currentBalance: card.currentBalance,
-      apr: card.apr,
-      minimumPaymentPercent: card.minimumPaymentPercent,
-      minimumPaymentFloor: card.minimumPaymentFloor,
-      minimumPaymentMethod: values.creditMinPaymentMethod,
-      statementDate: card.statementDate,
-      dueDate: card.dueDate,
-      paymentStrategy: values.creditPaymentStrategy,
-      ...(values.creditPaymentStrategy === "fixed" && card.fixedPayment
-        ? { fixedPaymentAmount: card.fixedPayment }
-        : {}),
-    };
+    payload.creditConfig = buildCreditConfig(values);
   }
 
   if (values.expenseType === "installment" && amount > 0) {
@@ -705,6 +838,15 @@ export const buildExpenseRulePayload = (values: ExpenseRuleFormValues): ExpenseR
 /** A finite number as text; `undefined` for a missing or non-finite (legacy NaN) value. */
 const finiteText = (n: number | undefined): string | undefined =>
   typeof n === "number" && Number.isFinite(n) ? String(n) : undefined;
+
+/** A stored loan's payment-fixing terms as the form holds them (see `loanTermsKey`). */
+const loanTermsOf = (loan: LoanConfig) => ({
+  loanPrincipal: loan.principalAmount?.toString() || "",
+  loanCurrentBalance: loan.currentBalance?.toString() || "",
+  loanInterestRate: loan.interestRate?.toString() || "",
+  loanTermMonths: loan.termMonths?.toString() || "",
+  loanCalculationType: loan.calculationType || ("amortized" as LoanCalculationType),
+});
 
 /**
  * A stored rule as the wizard's initial values. A schedule value the rule does not store (`dayOfWeek`,
@@ -734,6 +876,8 @@ export const expenseRuleToFormValues = (rule: ExpenseRule): Partial<ExpenseRuleF
   loanTermMonths: rule.loanConfig?.termMonths?.toString() || "",
   loanCalculationType: rule.loanConfig?.calculationType || "amortized",
   loanStartDate: rule.loanConfig?.loanStartDate || "",
+  loanStoredPayment: rule.loanConfig?.monthlyPayment,
+  loanStoredTerms: rule.loanConfig ? loanTermsKey(loanTermsOf(rule.loanConfig)) : undefined,
   loanPaymentsMade: rule.loanConfig?.paymentsMade ?? 0,
   // 0 means "no limit given" and a legacy NaN means the same: both show as a blank field
   creditLimit: rule.creditConfig?.creditLimit ? String(rule.creditConfig.creditLimit) : "",

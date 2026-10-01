@@ -6,10 +6,11 @@ import { FormInput, FormSelect, FormCheckbox, FormDatePicker } from "@/component
 import { Button, Icon } from "@/components/common";
 import { FREQUENCY_OPTIONS, DAYS_OF_WEEK, WEEKEND_ADJUSTMENT_OPTIONS } from "../constants";
 import SchedulePreview from "../components/SchedulePreview";
-import { ordinal, toWholeNumber } from "@/lib/logic/ruleSchedule";
+import { ordinal } from "@/lib/logic/ruleSchedule";
 import {
   buildScheduleConfig,
   getEffectiveFrequency,
+  previewPaymentCount,
   type ExpenseRuleFormValues,
 } from "../formHelpers";
 
@@ -49,13 +50,8 @@ const ScheduleStep: React.FC<IProps> = ({ totalSteps }) => {
     );
   };
 
-  // A loan or installment plan has a fixed number of payments
-  const maxPayments =
-    expenseType === "cash_loan"
-      ? toWholeNumber(values.loanTermMonths)
-      : expenseType === "installment"
-        ? toWholeNumber(values.installmentCount)
-        : undefined;
+  // A loan, a card that clears its balance and an installment plan have a known number of payments
+  const maxPayments = previewPaymentCount(values);
 
   const filteredFrequencyOptions = FREQUENCY_OPTIONS.filter((f) =>
     expenseType === "cash_loan" || expenseType === "credit_card" || expenseType === "installment"

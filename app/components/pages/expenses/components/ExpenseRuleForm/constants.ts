@@ -5,6 +5,7 @@ import {
   CreditPaymentStrategy,
   MinimumPaymentMethod,
 } from "@/lib/types";
+import { WEEKEND_ADJUSTMENT_LABELS } from "@/lib/utils/ruleLabels";
 
 export const EXPENSE_TYPES: { value: ExpenseType; label: string; description: string }[] = [
   {
@@ -75,8 +76,7 @@ export const DAYS_OF_WEEK = [
   { value: 6, label: "Saturday" },
 ];
 
-export const WEEKEND_ADJUSTMENT_OPTIONS = [
-  { value: "before", label: "Pay on Friday if weekend" },
-  { value: "after", label: "Pay on Monday if weekend" },
-  { value: "none", label: "No adjustment" },
-];
+export const WEEKEND_ADJUSTMENT_OPTIONS = (["before", "after", "none"] as const).map((value) => ({
+  value,
+  label: WEEKEND_ADJUSTMENT_LABELS[value],
+}));

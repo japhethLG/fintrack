@@ -81,7 +81,14 @@ export const getDefaultValues = (
 export const incomeSourceSchema = yup.object({
   sourceType: yup.string().required("Source type is required"),
   name: yup.string().required("Name is required").min(1, "Name is required"),
-  amount: yup.string().required("Amount is required"),
+  amount: yup
+    .string()
+    .required("Amount is required")
+    .test("positive", "Amount must be greater than 0", (value) => {
+      // blank is reported by `required`; anything else must be a number above zero
+      if (value === undefined || value === null || value.trim() === "") return true;
+      return Number.isFinite(Number(value)) && Number(value) > 0;
+    }),
   isVariableAmount: yup.boolean(),
   // Frequency, start date, end date, day of month and the semi-monthly days are checked together by
   // `validateSchedule` (see `collectIncomeIssues`); here they only need to exist.

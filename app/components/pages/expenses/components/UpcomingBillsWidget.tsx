@@ -7,6 +7,7 @@ import { Card, Icon, Select, Badge } from "@/components/common";
 import { addDays, formatDate, getTodayKey, parseDate } from "@/lib/utils/dateUtils";
 import { useCurrency } from "@/lib/hooks/useCurrency";
 import { useModal } from "@/components/modals";
+import { categoryLabel } from "@/lib/utils/categoryLabel";
 
 const RANGE_OPTIONS = [
   { value: "14", label: "Next 14 days" },
@@ -115,7 +116,7 @@ const UpcomingBillsWidget: React.FC = () => {
                         </div>
                         <div>
                           <p className="font-bold text-white">{t.name}</p>
-                          <p className="text-xs text-gray-400 capitalize">{t.category}</p>
+                          <p className="text-xs text-gray-400">{categoryLabel(t.category)}</p>
                         </div>
                       </div>
                       <div className="text-right">

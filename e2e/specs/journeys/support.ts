@@ -254,7 +254,7 @@ export const addFixedExpenseViaWizard = async (
 
 export const addLoanViaWizard = async (
   page: Page,
-  o: ExpenseWizardCommon & { principal: number; ratePct: number; termMonths: number; firstPayment: string; loanStart?: string; currentBalance?: number }
+  o: ExpenseWizardCommon & { principal: number; ratePct: number; termMonths: number; firstPayment: string; currentBalance?: number }
 ): Promise<void> => {
   await pickExpenseType(page, "Loan");
   await page.getByLabel("Loan Name *").fill(o.name);
@@ -262,7 +262,6 @@ export const addLoanViaWizard = async (
   if (o.currentBalance !== undefined) await page.getByLabel(/Current Balance/).fill(String(o.currentBalance));
   await page.getByLabel(/Annual Interest Rate/).fill(String(o.ratePct));
   await page.getByLabel(/Term \(Months\)/).fill(String(o.termMonths));
-  if (o.loanStart) await fillDate(page, "loanStartDate", o.loanStart);
   await cont(page);
   await fillDate(page, "startDate", o.firstPayment);
   const dom = page.getByLabel("Day of Month");

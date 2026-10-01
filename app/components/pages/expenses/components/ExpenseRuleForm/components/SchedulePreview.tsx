@@ -5,6 +5,10 @@ import { Card } from "@/components/common";
 import type { IncomeFrequency, ScheduleConfig } from "@/lib/types";
 import { getSchedulePreview, PREVIEW_HORIZON_MONTHS } from "@/lib/logic/ruleSchedule";
 
+/** "Sun Nov 1" */
+const dayLabel = (date: Date): string =>
+  `${date.toLocaleDateString("en-US", { weekday: "short" })} ${date.toLocaleDateString("en-US", { month: "short" })} ${date.getDate()}`;
+
 /** How many dates are drawn as cards; the rest are counted in "+N more occurrences". */
 const MAX_CARDS = 8;
 
@@ -34,7 +38,7 @@ const SchedulePreview: React.FC<IProps> = ({
   scheduleConfig,
   maxOccurrences,
 }) => {
-  const { dates } = useMemo(
+  const { occurrences } = useMemo(
     () =>
       getSchedulePreview({
         frequency,
@@ -48,7 +52,7 @@ const SchedulePreview: React.FC<IProps> = ({
     [frequency, startDate, endDate, hasEndDate, weekendAdjustment, scheduleConfig, maxOccurrences]
   );
 
-  if (dates.length === 0) return null;
+  if (occurrences.length === 0) return null;
 
   const showsHorizon = !(hasEndDate && endDate) && frequency !== "one-time";
 
@@ -61,21 +65,30 @@ const SchedulePreview: React.FC<IProps> = ({
         </p>
       )}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        {dates.slice(0, MAX_CARDS).map((date, i) => (
-          <div key={i} className="bg-gray-800 rounded-lg p-3 text-center">
-            <p className="text-xs text-gray-400">
-              {date.toLocaleDateString("en-US", { month: "short" })}
-            </p>
-            <p className="text-2xl font-bold text-white">{date.getDate()}</p>
-            <p className="text-xs text-gray-400">
-              {date.toLocaleDateString("en-US", { weekday: "short" })}
-            </p>
-          </div>
-        ))}
+        {occurrences.slice(0, MAX_CARDS).map(({ date, logicalDate }, i) => {
+          // A weekend adjustment moved this payment off the day it is nominally due: say so
+          const moved = date.getTime() !== logicalDate.getTime();
+          return (
+            <div key={i} className="bg-gray-800 rounded-lg p-3 text-center">
+              <p className="text-xs text-gray-400">
+                {date.toLocaleDateString("en-US", { month: "short" })}
+              </p>
+              <p className="text-2xl font-bold text-white">{date.getDate()}</p>
+              <p className="text-xs text-gray-400">
+                {date.toLocaleDateString("en-US", { weekday: "short" })}
+              </p>
+              {moved && (
+                <span className="block text-[11px] leading-tight text-gray-500 mt-1">
+                  (moved from {dayLabel(logicalDate)})
+                </span>
+              )}
+            </div>
+          );
+        })}
       </div>
-      {dates.length > MAX_CARDS && (
+      {occurrences.length > MAX_CARDS && (
         <p className="text-xs text-gray-500 mt-3 text-center">
-          +{dates.length - MAX_CARDS} more occurrences
+          +{occurrences.length - MAX_CARDS} more occurrences
         </p>
       )}
     </Card>

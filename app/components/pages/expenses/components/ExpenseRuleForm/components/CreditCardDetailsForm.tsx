@@ -7,6 +7,7 @@ import { EXPENSE_CATEGORY_LABELS } from "@/lib/constants";
 import { useCurrency } from "@/lib/hooks/useCurrency";
 import { PAYMENT_STRATEGIES, MINIMUM_PAYMENT_METHODS } from "../constants";
 import type { ExpenseRuleFormValues } from "../formHelpers";
+import MinimumPaymentWarning from "./MinimumPaymentWarning";
 
 const CreditCardDetailsForm: React.FC = () => {
   const { currencySymbol } = useCurrency();
@@ -141,6 +142,10 @@ const CreditCardDetailsForm: React.FC = () => {
 
       <div>
         <FormSelect inputName="category" label="Category" options={categoryOptions} isRequired />
+      </div>
+
+      <div className="md:col-span-2 empty:hidden">
+        <MinimumPaymentWarning />
       </div>
     </div>
   );
