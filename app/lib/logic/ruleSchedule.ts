@@ -210,6 +210,11 @@ export interface SchedulePreviewInput {
   scheduleConfig: ScheduleConfig;
   /** A plan with a fixed number of payments (loan term, installment count) previews at most that many. */
   maxOccurrences?: number;
+  /**
+   * Payments of the plan already made (an edit of a loan / installment plan part-way through): the preview
+   * starts at the next payment due instead of the first one; `maxOccurrences` counts the REMAINING ones.
+   */
+  alreadyPaid?: number;
 }
 
 export interface SchedulePreview {
@@ -237,9 +242,10 @@ export const getSchedulePreview = (input: SchedulePreviewInput): SchedulePreview
 
   const end = input.hasEndDate && input.endDate ? parseDate(input.endDate) : null;
   const hasEnd = end !== null && !Number.isNaN(end.getTime());
+  const paid = Math.max(0, Math.floor(input.alreadyPaid ?? 0));
   const horizonEnd = hasEnd
     ? addDays(end as Date, MAX_WEEKEND_SHIFT_DAYS)
-    : addMonths(start, PREVIEW_HORIZON_MONTHS);
+    : addMonths(start, PREVIEW_HORIZON_MONTHS + paid);
 
   const occurrences = calculateOccurrencesDetailed(
     {
@@ -253,7 +259,7 @@ export const getSchedulePreview = (input: SchedulePreviewInput): SchedulePreview
     horizonEnd
   );
 
-  let shown = occurrences;
+  let shown = occurrences.slice(paid);
   if (input.maxOccurrences !== undefined && input.maxOccurrences >= 0) {
     shown = shown.slice(0, Math.floor(input.maxOccurrences));
   }

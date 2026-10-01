@@ -20,8 +20,10 @@ interface IProps {
   weekendAdjustment: "before" | "after" | "none";
   /** The `scheduleConfig` the form will save (its `buildScheduleConfig`), so the preview IS the saved rule. */
   scheduleConfig: ScheduleConfig;
-  /** A plan with a fixed number of payments (loan term, installment count). */
+  /** A plan with a fixed number of payments (loan term, installment count): the REMAINING ones. */
   maxOccurrences?: number;
+  /** Payments already made: the preview starts at the next one due. */
+  alreadyPaid?: number;
 }
 
 /**
@@ -37,6 +39,7 @@ const SchedulePreview: React.FC<IProps> = ({
   weekendAdjustment,
   scheduleConfig,
   maxOccurrences,
+  alreadyPaid = 0,
 }) => {
   const { occurrences } = useMemo(
     () =>
@@ -48,8 +51,9 @@ const SchedulePreview: React.FC<IProps> = ({
         weekendAdjustment,
         scheduleConfig,
         maxOccurrences,
+        alreadyPaid,
       }),
-    [frequency, startDate, endDate, hasEndDate, weekendAdjustment, scheduleConfig, maxOccurrences]
+    [frequency, startDate, endDate, hasEndDate, weekendAdjustment, scheduleConfig, maxOccurrences, alreadyPaid]
   );
 
   if (occurrences.length === 0) return null;
@@ -59,10 +63,16 @@ const SchedulePreview: React.FC<IProps> = ({
   return (
     <Card padding="md" className="mt-6">
       <h4 className="font-bold text-white mb-1">Schedule Preview</h4>
-      {showsHorizon && (
+      {alreadyPaid > 0 ? (
         <p className="text-xs text-gray-500 mb-3">
-          The first {PREVIEW_HORIZON_MONTHS} months from the start date, as they will be scheduled
+          The payments still to make ({alreadyPaid} already paid), as they will be scheduled
         </p>
+      ) : (
+        showsHorizon && (
+          <p className="text-xs text-gray-500 mb-3">
+            The first {PREVIEW_HORIZON_MONTHS} months from the start date, as they will be scheduled
+          </p>
+        )
       )}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
         {occurrences.slice(0, MAX_CARDS).map(({ date, logicalDate }, i) => {

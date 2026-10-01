@@ -10,6 +10,7 @@ import { ordinal } from "@/lib/logic/ruleSchedule";
 import {
   buildScheduleConfig,
   getEffectiveFrequency,
+  previewAlreadyPaid,
   previewPaymentCount,
   type ExpenseRuleFormValues,
 } from "../formHelpers";
@@ -200,6 +201,7 @@ const ScheduleStep: React.FC<IProps> = ({ totalSteps }) => {
           weekendAdjustment={weekendAdjustment}
           scheduleConfig={buildScheduleConfig(values)}
           maxOccurrences={maxPayments}
+          alreadyPaid={previewAlreadyPaid(values)}
         />
       )}
     </div>

@@ -763,11 +763,20 @@ export const previewPaymentCount = (values: ExpenseRuleFormValues): number | und
       // the engine drops a zero payment (both minimum-payment fields blank): it is no bill
       return buildPayoffSchedule(config).filter((step) => step.payment >= 0.005).length;
     }
-    case "installment":
-      return toWholeNumber(values.installmentCount);
+    case "installment": {
+      const count = toWholeNumber(values.installmentCount);
+      return count === undefined ? undefined : Math.max(0, count - (toWholeNumber(values.installmentsPaid) ?? 0));
+    }
     default:
       return undefined;
   }
+};
+
+/** Payments of a loan / installment plan already made (an edit part-way through); 0 otherwise. */
+export const previewAlreadyPaid = (values: ExpenseRuleFormValues): number => {
+  if (values.expenseType === "cash_loan") return toWholeNumber(values.loanPaymentsMade) ?? 0;
+  if (values.expenseType === "installment") return toWholeNumber(values.installmentsPaid) ?? 0;
+  return 0;
 };
 
 /**

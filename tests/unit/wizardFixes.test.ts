@@ -7,6 +7,7 @@ import {
   getDefaultValues,
   isMinimumPaymentTrap,
   keptLoanPayment,
+  previewAlreadyPaid,
   previewPaymentCount,
   collectExpenseIssues,
   type ExpenseRuleFormValues,
@@ -186,5 +187,36 @@ describe("amounts must be above zero, with a message", () => {
     expect(messages({ expenseType: "installment", installmentTotal: "-1" })).toContain(
       "Total amount must be greater than 0"
     );
+  });
+});
+
+// Wizards agent follow-up: editing a plan part-way through previewed its schedule from the FIRST payment.
+describe("schedule preview of a plan part-way through", () => {
+  const installment = (installmentsPaid: number): ExpenseRuleFormValues => ({
+    ...getDefaultValues(),
+    expenseType: "installment",
+    installmentCount: 6,
+    installmentsPaid,
+  } as unknown as ExpenseRuleFormValues);
+
+  it("counts and starts from the payments still to make (6 monthly on the 5th, 2 paid: Mar 5 .. Jun 5)", () => {
+    const values = installment(2);
+    expect(previewPaymentCount(values)).toBe(4);
+    expect(previewAlreadyPaid(values)).toBe(2);
+    const preview = getSchedulePreview({
+      frequency: "monthly",
+      startDate: "2026-01-05",
+      weekendAdjustment: "none",
+      scheduleConfig: { dayOfMonth: 5 },
+      maxOccurrences: previewPaymentCount(values),
+      alreadyPaid: previewAlreadyPaid(values),
+    });
+    expect(preview.dates.map(ymd)).toEqual(["2026-03-05", "2026-04-05", "2026-05-05", "2026-06-05"]);
+  });
+
+  it("a fresh plan still previews from its first payment", () => {
+    const values = installment(0);
+    expect(previewPaymentCount(values)).toBe(6);
+    expect(previewAlreadyPaid(values)).toBe(0);
   });
 });
