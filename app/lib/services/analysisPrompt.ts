@@ -1,4 +1,5 @@
 import type {
+  CreditConfig,
   Transaction,
   IncomeSource,
   ExpenseRule,
@@ -6,6 +7,7 @@ import type {
   VarianceReport,
 } from "@/lib/types";
 import { getCurrencySymbol } from "@/lib/utils/currency";
+import { calculatePayoffSummary } from "@/lib/logic/creditCardCalculator";
 import { getTodayKey, lastDayOfNextDays } from "@/lib/utils/dateUtils";
 
 /** The "Upcoming" window of the prompt: the next 30 days, today included (see `lastDayOfNextDays`). */
@@ -50,6 +52,22 @@ const formatIncomeSources = (incomeSources: IncomeSource[], symbol: string) => {
     .join("\n");
 };
 
+/**
+ * The card's minimum-payment trap, in words, when the app's own detection (the same
+ * `isMinimumPaymentTrap` the card's detail view warns with) says the payment barely covers the interest.
+ */
+const minimumPaymentTrapNote = (config: CreditConfig, symbol: string): string => {
+  const summary = calculatePayoffSummary(config);
+  if (!summary.isMinimumPaymentTrap) return "";
+  const payoff = Number.isFinite(summary.monthsToPayoff)
+    ? `it would take ${summary.monthsToPayoff} months to pay off`
+    : "it will never be paid off at this payment";
+  return (
+    `\n  WARNING (minimum-payment trap): the payment of ${symbol}${summary.effectiveMonthlyPayment.toFixed(2)} ` +
+    `barely covers the monthly interest of ${symbol}${summary.currentMonthlyInterest.toFixed(2)}; ${payoff}.`
+  );
+};
+
 const formatExpenseRules = (expenseRules: ExpenseRule[], symbol: string) => {
   if (!expenseRules || expenseRules.length === 0) return "No expense rules configured.";
   return expenseRules
@@ -61,6 +79,7 @@ const formatExpenseRules = (expenseRules: ExpenseRule[], symbol: string) => {
       }
       if (r.creditConfig) {
         details += `\n  Credit Card: ${symbol}${r.creditConfig.currentBalance}/${symbol}${r.creditConfig.creditLimit}, ${r.creditConfig.apr}% APR`;
+        details += minimumPaymentTrapNote(r.creditConfig, symbol);
       }
       if (r.isPriority) details += " [PRIORITY]";
       return details;

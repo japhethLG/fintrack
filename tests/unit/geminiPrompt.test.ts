@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { makeExpenseRule, makeManualTransaction } from "../helpers/builders";
+import { makeCreditRule, makeExpenseRule, makeManualTransaction } from "../helpers/builders";
+import { calculatePayoffSummary } from "@/lib/logic/creditCardCalculator";
 
 /**
  * E2E-ROB-12: the prompt's "Upcoming (next 30 days)" list used to be the first 15 projected rows of whatever
@@ -108,5 +109,33 @@ describe("the AI prompt's transaction lists", () => {
     // nearest 15 of Mar 11..Mar 30 are Mar 11..Mar 25
     expect(listed[0]).toBe("Bill 11");
     expect(listed[14]).toBe("Bill 25");
+  });
+});
+
+describe("the AI prompt flags the credit-card minimum-payment trap (MANUAL-j)", () => {
+  const promptFor = async (rules: ReturnType<typeof makeCreditRule>[]) => {
+    sent.length = 0;
+    await analyzeBudget({ transactions: [], incomeSources: [], expenseRules: rules, currentBalance: 1_000 });
+    return sent[0];
+  };
+
+  it("a card whose payment barely covers its interest carries a WARNING line with the numbers", async () => {
+    // 5,000 at 24% APR: interest 100.00 a month; the 2% minimum is also 100.00
+    const trap = makeCreditRule({ id: "trap", name: "Trap Card" });
+    expect(calculatePayoffSummary(trap.creditConfig!).isMinimumPaymentTrap).toBe(true); // the app's own detection
+    const text = await promptFor([trap]);
+    expect(text).toContain("Trap Card");
+    expect(text).toContain("minimum-payment trap");
+    expect(text).toMatch(/payment of \D?100\.00 barely covers the monthly interest of \D?100\.00/);
+    expect(text).toContain("never be paid off");
+  });
+
+  it("a card paid down properly gets no warning", async () => {
+    const fine = makeCreditRule(
+      { id: "fine", name: "Fine Card" },
+      { paymentStrategy: "fixed", fixedPaymentAmount: 1_000 }
+    );
+    expect(calculatePayoffSummary(fine.creditConfig!).isMinimumPaymentTrap).toBe(false);
+    expect(await promptFor([fine])).not.toContain("minimum-payment trap");
   });
 });
