@@ -1,4 +1,5 @@
 import { IncomeSourceType, IncomeFrequency } from "@/lib/types";
+import { FREQUENCY_SHORT_LABELS, WEEKEND_ADJUSTMENT_LABELS } from "@/lib/utils/ruleLabels";
 
 export const INCOME_SOURCE_TYPES: {
   value: IncomeSourceType;
@@ -44,11 +45,10 @@ export const DAYS_OF_WEEK = [
   { value: 6, label: "Saturday" },
 ];
 
-export const WEEKEND_ADJUSTMENT_OPTIONS = [
-  { value: "before", label: "Pay on Friday if weekend" },
-  { value: "after", label: "Pay on Monday if weekend" },
-  { value: "none", label: "No adjustment" },
-];
+export const WEEKEND_ADJUSTMENT_OPTIONS = (["before", "after", "none"] as const).map((value) => ({
+  value,
+  label: WEEKEND_ADJUSTMENT_LABELS[value],
+}));
 
 export const SOURCE_TYPE_ICONS: Record<string, string> = {
   salary: "work",
@@ -61,14 +61,5 @@ export const SOURCE_TYPE_ICONS: Record<string, string> = {
   other: "attach_money",
 };
 
-export const FREQUENCY_LABELS: Record<string, string> = {
-  "one-time": "One-time",
-  daily: "Daily",
-  weekly: "Weekly",
-  "bi-weekly": "Every 2 weeks",
-  "semi-monthly": "Semi-monthly",
-  monthly: "Monthly",
-  quarterly: "Quarterly",
-  yearly: "Yearly",
-};
+export const FREQUENCY_LABELS: Record<string, string> = FREQUENCY_SHORT_LABELS;
 

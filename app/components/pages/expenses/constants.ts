@@ -1,4 +1,4 @@
-import { IncomeFrequency } from "@/lib/types";
+import { FREQUENCY_SHORT_LABELS } from "@/lib/utils/ruleLabels";
 
 export const EXPENSE_TYPE_ICONS: Record<string, string> = {
   fixed: "event_repeat",
@@ -30,14 +30,5 @@ export const EXPENSE_FILTER_OPTIONS = [
   { value: "one-time", label: EXPENSE_TYPE_LABELS["one-time"] },
 ];
 
-export const FREQUENCY_LABELS: Record<string, string> = {
-  "one-time": "One-time",
-  daily: "Daily",
-  weekly: "Weekly",
-  "bi-weekly": "Every 2 weeks",
-  "semi-monthly": "Semi-monthly",
-  monthly: "Monthly",
-  quarterly: "Quarterly",
-  yearly: "Yearly",
-};
+export const FREQUENCY_LABELS: Record<string, string> = FREQUENCY_SHORT_LABELS;
 

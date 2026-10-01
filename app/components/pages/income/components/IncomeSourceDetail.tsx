@@ -6,6 +6,8 @@ import { Button, Card, Icon, Badge } from "@/components/common";
 import { cn } from "@/lib/utils/cn";
 import { useCurrency } from "@/lib/hooks/useCurrency";
 import { SOURCE_TYPE_ICONS, FREQUENCY_LABELS } from "../constants";
+import { categoryLabel } from "@/lib/utils/categoryLabel";
+import { weekendAdjustmentLabel } from "@/lib/utils/ruleLabels";
 import { parseDate } from "@/lib/utils/dateUtils";
 import { describeSchedule } from "@/lib/logic/ruleSchedule";
 
@@ -43,7 +45,7 @@ const IncomeSourceDetail: React.FC<IProps> = ({ source, onEdit, onDelete, onTogg
               <Badge variant="default" className="capitalize">
                 {source.sourceType}
               </Badge>
-              <Badge variant="default">{source.category}</Badge>
+              <Badge variant="default">{categoryLabel(source.category)}</Badge>
             </div>
           </div>
         </div>
@@ -83,10 +85,8 @@ const IncomeSourceDetail: React.FC<IProps> = ({ source, onEdit, onDelete, onTogg
         </div>
         <div>
           <p className="text-gray-400 text-sm mb-1">Weekend Handling</p>
-          <p className="text-white font-medium capitalize">
-            {source.weekendAdjustment === "none"
-              ? "No adjustment"
-              : `Pay ${source.weekendAdjustment === "before" ? "Friday" : "Monday"} if weekend`}
+          <p className="text-white font-medium">
+            {weekendAdjustmentLabel(source.weekendAdjustment)}
           </p>
         </div>
         <div>

@@ -15,7 +15,9 @@ import {
   type PayoffScenario,
 } from "@/lib/logic/creditCardCalculator";
 import { parseDate } from "@/lib/utils/dateUtils";
-import { describeSchedule, ordinal } from "@/lib/logic/ruleSchedule";
+import { describeSchedule, lastMonthlyPaymentDate, ordinal } from "@/lib/logic/ruleSchedule";
+import { categoryLabel } from "@/lib/utils/categoryLabel";
+import { weekendAdjustmentLabel } from "@/lib/utils/ruleLabels";
 
 interface IProps {
   rule: ExpenseRule;
@@ -62,6 +64,23 @@ const ExpenseRuleDetail: React.FC<IProps> = ({ rule, onEdit, onDelete, onToggleA
 
   const displayAmount = getDisplayAmount();
 
+  // A plan with a fixed number of payments ends with its last one (a card or a plain rule has no end)
+  const lastPayment = rule.installmentConfig
+    ? lastMonthlyPaymentDate(
+        rule.startDate,
+        rule.scheduleConfig?.dayOfMonth,
+        rule.installmentConfig.installmentCount,
+        rule.weekendAdjustment
+      )
+    : rule.loanConfig
+      ? lastMonthlyPaymentDate(
+          rule.startDate,
+          rule.scheduleConfig?.dayOfMonth,
+          rule.loanConfig.termMonths,
+          rule.weekendAdjustment
+        )
+      : null;
+
   const getScheduleDescription = () =>
     describeSchedule(rule.frequency, rule.scheduleConfig, rule.startDate, FREQUENCY_LABELS[rule.frequency]);
 
@@ -82,7 +101,7 @@ const ExpenseRuleDetail: React.FC<IProps> = ({ rule, onEdit, onDelete, onToggleA
             <h2 className="text-2xl font-bold text-white">{rule.name}</h2>
             <div className="flex items-center gap-2 mt-1">
               <Badge variant="default">{EXPENSE_TYPE_LABELS[rule.expenseType]}</Badge>
-              <Badge variant="default">{EXPENSE_CATEGORY_LABELS[rule.category]}</Badge>
+              <Badge variant="default">{EXPENSE_CATEGORY_LABELS[rule.category] ?? categoryLabel(rule.category)}</Badge>
               {rule.isPriority && <Badge variant="warning">Priority</Badge>}
             </div>
           </div>
@@ -581,21 +600,25 @@ const ExpenseRuleDetail: React.FC<IProps> = ({ rule, onEdit, onDelete, onToggleA
       {/* Schedule Details */}
       <div className="grid grid-cols-2 gap-6 mb-6">
         <div>
-          <p className="text-gray-400 text-sm mb-1">Start Date</p>
+          <p className="text-gray-400 text-sm mb-1">
+            {rule.loanConfig || rule.installmentConfig ? "First Payment Date" : "Start Date"}
+          </p>
           <p className="text-white font-medium">{parseDate(rule.startDate).toLocaleDateString()}</p>
         </div>
         <div>
           <p className="text-gray-400 text-sm mb-1">End Date</p>
           <p className="text-white font-medium">
-            {rule.endDate ? parseDate(rule.endDate).toLocaleDateString() : "Ongoing"}
+            {rule.endDate
+              ? parseDate(rule.endDate).toLocaleDateString()
+              : lastPayment
+                ? lastPayment.toLocaleDateString()
+                : "Ongoing"}
           </p>
         </div>
         <div>
           <p className="text-gray-400 text-sm mb-1">Weekend Handling</p>
-          <p className="text-white font-medium capitalize">
-            {rule.weekendAdjustment === "none"
-              ? "No adjustment"
-              : `Pay ${rule.weekendAdjustment === "before" ? "Friday" : "Monday"} if weekend`}
+          <p className="text-white font-medium">
+            {weekendAdjustmentLabel(rule.weekendAdjustment)}
           </p>
         </div>
         <div>

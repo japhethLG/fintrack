@@ -6,7 +6,14 @@ import { Card, Badge } from "@/components/common";
 import { FormInput } from "@/components/formElements";
 import { EXPENSE_CATEGORY_LABELS } from "@/lib/constants";
 import { useCurrency } from "@/lib/hooks/useCurrency";
+import { categoryLabel } from "@/lib/utils/categoryLabel";
+import { frequencyLabel, weekendAdjustmentLabel } from "@/lib/utils/ruleLabels";
+import { parseDate } from "@/lib/utils/dateUtils";
+import { describeSchedule, lastMonthlyPaymentDate } from "@/lib/logic/ruleSchedule";
+import { EXPENSE_TYPE_LABELS } from "../../../constants";
+import MinimumPaymentWarning from "../components/MinimumPaymentWarning";
 import {
+  buildScheduleConfig,
   calculateLoanPlan,
   calculateRuleAmount,
   getEffectiveFrequency,
@@ -44,6 +51,26 @@ const ReviewStep: React.FC<IProps> = ({ error }) => {
     ]
   );
   const calculatedLoanPayment = loanPlan?.payment ?? null;
+  const isOneTime = frequency === "one-time";
+  const schedule = describeSchedule(
+    frequency,
+    buildScheduleConfig(values),
+    values.startDate,
+    frequencyLabel(frequency)
+  );
+  const showDate = (iso: string) => parseDate(iso).toLocaleDateString();
+  // An installment plan ends with its last payment, placed as the engine places it
+  const installmentCount = Number(values.installmentCount);
+  const installmentTotal = Number(values.installmentTotal);
+  const lastInstallment =
+    expenseType === "installment"
+      ? lastMonthlyPaymentDate(
+          values.startDate,
+          values.dayOfMonth,
+          values.installmentCount,
+          values.weekendAdjustment
+        )
+      : null;
   const card = resolveCreditInputs(values);
   const displayAmount = calculateRuleAmount(values);
 
@@ -55,7 +82,7 @@ const ReviewStep: React.FC<IProps> = ({ error }) => {
         <div className="grid grid-cols-2 gap-4">
           <div>
             <p className="text-xs text-gray-400">Type</p>
-            <p className="text-white font-medium capitalize">{expenseType.replace("_", " ")}</p>
+            <p className="text-white font-medium">{EXPENSE_TYPE_LABELS[expenseType] ?? expenseType}</p>
           </div>
           <div>
             <p className="text-xs text-gray-400">Name</p>
@@ -78,12 +105,34 @@ const ReviewStep: React.FC<IProps> = ({ error }) => {
           </div>
           <div>
             <p className="text-xs text-gray-400">Frequency</p>
-            <p className="text-white font-medium capitalize">{frequency.replace("-", " ")}</p>
+            <p className="text-white font-medium">{frequencyLabel(frequency)}</p>
           </div>
           <div>
             <p className="text-xs text-gray-400">Category</p>
-            <p className="text-white font-medium">{EXPENSE_CATEGORY_LABELS[category]}</p>
+            <p className="text-white font-medium">
+              {EXPENSE_CATEGORY_LABELS[category] ?? categoryLabel(category)}
+            </p>
           </div>
+          {!isOneTime && (
+            <div className="col-span-2">
+              <p className="text-xs text-gray-400">Schedule</p>
+              <p className="text-white font-medium">{schedule}</p>
+            </div>
+          )}
+          <div>
+            <p className="text-xs text-gray-400">
+              {isOneTime ? "Date" : expenseType === "credit_card" ? "Tracking From" : "First Payment"}
+            </p>
+            <p className="text-white font-medium">{showDate(values.startDate)}</p>
+          </div>
+          {!isOneTime && (
+            <div>
+              <p className="text-xs text-gray-400">Weekend Adjustment</p>
+              <p className="text-white font-medium">
+                {weekendAdjustmentLabel(values.weekendAdjustment)}
+              </p>
+            </div>
+          )}
           <div>
             <p className="text-xs text-gray-400">Priority</p>
             <Badge variant={isPriority ? "warning" : "default"}>
@@ -118,6 +167,31 @@ const ReviewStep: React.FC<IProps> = ({ error }) => {
           </div>
         )}
 
+        {expenseType === "installment" && (
+          <div className="mt-4 pt-4 border-t border-gray-700 grid grid-cols-2 gap-4">
+            <div>
+              <p className="text-xs text-gray-400">Total Amount</p>
+              <p className="text-white font-medium">
+                {formatCurrency(Number.isFinite(installmentTotal) ? installmentTotal : 0)}
+              </p>
+            </div>
+            <div>
+              <p className="text-xs text-gray-400">Number of Payments</p>
+              <p className="text-white font-medium">
+                {Number.isFinite(installmentCount) ? installmentCount : 0}
+              </p>
+            </div>
+            {lastInstallment && (
+              <div>
+                <p className="text-xs text-gray-400">Last Payment</p>
+                <p className="text-white font-medium">
+                  {lastInstallment.toLocaleDateString()}
+                </p>
+              </div>
+            )}
+          </div>
+        )}
+
         {expenseType === "credit_card" && (
           <div className="mt-4 pt-4 border-t border-gray-700 grid grid-cols-2 gap-4">
             <div>
@@ -142,6 +216,8 @@ const ReviewStep: React.FC<IProps> = ({ error }) => {
           </div>
         )}
       </Card>
+
+      <MinimumPaymentWarning />
 
       <FormInput inputName="notes" label="Notes (Optional)" placeholder="Any additional notes..." />
 

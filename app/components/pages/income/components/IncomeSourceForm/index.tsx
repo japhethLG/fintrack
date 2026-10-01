@@ -18,7 +18,9 @@ import FormStepIndicator from "../../../expenses/components/ExpenseRuleForm/comp
 import SchedulePreview from "../../../expenses/components/ExpenseRuleForm/components/SchedulePreview";
 import ValidationIssues from "../../../expenses/components/ExpenseRuleForm/components/ValidationIssues";
 import { useFollowStartDate } from "@/lib/hooks/useFollowStartDate";
-import { ordinal } from "@/lib/logic/ruleSchedule";
+import { describeSchedule, ordinal } from "@/lib/logic/ruleSchedule";
+import { frequencyLabel, weekendAdjustmentLabel } from "@/lib/utils/ruleLabels";
+import { categoryLabel } from "@/lib/utils/categoryLabel";
 import {
   INCOME_SOURCE_TYPES,
   FREQUENCY_OPTIONS,
@@ -459,8 +461,21 @@ const IncomeSourceForm: React.FC<IProps> = ({
                 </div>
                 <div>
                   <p className="text-xs text-gray-400">Frequency</p>
-                  <p className="text-white font-medium capitalize">{frequency.replace("-", " ")}</p>
+                  <p className="text-white font-medium">{frequencyLabel(frequency)}</p>
                 </div>
+                {frequency !== "one-time" && (
+                  <div className="col-span-2">
+                    <p className="text-xs text-gray-400">Schedule</p>
+                    <p className="text-white font-medium">
+                      {describeSchedule(
+                        frequency,
+                        buildScheduleConfig(allValues),
+                        startDate,
+                        frequencyLabel(frequency)
+                      )}
+                    </p>
+                  </div>
+                )}
                 <div>
                   <p className="text-xs text-gray-400">Start Date</p>
                   <p className="text-white font-medium">
@@ -475,12 +490,12 @@ const IncomeSourceForm: React.FC<IProps> = ({
                 </div>
                 <div>
                   <p className="text-xs text-gray-400">Category</p>
-                  <p className="text-white font-medium">{category}</p>
+                  <p className="text-white font-medium">{categoryLabel(category)}</p>
                 </div>
                 <div>
                   <p className="text-xs text-gray-400">Weekend Adjustment</p>
-                  <p className="text-white font-medium capitalize">
-                    {weekendAdjustment === "none" ? "None" : `Pay ${weekendAdjustment}`}
+                  <p className="text-white font-medium">
+                    {weekendAdjustmentLabel(weekendAdjustment)}
                   </p>
                 </div>
               </div>
