@@ -495,17 +495,20 @@ describe("generateLoanProjections", () => {
 
     it("shifts the split from interest to principal as the loan amortizes", () => {
       const last = projections[projections.length - 1].paymentBreakdown!;
-      // Final period: 5.59 interest on a 559.29 balance, the rest is principal.
+      // Final period: 5.59 interest, the rest is principal.
+      // REWRITTEN (MANUAL-L3): payments are whole cents, so 23 payments of 564.88 (not 564.8817) leave
+      // 23 x 0.17 cents more for the last one: 559.34, not 559.29.
       expect(last.interestPaid).toBeCloseTo(5.59, 2);
-      expect(last.principalPaid).toBeCloseTo(559.29, 2);
+      expect(last.principalPaid).toBeCloseTo(559.34, 2);
       expect(last.remainingBalance).toBeCloseTo(0, 2);
     });
 
     it("projects the amount as that period's principal plus interest", () => {
-      projections.forEach((t) => {
+      // REWRITTEN (MANUAL-L3): projected debt payments are whole cents; the last payment absorbs the rounding.
+      projections.forEach((t, i) => {
         const breakdown = t.paymentBreakdown!;
-        expect(t.projectedAmount).toBe(breakdown.principalPaid + breakdown.interestPaid);
-        expect(t.projectedAmount).toBeCloseTo(REFERENCE_PMT, 2);
+        expect(t.projectedAmount).toBeCloseTo(breakdown.principalPaid + breakdown.interestPaid, 10);
+        expect(t.projectedAmount).toBeCloseTo(REFERENCE_PMT, i === projections.length - 1 ? 0 : 2);
       });
     });
 

@@ -3,9 +3,9 @@
  */
 
 import { ExpenseRule, InstallmentConfig, Transaction } from "@/lib/types";
-import { formatDate, parseDate } from "@/lib/utils/dateUtils";
-import { adjustForWeekend, byScheduledDate, monthlyPaymentDate, windowFilter } from "./dateUtils";
-import { generateOccurrenceId } from "./occurrenceIdGenerator";
+import { formatDate } from "@/lib/utils/dateUtils";
+import { adjustForWeekend, byScheduledDate, windowFilter } from "./dateUtils";
+import { unpaidSlots } from "./debtSlots";
 import { createProjectedTransaction } from "./transactionFactory";
 
 type ProjectedTransaction = Omit<Transaction, "id" | "userId" | "createdAt" | "updatedAt">;
@@ -79,23 +79,19 @@ export const generateInstallmentProjections = (
   const paid = Math.max(0, Math.floor(Number.isFinite(installmentConfig.installmentsPaid) ? installmentConfig.installmentsPaid : 0));
   if (count - paid <= 0) return [];
 
-  const anchor = parseDate(rule.startDate);
   const adjustment = rule.weekendAdjustment === "none" ? undefined : rule.weekendAdjustment;
   const projections: ProjectedTransaction[] = [];
   const inWindow = windowFilter(viewStartDate, viewEndDate);
+  // The remaining installments fall on the plan's unpaid slots, earliest first (see debtSlots.ts)
+  const slots = unpaidSlots(rule, count - paid);
 
   for (let i = paid; i < count; i++) {
-    const logicalDate = monthlyPaymentDate(anchor, rule.scheduleConfig?.dayOfMonth, i);
+    const slot = slots[i - paid];
+    const logicalDate = slot.date;
     const emittedDate = adjustment ? adjustForWeekend(logicalDate, adjustment) : logicalDate;
 
-    const paymentNumber = i + 1;
-    const occurrenceId = generateOccurrenceId(
-      rule.id,
-      rule.frequency === "one-time" ? "monthly" : rule.frequency,
-      logicalDate,
-      rule.startDate,
-      rule.scheduleConfig
-    );
+    const paymentNumber = slot.index + 1;
+    const occurrenceId = slot.id;
     const override = rule.occurrenceOverrides?.[occurrenceId];
     // The window applies to where the row is shown (a dragged installment moves with its override)
     if (!inWindow(override?.scheduledDate ?? formatDate(emittedDate))) continue;

@@ -3,27 +3,13 @@
  */
 
 import { ExpenseRule, Transaction } from "@/lib/types";
-import { formatDate, parseDate } from "@/lib/utils/dateUtils";
+import { formatDate } from "@/lib/utils/dateUtils";
 import { buildPayoffSchedule } from "../creditCardCalculator/payoffCalculator";
 import { adjustForWeekend, byScheduledDate, windowFilter } from "./dateUtils";
-import { generateOccurrenceId } from "./occurrenceIdGenerator";
-import { createProjectedTransaction } from "./transactionFactory";
+import { debtPaymentsMade, unpaidSlots } from "./debtSlots";
+import { centsSchedule, createProjectedTransaction } from "./transactionFactory";
 
 type ProjectedTransaction = Omit<Transaction, "id" | "userId" | "createdAt" | "updatedAt">;
-
-const pad = (n: number): string => String(n).padStart(2, "0");
-
-/** Date of `day` in month `monthIndex` (0-based, may overflow the year), clamped to that month's length. */
-const dueDateInMonth = (year: number, monthIndex: number, day: number): Date => {
-  const y = year + Math.floor(monthIndex / 12);
-  const m = ((monthIndex % 12) + 12) % 12;
-  const lastDay = new Date(y, m + 1, 0).getDate();
-  return parseDate(`${y}-${pad(m + 1)}-${pad(Math.min(day, lastDay))}`);
-};
-
-/** A usable day of month, 1-31; anything else falls back to `fallback`. */
-const usableDay = (day: number, fallback: number): number =>
-  Number.isFinite(day) && day >= 1 ? Math.min(31, Math.floor(day)) : fallback;
 
 /**
  * Generate projected credit card payment transactions
@@ -32,7 +18,7 @@ const usableDay = (day: number, fallback: number): number =>
  * 600-month horizon) and then filtered to the window, so `paymentNumber` and
  * `totalPayments` do not depend on the viewport. Bills keep coming for as long
  * as the window asks, including for a card whose payment never covers its
- * interest. Payment `n` is due on `dueDate` of month `firstMonth + n - 1`
+ * interest. The payments fall on the card's unpaid slots (see debtSlots.ts): slot k is `dueDate` of month `firstMonth + k`
  * (clamped to that month's last day), moved for weekends when the rule asks.
  *
  * @param rule - Expense rule with credit card configuration
@@ -51,27 +37,11 @@ export const generateCreditProjections = (
 
   if (!Number.isFinite(creditConfig.currentBalance) || creditConfig.currentBalance <= 0) return [];
 
-  const startDateParsed = parseDate(rule.startDate);
-  const dueDay = usableDay(creditConfig.dueDate, startDateParsed.getDate());
-
-  // First payment: the due day within the start month (clamped), or next month's if already past
-  let firstYear = startDateParsed.getFullYear();
-  let firstMonth = startDateParsed.getMonth();
-  if (dueDateInMonth(firstYear, firstMonth, dueDay) < startDateParsed) {
-    firstMonth += 1;
-    firstYear += Math.floor(firstMonth / 12);
-    firstMonth %= 12;
-  }
-  // The schedule starts from the CURRENT balance, so it starts after the payments already made
-  // (like a loan's `paymentsMade`); `paymentNumber` stays absolute.
-  const made = Number.isFinite(creditConfig.paymentsMade)
-    ? Math.max(0, Math.floor(creditConfig.paymentsMade as number))
-    : 0;
-  firstMonth += made;
-  firstYear += Math.floor(firstMonth / 12);
-  firstMonth %= 12;
-
-  const schedule = buildPayoffSchedule(creditConfig, dueDateInMonth(firstYear, firstMonth, dueDay));
+  // The schedule starts from the CURRENT balance, so it covers only the payments still to make; they fall
+  // on the card's UNPAID monthly due dates, earliest first (see debtSlots.ts). `paymentNumber` stays absolute.
+  const made = debtPaymentsMade(rule);
+  const [firstUnpaid] = unpaidSlots(rule, 1);
+  const schedule = buildPayoffSchedule(creditConfig, firstUnpaid.date);
   if (schedule.length === 0) return [];
 
   // A card that never pays off has no known number of payments
@@ -79,38 +49,31 @@ export const generateCreditProjections = (
   const totalPayments = last.remainingBalance < 0.01 ? made + schedule.length : 0;
   const adjustment = rule.weekendAdjustment === "none" ? undefined : rule.weekendAdjustment;
   const inWindow = windowFilter(viewStartDate, viewEndDate);
+  const slots = unpaidSlots(rule, schedule.length);
 
-  return schedule.flatMap((step) => {
+  const inCents = centsSchedule(schedule, creditConfig.currentBalance);
+
+  return schedule.flatMap((step, index) => {
     // A zero payment is no bill (e.g. both minimum-payment fields left blank)
     if (!(step.payment >= 0.005)) return [];
 
-    const logicalDate = dueDateInMonth(firstYear, firstMonth + step.month - 1, dueDay);
+    const slot = slots[step.month - 1];
+    const logicalDate = slot.date;
     const paymentDate = adjustment ? adjustForWeekend(logicalDate, adjustment) : logicalDate;
 
     // The id names the logical month, so a weekend shift never changes which bill this is
-    const occurrenceId = generateOccurrenceId(
-      rule.id,
-      rule.frequency === "one-time" ? "monthly" : rule.frequency,
-      logicalDate,
-      rule.startDate,
-      rule.scheduleConfig
-    );
+    const occurrenceId = slot.id;
     const override = rule.occurrenceOverrides?.[occurrenceId];
     // Filter on the date that is actually shown: a dragged bill belongs to the window it was dropped in
     if (!inWindow(override?.scheduledDate ?? formatDate(paymentDate))) return [];
 
+    const { amount, ...cents } = inCents[index];
     const transaction = createProjectedTransaction(
-      { ...rule, amount: step.payment },
+      { ...rule, amount },
       paymentDate,
       "expense",
       "expense_rule",
-      {
-        principalPaid: step.principal,
-        interestPaid: step.interest,
-        remainingBalance: step.remainingBalance,
-        paymentNumber: made + step.month,
-        totalPayments,
-      },
+      { ...cents, paymentNumber: slot.index + 1, totalPayments },
       occurrenceId,
       override
     );

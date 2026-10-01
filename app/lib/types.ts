@@ -128,6 +128,11 @@ export interface LoanConfig {
   loanStartDate: string;
   firstPaymentDate: string;
   paymentsMade: number;
+  /**
+   * Occurrence ids of the paid payments (one per counted payment), kept by the ledger with the counter.
+   * Optional: plans without it read the first N slots as paid. See projectionEngine/debtSlots.ts.
+   */
+  paidOccurrenceIds?: string[];
 }
 
 export type MinimumPaymentMethod = "percent_only" | "percent_plus_interest";
@@ -151,6 +156,11 @@ export interface CreditConfig {
    * 400 paid: schedule 400, 200 instead of 400, 200 for the REMAINING 600 starting next month).
    */
   paymentsMade?: number;
+  /**
+   * Occurrence ids of the paid payments (one per counted payment), kept by the ledger with the counter.
+   * Optional: plans without it read the first N slots as paid. See projectionEngine/debtSlots.ts.
+   */
+  paidOccurrenceIds?: string[];
 }
 
 export interface InstallmentConfig {
@@ -160,6 +170,11 @@ export interface InstallmentConfig {
   installmentsPaid: number;
   hasInterest: boolean;
   interestRate?: number;
+  /**
+   * Occurrence ids of the paid payments (one per counted payment), kept by the ledger with the counter.
+   * Optional: plans without it read the first N slots as paid. See projectionEngine/debtSlots.ts.
+   */
+  paidOccurrenceIds?: string[];
 }
 
 export interface ScheduleConfig {

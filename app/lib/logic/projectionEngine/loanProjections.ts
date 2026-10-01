@@ -5,9 +5,9 @@
 import { ExpenseRule, LoanConfig, Transaction } from "@/lib/types";
 import { formatDate, parseDate } from "@/lib/utils/dateUtils";
 import { AmortizationStep, calculateAmortizationSchedule } from "../amortization";
-import { adjustForWeekend, byScheduledDate, monthlyPaymentDate, windowFilter } from "./dateUtils";
-import { generateOccurrenceId } from "./occurrenceIdGenerator";
-import { createProjectedTransaction } from "./transactionFactory";
+import { adjustForWeekend, byScheduledDate, windowFilter } from "./dateUtils";
+import { DebtSlot, unpaidSlots } from "./debtSlots";
+import { centsSchedule, createProjectedTransaction } from "./transactionFactory";
 
 type ProjectedTransaction = Omit<Transaction, "id" | "userId" | "createdAt" | "updatedAt">;
 
@@ -40,9 +40,11 @@ export const getLoanStatus = (loanConfig: LoanConfig): LoanStatus => {
  * The remaining payment schedule of a loan, with absolute payment numbers.
  *
  * - The schedule starts from `currentBalance` over the remaining term
- *   (`termMonths - paymentsMade`), dated from the ORIGINAL anchor
- *   (`rule.startDate`) advanced by `paymentsMade` months, on the rule's
+ *   (`termMonths - paymentsMade`). Its payments fall on the loan's UNPAID
+ *   slots, earliest first (see `debtSlots.ts`): slot k is the ORIGINAL anchor
+ *   (`rule.startDate`) advanced by k months, on the rule's
  *   `scheduleConfig.dayOfMonth` when it has one (see `monthlyPaymentDate`).
+ *   With payments made in order that is "after the first `paymentsMade`".
  * - An amortized loan pays its stored `monthlyPayment` (the contract); flat and
  *   reducing-balance loans pay what their formula says.
  * - Past the term with a balance still owed, one payment for the outstanding
@@ -51,7 +53,7 @@ export const getLoanStatus = (loanConfig: LoanConfig): LoanStatus => {
 const buildRemainingSchedule = (
   rule: ExpenseRule,
   loanConfig: LoanConfig
-): { steps: AmortizationStep[]; made: number } | null => {
+): { steps: (AmortizationStep & { slot: DebtSlot })[]; made: number } | null => {
   const status = getLoanStatus(loanConfig);
   if (status === "paid_off" || status === "invalid") return null;
 
@@ -63,11 +65,13 @@ const buildRemainingSchedule = (
 
   if (status === "past_term_balance_owed") {
     const interest = balance * (annualRate / 100 / 12);
+    const [slot] = unpaidSlots(rule, 1);
     return {
       made,
       steps: [
         {
-          date: monthlyPaymentDate(anchor, rule.scheduleConfig?.dayOfMonth, made),
+          slot,
+          date: slot.date,
           payment: balance + interest,
           principal: balance,
           interest,
@@ -87,11 +91,10 @@ const buildRemainingSchedule = (
     calculationType: loanConfig.calculationType,
     interestBasis: loanConfig.principalAmount,
   });
-  // The schedule's own dates follow the start date's day; the rule's Day of Month (when set) decides the day.
-  const steps = schedule.map((step, index) => ({
-    ...step,
-    date: monthlyPaymentDate(anchor, rule.scheduleConfig?.dayOfMonth, made + index),
-  }));
+  // The schedule's own dates follow the start date's day; the slots (unpaid months, on the rule's Day of
+  // Month when set) decide the dates.
+  const slots = unpaidSlots(rule, schedule.length);
+  const steps = schedule.map((step, index) => ({ ...step, slot: slots[index], date: slots[index].date }));
   return { steps, made };
 };
 
@@ -118,36 +121,25 @@ export const generateLoanProjections = (
   const adjustment = rule.weekendAdjustment === "none" ? undefined : rule.weekendAdjustment;
   const inWindow = windowFilter(viewStartDate, viewEndDate);
 
-  // Number EVERY step first, then filter: a payment's number is its absolute
-  // position in the loan and must not depend on what the viewport shows.
+  // A payment's number is its slot's absolute position in the loan and must not depend on what the
+  // viewport shows; the occurrence id names the slot's logical month (the weekend shift only moves the date).
+  const inCents = centsSchedule(steps, finiteOr(loanConfig.currentBalance, 0));
   return steps
-    .map((step, index) => ({ step, paymentNumber: made + index + 1 }))
-    .flatMap(({ step, paymentNumber }) => {
-      // The occurrence id names the logical month; the weekend shift only moves the date.
-      const occurrenceId = generateOccurrenceId(
-        rule.id,
-        rule.frequency === "one-time" ? "monthly" : rule.frequency,
-        step.date,
-        rule.startDate,
-        rule.scheduleConfig
-      );
+    .flatMap((step, index) => {
+      const paymentNumber = step.slot.index + 1;
+      const occurrenceId = step.slot.id;
       const emittedDate = adjustment ? adjustForWeekend(step.date, adjustment) : step.date;
       // The window applies to where the row is SHOWN: a dragged payment (override
       // `scheduledDate`) belongs to the window it was dropped in, with its breakdown.
       const override = rule.occurrenceOverrides?.[occurrenceId];
       if (!inWindow(override?.scheduledDate ?? formatDate(emittedDate))) return [];
+      const { amount, ...cents } = inCents[index];
       const transaction = createProjectedTransaction(
-        { ...rule, amount: step.payment },
+        { ...rule, amount },
         emittedDate,
         "expense",
         "expense_rule",
-        {
-          principalPaid: step.principal,
-          interestPaid: step.interest,
-          remainingBalance: step.remainingBalance,
-          paymentNumber,
-          totalPayments,
-        },
+        { ...cents, paymentNumber, totalPayments },
         occurrenceId,
         override
       );

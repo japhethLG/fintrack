@@ -187,11 +187,14 @@ describe("cash loan wizard: a fresh loan (12,000 at 12% over 24 months)", () => 
         return `${y}-${String((m0 % 12) + 1).padStart(2, "0")}-10`;
       })
     );
-    rows.forEach((r) => expect(r.projectedAmount).toBeCloseTo(EMI, 6));
-    expect(d.sum(rows.map((r) => r.projectedAmount))).toBeCloseTo(24 * EMI, 4);
-    expect(rows[23].paymentBreakdown?.remainingBalance).toBeCloseTo(0, 6);
-    expect(rows[0].paymentBreakdown?.interestPaid).toBeCloseTo(120, 6);
-    expect(rows[0].paymentBreakdown?.principalPaid).toBeCloseTo(EMI - 120, 6);
+    // REWRITTEN (MANUAL-L3): projected debt payments are whole cents (564.88, not 564.8817); the last one
+    // absorbs the rounding, so the total stays within a few cents of 24 x EMI and the balance ends at 0.
+    rows.slice(0, -1).forEach((r) => expect(r.projectedAmount).toBe(564.88));
+    expect(rows[23].projectedAmount).toBeCloseTo(EMI, 1);
+    expect(d.sum(rows.map((r) => r.projectedAmount))).toBeCloseTo(24 * EMI, 1);
+    expect(rows[23].paymentBreakdown?.remainingBalance).toBe(0);
+    expect(rows[0].paymentBreakdown?.interestPaid).toBe(120);
+    expect(rows[0].paymentBreakdown?.principalPaid).toBe(444.88);
   });
 
   it("the sum of the interest actually projected equals the 'Total Interest' shown in the wizard", async () => {

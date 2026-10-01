@@ -1018,7 +1018,9 @@ describe("loan lifecycle: paying the first of six amortized payments", () => {
     const view = loanView();
 
     expect(dates(view.transactions)).toEqual(LOAN_DATES);
-    view.transactions.forEach((t) => expect(t.projectedAmount).toBeCloseTo(ORIGINAL_PMT, 2));
+    // REWRITTEN (MANUAL-L3): projected debt payments are whole cents; the last payment absorbs the rounding.
+    view.transactions.slice(0, -1).forEach((t) => expect(t.projectedAmount).toBe(ORIGINAL_PMT));
+    expect(view.transactions[5].projectedAmount).toBeCloseTo(ORIGINAL_PMT, 1); // trued up: within a cent or two
     expect(view.transactions.map((t) => t.paymentBreakdown!.paymentNumber)).toEqual([
       1, 2, 3, 4, 5, 6,
     ]);
@@ -1109,6 +1111,69 @@ describe("loan lifecycle: paying the first of six amortized payments", () => {
     expect(view.transactions.filter((t) => t.occurrenceId === "loan-1_2026-01")).toHaveLength(1);
   });
 
+  // MANUAL-M9 (docs/audit/manual-test-2026-10-01.md): the remaining schedule used to start "after the
+  // first paymentsMade months", so a payment made OUT OF ORDER hid an owed month: reverting January while
+  // February stayed paid made January vanish (paymentsMade 1 -> the schedule started at February).
+  describe("payments out of order", () => {
+    const JAN_ID = "proj_loan-1::2026-01-01::loan-1_2026-01";
+    const FEB_ID = "proj_loan-1::2026-02-01::loan-1_2026-02";
+    const storedFor = (occurrenceId: string): Transaction =>
+      (store.__all<Transaction>("transactions") as Transaction[]).find((t) => t.occurrenceId === occurrenceId)!;
+
+    it("the stored debt balance stays in whole cents through payments (MANUAL-L2)", async () => {
+      await completeOccurrence(JAN_ID, ORIGINAL_PMT);
+      await completeOccurrence(FEB_ID, ORIGINAL_PMT);
+      // Feb interest 5024.71 x 1% = 50.2471 -> 50.25, principal 1035.29 - 50.25 = 985.04 -> 4039.67 exactly
+      expect(storedRule("loan-1").loanConfig!.currentBalance).toBe(4_039.67);
+      expect(storedFor("loan-1_2026-02").paymentBreakdown).toMatchObject({ interestPaid: 50.25, principalPaid: 985.04 });
+    });
+
+    it("reverting January while February stays paid brings January back as payment #1", async () => {
+      await completeOccurrence(JAN_ID, ORIGINAL_PMT);
+      await completeOccurrence(FEB_ID, ORIGINAL_PMT);
+      // Jan: 60.00 interest, 975.29 principal -> 5024.71; Feb: 50.2471 interest, 985.0429 principal -> 4039.6671
+      expect(storedRule("loan-1").loanConfig!.currentBalance).toBeCloseTo(4_039.67, 2);
+
+      await revertTransactionToProjectedAction(storedFor("loan-1_2026-01").id);
+
+      const config = storedRule("loan-1").loanConfig!;
+      expect(config.paymentsMade).toBe(1);
+      expect(config.paidOccurrenceIds).toEqual(["loan-1_2026-02"]);
+      expect(config.currentBalance).toBeCloseTo(4_039.67 + 975.29, 2); // January's principal is owed again
+
+      const view = loanView();
+      expect(dates(view.transactions)).toEqual(LOAN_DATES); // all six months, none hidden
+      const projected = projectedRows(view);
+      expect(dates(projected)).toEqual(["2026-01-01", "2026-03-01", "2026-04-01", "2026-05-01", "2026-06-01"]);
+      expect(projected.map((t) => t.paymentBreakdown!.paymentNumber)).toEqual([1, 3, 4, 5, 6]);
+      // January is the next payment due: a month of interest on the restored balance, 5014.9571 x 1%
+      expect(projected[0].paymentBreakdown!.interestPaid).toBeCloseTo(50.15, 2);
+    });
+
+    it("paying February early while January is unpaid keeps January owed (and payable)", async () => {
+      await completeOccurrence(FEB_ID, ORIGINAL_PMT);
+
+      expect(storedRule("loan-1").loanConfig!.paidOccurrenceIds).toEqual(["loan-1_2026-02"]);
+      const projected = projectedRows(loanView());
+      expect(dates(projected)).toEqual(["2026-01-01", "2026-03-01", "2026-04-01", "2026-05-01", "2026-06-01"]);
+
+      await completeOccurrence(JAN_ID, ORIGINAL_PMT);
+      const config = storedRule("loan-1").loanConfig!;
+      expect(config.paymentsMade).toBe(2);
+      expect([...config.paidOccurrenceIds!].sort()).toEqual(["loan-1_2026-01", "loan-1_2026-02"]);
+      expect(dates(projectedRows(loanView()))).toEqual(["2026-03-01", "2026-04-01", "2026-05-01", "2026-06-01"]);
+    });
+
+    it("a loan stored before the paid list existed reads its first paymentsMade months as paid", () => {
+      // legacy shape: paymentsMade 2, no paidOccurrenceIds -> January and February are the paid ones
+      const legacy = storedRule("loan-1");
+      store.__seedEntities("expense_rules", [
+        { ...legacy, loanConfig: { ...legacy.loanConfig!, paymentsMade: 2, currentBalance: 4_039.67 } },
+      ]);
+      expect(dates(projectedRows(loanView()))).toEqual(["2026-03-01", "2026-04-01", "2026-05-01", "2026-06-01"]);
+    });
+  });
+
   // MANUAL-H1 (docs/audit/manual-test-2026-10-01.md): the loan generator windowed on the
   // logical date, so the regenerated projection of a DRAGGED payment was not found on its new
   // day; the completion fell back to the rule amount with no breakdown and the whole payment
@@ -1195,9 +1260,10 @@ describe("loan lifecycle: paying the first of six amortized payments", () => {
     it("the remaining payments keep their original amount", async () => {
       await completeOccurrence("proj_loan-1::2026-01-01::loan-1_2026-01", ORIGINAL_PMT);
 
-      projectedRows(loanView()).forEach((t) =>
-        expect(t.projectedAmount).toBeCloseTo(ORIGINAL_PMT, 2)
-      );
+      // REWRITTEN (MANUAL-L3): projected debt payments are whole cents; the last payment absorbs the rounding.
+      const rows = projectedRows(loanView());
+      rows.slice(0, -1).forEach((t) => expect(t.projectedAmount).toBe(ORIGINAL_PMT));
+      expect(rows[rows.length - 1].projectedAmount).toBeCloseTo(ORIGINAL_PMT, 1);
     });
 
     /**
@@ -1292,6 +1358,36 @@ describe("card and installment: a dragged payment keeps its breakdown (MANUAL-H1
 
     expect(onlyStoredRow().paymentBreakdown!.principalPaid).toBeCloseTo(400, 2);
     expect(storedRule("card-1").creditConfig!.currentBalance).toBeCloseTo(4_600, 2);
+  });
+
+  it("installment: reverting the 1st while the 2nd stays paid brings the 1st back (MANUAL-M9)", async () => {
+    seed(makeInstallmentRule({ startDate: "2026-01-05" }));
+    await completeOccurrence("proj_inst-1::2026-01-05::inst-1_2026-01", 200);
+    await completeOccurrence("proj_inst-1::2026-02-05::inst-1_2026-02", 200);
+    const jan = (store.__all<Transaction>("transactions") as Transaction[]).find((t) => t.occurrenceId === "inst-1_2026-01")!;
+
+    await revertTransactionToProjectedAction(jan.id);
+
+    expect(storedRule("inst-1").installmentConfig).toMatchObject({ installmentsPaid: 1, paidOccurrenceIds: ["inst-1_2026-02"] });
+    const view = snapshot({ start: "2026-01-01", end: "2026-06-30" });
+    const projected = view.transactions.filter((t) => t.id.startsWith("proj_"));
+    expect(dates(projected)).toEqual(["2026-01-05", "2026-03-05", "2026-04-05", "2026-05-05", "2026-06-05"]);
+    expect(projected.map((t) => t.paymentBreakdown!.paymentNumber)).toEqual([1, 3, 4, 5, 6]);
+  });
+
+  it("card: paying February's bill while January's is unpaid keeps January's bill", async () => {
+    seed(
+      makeCreditRule(
+        { amount: 500, startDate: "2026-01-01" },
+        { paymentStrategy: "fixed", fixedPaymentAmount: 500 }
+      )
+    );
+    await completeOccurrence("proj_card-1::2026-02-15::card-1_2026-02", 500);
+
+    expect(storedRule("card-1").creditConfig).toMatchObject({ paymentsMade: 1, paidOccurrenceIds: ["card-1_2026-02"] });
+    const view = snapshot({ start: "2026-01-01", end: "2026-03-31" });
+    const projected = view.transactions.filter((t) => t.id.startsWith("proj_"));
+    expect(dates(projected)).toEqual(["2026-01-15", "2026-03-15"]);
   });
 
   it("installment: the 2nd of 6 x 200 dragged into January is shown there with its number and remaining", async () => {

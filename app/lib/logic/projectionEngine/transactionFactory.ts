@@ -11,6 +11,41 @@ import {
   OccurrenceOverride,
 } from "@/lib/types";
 import { formatDate } from "@/lib/utils/dateUtils";
+import { roundCents } from "../balanceCalculator/ledgerMath";
+
+/** One payment of a debt schedule, in whole cents. */
+export interface CentsStep {
+  amount: number;
+  principalPaid: number;
+  interestPaid: number;
+  remainingBalance: number;
+}
+
+/**
+ * A debt schedule in whole cents (MANUAL-L2/L3): nobody pays 4707.347222.... Each payment and its interest
+ * are rounded to the cent and the principal is what is left of the payment, against a running balance
+ * kept in cents, so principal + interest == payment exactly and the principals sum to the opening balance.
+ * A schedule that pays off has its last payment trued up to whatever (whole-cent) balance is left. The
+ * amortization itself keeps full precision; only what is shown and recorded is rounded.
+ */
+export const centsSchedule = (
+  steps: readonly { payment: number; interest: number; remainingBalance: number }[],
+  openingBalance: number
+): CentsStep[] => {
+  let balance = roundCents(openingBalance);
+  const paysOff = steps.length > 0 && steps[steps.length - 1].remainingBalance < 0.005;
+  return steps.map((step, index) => {
+    const interestPaid = roundCents(step.interest);
+    let amount = roundCents(step.payment);
+    let principalPaid = roundCents(amount - interestPaid);
+    if (paysOff && index === steps.length - 1) {
+      principalPaid = balance;
+      amount = roundCents(principalPaid + interestPaid);
+    }
+    balance = roundCents(balance - principalPaid);
+    return { amount, principalPaid, interestPaid, remainingBalance: balance };
+  });
+};
 
 /**
  * Create a projected transaction from a source rule
@@ -37,7 +72,7 @@ export const createProjectedTransaction = (
   const amount =
     override?.amount ??
     (paymentBreakdown?.principalPaid
-      ? paymentBreakdown.principalPaid + paymentBreakdown.interestPaid
+      ? roundCents(paymentBreakdown.principalPaid + paymentBreakdown.interestPaid)
       : source.amount);
 
   const scheduledDate = override?.scheduledDate ?? formatDate(date);

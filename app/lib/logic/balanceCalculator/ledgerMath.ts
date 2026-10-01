@@ -20,9 +20,10 @@
  */
 
 import { ExpenseRule, Transaction } from "@/lib/types";
+import { resolvePaidIds } from "../projectionEngine/debtSlots";
 
 type RowLike = Pick<Transaction, "status" | "type" | "projectedAmount"> &
-  Partial<Pick<Transaction, "actualAmount" | "paymentBreakdown" | "sourceType">>;
+  Partial<Pick<Transaction, "actualAmount" | "paymentBreakdown" | "sourceType" | "occurrenceId">>;
 
 /** Sub-cent noise from float addition is removed; real sub-cent amounts survive. */
 export const cleanMoney = (value: number): number => Math.round(value * 1e6) / 1e6;
@@ -64,11 +65,14 @@ export interface DebtEffect {
    * when a payment does not cover the interest: the shortfall capitalises.
    */
   principal: number;
+  /** The occurrence (payment slot) the payment counts for, when the row names one. */
+  occurrenceId?: string;
 }
 
 export const NO_DEBT_EFFECT: DebtEffect = { payments: 0, principal: 0 };
 
-type DebtBearing = Pick<ExpenseRule, "loanConfig" | "creditConfig" | "installmentConfig">;
+type DebtBearing = Pick<ExpenseRule, "loanConfig" | "creditConfig" | "installmentConfig"> &
+  Partial<Pick<ExpenseRule, "id" | "frequency" | "startDate" | "scheduleConfig">>;
 
 /**
  * The debt progress a stored row has applied. A pure function of the row and
@@ -83,9 +87,10 @@ export const debtEffectOf = (rule: DebtBearing | null | undefined, row: RowLike 
     return NO_DEBT_EFFECT;
   }
   const principal = cleanMoney(paidAmount(row) - (row.paymentBreakdown?.interestPaid ?? 0));
-  if (rule.loanConfig) return { payments: 1, principal };
-  if (rule.creditConfig) return { payments: 1, principal };
-  if (rule.installmentConfig) return { payments: 1, principal: 0 };
+  const slot = row.occurrenceId ? { occurrenceId: row.occurrenceId } : {};
+  if (rule.loanConfig) return { payments: 1, principal, ...slot };
+  if (rule.creditConfig) return { payments: 1, principal, ...slot };
+  if (rule.installmentConfig) return { payments: 1, principal: 0, ...slot };
   return NO_DEBT_EFFECT;
 };
 
@@ -104,6 +109,44 @@ const activeFlag = (
 };
 
 /**
+ * The plan's paid-slot list after a payment moves from `before` to `after` (MANUAL-M9): the slot `before`
+ * counted is released, the slot `after` counts is taken. Starts from the stored list, or from the
+ * pre-list reading (first N slots) when there is none. `undefined` when the result cannot be trusted
+ * (a row without an occurrence id, a slot the list does not hold, a rule without schedule fields): the
+ * list is then dropped and readers fall back to the first-N reading, exactly as before the list existed.
+ */
+const nextPaidIds = (
+  rule: DebtBearing,
+  before: DebtEffect,
+  after: DebtEffect,
+  paymentsAfter: number
+): string[] | undefined => {
+  let ids: string[];
+  try {
+    ids = resolvePaidIds(rule as Parameters<typeof resolvePaidIds>[0]);
+  } catch {
+    return undefined;
+  }
+  if (before.payments > 0) {
+    const at = before.occurrenceId === undefined ? -1 : ids.indexOf(before.occurrenceId);
+    if (at < 0) return undefined;
+    ids.splice(at, 1);
+  }
+  if (after.payments > 0) {
+    if (after.occurrenceId === undefined || ids.includes(after.occurrenceId)) return undefined;
+    ids.push(after.occurrenceId);
+  }
+  return ids.length === paymentsAfter ? ids : undefined;
+};
+
+/** `config` with its paid-slot list replaced by `ids` (or removed when `ids` is undefined). */
+const withPaidIds = <C extends { paidOccurrenceIds?: string[] }>(config: C, ids: string[] | undefined): C => {
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const { paidOccurrenceIds: _previous, ...rest } = config;
+  return (ids ? { ...rest, paidOccurrenceIds: ids } : rest) as C;
+};
+
+/**
  * The fields to write on a rule so its debt progress moves from what `before`
  * had applied to what `after` applies. `null` when nothing changes.
  *
@@ -118,27 +161,36 @@ export const planDebtUpdate = (
 ): Partial<Pick<ExpenseRule, "loanConfig" | "creditConfig" | "installmentConfig" | "isActive">> | null => {
   const dPayments = after.payments - before.payments;
   const dPrincipal = cleanMoney(after.principal - before.principal);
-  if (dPayments === 0 && dPrincipal === 0) return null;
+  const sameSlot = (before.payments > 0 ? before.occurrenceId : undefined) === (after.payments > 0 ? after.occurrenceId : undefined);
+  if (dPayments === 0 && dPrincipal === 0 && sameSlot) return null;
 
   if (rule.loanConfig) {
     const previous = rule.loanConfig;
-    const currentBalance = Math.max(0, cleanMoney(previous.currentBalance - dPrincipal));
+    // Debt balances are stored in whole cents, like every amount the ledger writes (MANUAL-L2)
+    const currentBalance = Math.max(0, roundCents(previous.currentBalance - dPrincipal));
     const paymentsMade = Math.max(0, previous.paymentsMade + dPayments);
     const wasRepaid = previous.currentBalance <= REPAID_EPSILON;
     const isRepaid = currentBalance <= REPAID_EPSILON;
     return {
-      loanConfig: { ...previous, currentBalance, paymentsMade },
+      loanConfig: withPaidIds(
+        { ...previous, currentBalance, paymentsMade },
+        nextPaidIds(rule, before, after, paymentsMade)
+      ),
       ...activeFlag(rule.isActive, wasRepaid, isRepaid),
     };
   }
   if (rule.creditConfig) {
     const previous = rule.creditConfig;
+    const paymentsMade = Math.max(0, (previous.paymentsMade ?? 0) + dPayments);
     return {
-      creditConfig: {
-        ...previous,
-        currentBalance: Math.max(0, cleanMoney(previous.currentBalance - dPrincipal)),
-        paymentsMade: Math.max(0, (previous.paymentsMade ?? 0) + dPayments),
-      },
+      creditConfig: withPaidIds(
+        {
+          ...previous,
+          currentBalance: Math.max(0, roundCents(previous.currentBalance - dPrincipal)),
+          paymentsMade,
+        },
+        nextPaidIds(rule, before, after, paymentsMade)
+      ),
     };
   }
   if (rule.installmentConfig) {
@@ -147,7 +199,10 @@ export const planDebtUpdate = (
     const wasComplete = previous.installmentsPaid >= previous.installmentCount;
     const isComplete = installmentsPaid >= previous.installmentCount;
     return {
-      installmentConfig: { ...previous, installmentsPaid },
+      installmentConfig: withPaidIds(
+        { ...previous, installmentsPaid },
+        nextPaidIds(rule, before, after, installmentsPaid)
+      ),
       ...activeFlag(rule.isActive, wasComplete, isComplete),
     };
   }

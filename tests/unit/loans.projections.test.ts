@@ -85,7 +85,8 @@ describe("paymentNumber is a property of the loan, not of the viewport", () => {
 describe("the projected amount is the amortized step payment, not rule.amount", () => {
   it("ignores a stale rule.amount of 1,000: every step pays 564.88 (level), the last is trued up", () => {
     const rows = project(loan({ amount: 1_000 }));
-    rows.slice(0, -1).forEach((t) => expect(t.projectedAmount).toBeCloseTo(PMT_12K, 6));
+    // REWRITTEN (MANUAL-L3): projected debt payments are whole cents; the last payment absorbs the rounding.
+    rows.slice(0, -1).forEach((t) => expect(t.projectedAmount).toBe(564.88));
     expect(rows).toHaveLength(24);
   });
 
@@ -93,7 +94,7 @@ describe("the projected amount is the amortized step payment, not rule.amount", 
     // currentBalance never reduced (12,000 at k = 0..3): the contractual payment must not inflate.
     [0, 1, 2, 3].forEach((k) => {
       const rows = project(loan({}, { paymentsMade: k, currentBalance: 12_000 }));
-      expect(rows[0].projectedAmount).toBeCloseTo(PMT_12K, 6);
+      expect(rows[0].projectedAmount).toBe(564.88); // REWRITTEN (MANUAL-L3): whole cents
     });
   });
 });
@@ -125,9 +126,11 @@ describe("a consistent loan conserves money end to end", () => {
     const k = 6;
     const resumed = project(loan({}, { paymentsMade: k, currentBalance: balanceAfter(k) }));
     expect(resumed).toHaveLength(18);
-    expect(resumed[0].projectedAmount).toBeCloseTo(PMT_12K, 6);
+    // REWRITTEN (MANUAL-L3): projected debt payments are whole cents; the last payment absorbs the rounding. The principals sum to the
+    // balance rounded to the cent (a stored balance is whole cents).
+    expect(resumed[0].projectedAmount).toBe(564.88);
     expect(resumed[resumed.length - 1].scheduledDate).toBe(rows[rows.length - 1].scheduledDate);
-    expect(sum(resumed.map((t) => breakdown(t).principalPaid))).toBeCloseTo(balanceAfter(k), 6);
+    expect(sum(resumed.map((t) => breakdown(t).principalPaid))).toBeCloseTo(balanceAfter(k), 2);
     expect(breakdown(resumed[resumed.length - 1]).remainingBalance).toBe(0);
   });
 });
@@ -246,5 +249,33 @@ describe("month-end first payment", () => {
       "2026-03-31",
       "2026-04-30",
     ]);
+  });
+});
+
+// MANUAL-L2/L3 (docs/audit/manual-test-2026-10-01.md): projected loan amounts were full-precision floats
+// (4707.347222326467 in the AI prompt) and so was every recorded breakdown.
+describe("debt projections are whole cents and still conserve money", () => {
+  const isCents = (x: number) => Math.abs(x * 100 - Math.round(x * 100)) < 1e-6;
+  // 100,000 @ 12% over 24 months: PMT = 4707.347222... -> 4707.35 (the report's loan)
+  const big = makeLoanRule(
+    { startDate: "2026-10-15" },
+    { principalAmount: 100_000, currentBalance: 100_000, termMonths: 24, monthlyPayment: pmt(100_000, 0.01, 24) }
+  );
+  const rows = project(big);
+
+  it("every amount, interest, principal and remaining balance is whole cents", () => {
+    expect(rows[0].projectedAmount).toBe(4707.35);
+    expect(breakdown(rows[0]).interestPaid).toBe(1000);
+    expect(breakdown(rows[0]).principalPaid).toBe(3707.35);
+    rows.forEach((t) => {
+      const b = breakdown(t);
+      [t.projectedAmount, b.interestPaid, b.principalPaid, b.remainingBalance].forEach((x) => expect(isCents(x)).toBe(true));
+      expect(t.projectedAmount).toBeCloseTo(b.principalPaid + b.interestPaid, 10);
+    });
+  });
+
+  it("the principals sum to the balance to the cent, and the schedule ends at exactly 0", () => {
+    expect(Math.round(sum(rows.map((t) => breakdown(t).principalPaid)) * 100)).toBe(10_000_000);
+    expect(breakdown(rows[rows.length - 1]).remainingBalance).toBe(0);
   });
 });

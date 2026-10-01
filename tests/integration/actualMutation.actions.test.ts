@@ -779,7 +779,12 @@ describe("markTransactionCompleteAction", () => {
         );
         await markTransactionCompleteAction("stored-1", { actualAmount: 565 }, USER, [], []);
 
-        expect(loanOf("loan-a")).toEqual(loanOf("loan-b"));
+        // REWRITTEN (MANUAL-M9): each loan now also records WHICH payment was made, and the two loans
+        // name their own occurrence; everything else must still be identical.
+        const { paidOccurrenceIds: paidA, ...a } = loanOf("loan-a")!;
+        const { paidOccurrenceIds: paidB, ...b } = loanOf("loan-b")!;
+        expect(a).toEqual(b);
+        expect([paidA, paidB]).toEqual([["loan-a_2026-03"], ["loan-b_2026-03"]]);
       }
     );
 

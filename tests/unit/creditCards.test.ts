@@ -751,8 +751,9 @@ describe("generateCreditProjections", () => {
       const result = generateCreditProjections(minimumCard(), window.start, window.end);
       const amounts = result.map((t) => t.projectedAmount);
       // 50 * 0.96^(n-1): the payment shrinks with the balance.
+      // REWRITTEN (MANUAL-L3): projected debt payments are whole cents; the last payment absorbs the rounding.
       [50, 48, 46.08, 44.2368, 42.467328, 40.76863488].forEach((expected, i) => {
-        expect(amounts[i]).toBeCloseTo(expected, 6);
+        expect(amounts[i]).toBeCloseTo(expected, 2);
       });
       expect(strictlyDecreasing(amounts)).toBe(true);
     });
