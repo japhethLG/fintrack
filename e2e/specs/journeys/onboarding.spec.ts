@@ -46,7 +46,7 @@ test.describe("new user onboarding journey", () => {
     await S.gotoPage(page, "Expense Manager");
     await S.addFixedExpenseViaWizard(page, { name: "Rent", amount: 1200, frequency: "Monthly", startDate: "2026-03-10", dayOfMonth: 12, weekendAdjustment: "No adjustment" });
     await S.addFixedExpenseViaWizard(page, { name: "Groceries", amount: 150, variable: true, frequency: "Weekly", startDate: "2026-03-10", weekday: "Saturday", weekendAdjustment: "No adjustment" });
-    await S.addLoanViaWizard(page, { name: "Car Loan", principal: 12000, ratePct: 12, termMonths: 12, firstPayment: "2026-03-15", loanStart: "2026-03-10", weekendAdjustment: "No adjustment" });
+    await S.addLoanViaWizard(page, { name: "Car Loan", principal: 12000, ratePct: 12, termMonths: 12, firstPayment: "2026-03-15", weekendAdjustment: "No adjustment" });
     await S.addCreditCardViaWizard(page, { name: "Visa", limit: 10000, balance: 5000, aprPct: 24, dueDay: 25, startDate: "2026-03-10", weekendAdjustment: "No adjustment" });
     await S.addInstallmentViaWizard(page, { name: "Phone Plan", total: 1200, count: 6, firstPayment: "2026-03-20", weekendAdjustment: "No adjustment" });
 

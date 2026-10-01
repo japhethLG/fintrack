@@ -16,7 +16,10 @@ const LoanDetailsForm: React.FC = () => {
   const loanCurrentBalance = useWatch({ control, name: "loanCurrentBalance" });
   const loanInterestRate = useWatch({ control, name: "loanInterestRate" });
   const loanTermMonths = useWatch({ control, name: "loanTermMonths" });
-  const loanStartDate = useWatch({ control, name: "loanStartDate" });
+  const startDate = useWatch({ control, name: "startDate" });
+  const dayOfMonth = useWatch({ control, name: "dayOfMonth" });
+  const loanStoredPayment = useWatch({ control, name: "loanStoredPayment" });
+  const loanStoredTerms = useWatch({ control, name: "loanStoredTerms" });
   const loanCalculationType = useWatch({ control, name: "loanCalculationType" });
   const loanPaymentsMade = useWatch({ control, name: "loanPaymentsMade" });
 
@@ -35,7 +38,10 @@ const LoanDetailsForm: React.FC = () => {
       loanInterestRate,
       loanTermMonths,
       loanCalculationType,
-      loanStartDate,
+      startDate,
+      dayOfMonth,
+      loanStoredPayment,
+      loanStoredTerms,
       loanPaymentsMade,
     });
   }, [
@@ -44,7 +50,10 @@ const LoanDetailsForm: React.FC = () => {
     loanInterestRate,
     loanTermMonths,
     loanCalculationType,
-    loanStartDate,
+    startDate,
+    dayOfMonth,
+    loanStoredPayment,
+    loanStoredTerms,
     loanPaymentsMade,
   ]);
   const calculatedPayment = plan?.payment ?? null;
@@ -119,7 +128,12 @@ const LoanDetailsForm: React.FC = () => {
       </div>
 
       <div>
-        <FormDatePicker inputName="loanStartDate" label="Loan Start Date" />
+        {/* THE loan date: the schedule (this table, the next step, the calendar) starts here */}
+        <FormDatePicker inputName="startDate" label="First Payment Date" />
+        <p className="text-xs text-gray-400 mt-1">
+          The day the first payment is due. Every payment below, and the schedule on the next step,
+          follows from it.
+        </p>
       </div>
 
       <div>

@@ -21,7 +21,7 @@ const values = (over: Partial<LoanPlanInput> = {}): LoanPlanInput => ({
   loanInterestRate: "6",
   loanTermMonths: "12",
   loanCalculationType: "amortized",
-  loanStartDate: "2026-02-10",
+  startDate: "2026-02-10", // REWRITTEN (the loan has ONE date: the First Payment Date, `startDate`)
   ...over,
 });
 
@@ -113,7 +113,7 @@ describe("invalid loan input is reported as no plan / a 0 payment, never Infinit
   });
 
   it("a bad start date falls back to a valid date", () => {
-    const plan = calculateLoanPlan(values({ loanStartDate: "" }))!;
+    const plan = calculateLoanPlan(values({ startDate: "" }))!;
     expect(Number.isNaN(plan.schedule[0].date.getTime())).toBe(false);
   });
 });

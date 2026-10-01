@@ -27,7 +27,9 @@ async function widenWindow(app: AppHandle, start = "2025-01-01", end = "2032-12-
 
 /** Rows of the loan "Payment Schedule Preview" table on the Details step. */
 function amortRows() {
-  return Array.from(document.querySelectorAll("tbody tr")).map((tr) => {
+  // only the amortisation table: an antd date picker that was typed into keeps its calendar's own <tbody> in the DOM
+  const table = Array.from(document.querySelectorAll("table")).find((t) => t.textContent?.includes("Principal"));
+  return Array.from(table?.querySelectorAll("tbody tr") ?? []).map((tr) => {
     const cells = Array.from(tr.querySelectorAll("td")).map((td) => td.textContent ?? "");
     const [principal, interest, balance] = moneyIn(tr as HTMLElement);
     return { n: cells[0], date: cells[1], principal, interest, balance };
@@ -127,7 +129,8 @@ describe("cash loan wizard: a fresh loan (12,000 at 12% over 24 months)", () => 
         termMonths: 24,
         calculationType: "amortized",
         firstPaymentDate: "2026-02-10",
-        loanStartDate: "2026-01-15",
+        // REWRITTEN (M7): a loan has ONE date, the First Payment Date; a new loan stores it as its start date too
+        loanStartDate: "2026-02-10",
         paymentsMade: 0,
       },
     });
@@ -418,15 +421,16 @@ describe("cash loan wizard: schedule behaviour", () => {
     expect(screen.queryByRole("checkbox", { name: /Set End Date/ })).toBeNull();
   });
 
-  it("UI-RULE-38 — loan amortisation preview date is parsed as UTC: in America/New_York the first row shows the day BEFORE the Loan Start Date",
+  it("UI-RULE-38 — loan amortisation preview date is parsed as UTC: in America/New_York the first row shows the day BEFORE the First Payment Date",
     async () => {
-      // Loan Start Date field = 01/15/2026; observed first row "1/14/2026"
+      // REWRITTEN (M7): the Details step's date field is the First Payment Date (default today = 01/15/2026);
+      // observed first row "1/14/2026"
       const app = await renderApp({ route: "/expenses", today: TODAY, timeZone: "America/New_York" });
       await d.openExpenseForm(app);
       await app.user.click(screen.getByRole("heading", { name: "Loan" }));
       await d.next(app);
       await d.fillExpenseDetails(app, { kind: "Loan", principal: "1200", rate: "0", term: "12" });
-      expect((screen.getByLabelText(/^Loan Start Date/) as HTMLInputElement).value).toBe("01/15/2026"); // precondition
+      expect((screen.getByLabelText(/^First Payment Date/) as HTMLInputElement).value).toBe("01/15/2026"); // precondition
       const rows = amortRows();
       expect(rows.length).toBeGreaterThan(0);
       expect(rows[0].date).toBe("1/15/2026");

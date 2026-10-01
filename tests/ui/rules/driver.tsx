@@ -265,7 +265,6 @@ export interface ExpenseSpec {
   rate?: string;
   term?: string;
   calcType?: string;
-  loanStart?: string;
   // credit card
   limit?: string;
   balance?: string;
@@ -317,7 +316,8 @@ export async function fillExpenseDetails(app: AppHandle, spec: ExpenseSpec) {
     await fill(app, /^Annual Interest Rate/, spec.rate ?? "12");
     await fill(app, /^Term \(Months\)/, spec.term ?? "24");
     if (spec.calcType) await pick(app, /^Calculation Type/, spec.calcType);
-    if (spec.loanStart) await setDate(app, /^Loan Start Date/, spec.loanStart);
+    // THE loan date is the First Payment Date (the old separate "Loan Start Date" field is gone)
+    if (spec.start) await setDate(app, /^First Payment Date/, spec.start);
   } else if (kind === "Credit Card") {
     await fill(app, /^Credit Card Name/, spec.name ?? "Test Card");
     if (spec.limit !== undefined) await fill(app, /^Credit Limit/, spec.limit);
