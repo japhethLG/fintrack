@@ -50,6 +50,17 @@ export const addDays = (date: Date, days: number): Date => {
 };
 
 /**
+ * Last day (YYYY-MM-DD) of a "next N days" window. The ONE definition of the phrase: N calendar
+ * days, TODAY INCLUDED, so "next 30 days" from Oct 1 is Oct 1 .. Oct 30 (never Oct 31).
+ */
+export const lastDayOfNextDays = (today: string, days: number): string =>
+  formatDate(addDays(parseDate(today), days - 1));
+
+/** First day (YYYY-MM-DD) of a "last N days" window: N calendar days ending today, today included. */
+export const firstDayOfLastDays = (today: string, days: number): string =>
+  formatDate(addDays(parseDate(today), -(days - 1)));
+
+/**
  * Add months to a date and return a new Date object.
  */
 export const addMonths = (date: Date, months: number): Date => {

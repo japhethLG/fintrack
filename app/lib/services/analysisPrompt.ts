@@ -6,7 +6,10 @@ import type {
   VarianceReport,
 } from "@/lib/types";
 import { getCurrencySymbol } from "@/lib/utils/currency";
-import { addDays, formatDate, getTodayKey, parseDate } from "@/lib/utils/dateUtils";
+import { getTodayKey, lastDayOfNextDays } from "@/lib/utils/dateUtils";
+
+/** The "Upcoming" window of the prompt: the next 30 days, today included (see `lastDayOfNextDays`). */
+const UPCOMING_DAYS = 30;
 
 /**
  * The text sent to the AI. Pure (no SDK, no network), so tests and the E2E stub run the REAL prompt builder.
@@ -69,10 +72,10 @@ const formatTransactions = (transactions: Transaction[], symbol: string) => {
   if (transactions.length === 0) return "No transactions.";
 
   const completed = transactions.filter((t) => t.status === "completed");
-  // "Upcoming" means due from today to today + 30 days. A still-projected row dated before today is
+  // "Upcoming" means due in the next 30 days: today and the 29 days after it (the same window every "next N days" widget uses). A still-projected row dated before today is
   // OVERDUE and says so in its own section (E2E-ROB-12: they used to be listed as upcoming).
   const today = getTodayKey();
-  const horizon = formatDate(addDays(parseDate(today), 30));
+  const horizon = lastDayOfNextDays(today, UPCOMING_DAYS);
   const projectedRows = transactions
     .filter((t) => t.status === "projected")
     .sort((a, b) => (a.scheduledDate < b.scheduledDate ? -1 : a.scheduledDate > b.scheduledDate ? 1 : 0));
@@ -100,7 +103,7 @@ const formatTransactions = (transactions: Transaction[], symbol: string) => {
   }
 
   if (upcoming.length > 0) {
-    text += "\nUpcoming (next 30 days):\n";
+    text += `\nUpcoming (next ${UPCOMING_DAYS} days):\n`;
     upcoming.slice(0, 15).forEach((t) => {
       text += `- ${t.scheduledDate}: ${t.name} ${t.type === "income" ? "+" : "-"}${symbol}${t.projectedAmount} [${t.status}]\n`;
     });

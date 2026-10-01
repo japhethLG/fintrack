@@ -37,7 +37,8 @@ import MetricsGrid from "./components/MetricsGrid";
 import MonthlyOverview from "./components/MonthlyOverview";
 import AIAnalysisPanel from "./components/AIAnalysisPanel";
 
-// Forecast-specific date range presets
+// Forecast-specific date range presets. "Next N days" is N calendar days, today included
+// (today + N - 1; see `lastDayOfNextDays`).
 const FORECAST_PRESETS = [
   {
     value: "this-month",
@@ -47,17 +48,17 @@ const FORECAST_PRESETS = [
   {
     value: "next-30",
     label: "Next 30 Days",
-    range: [dayjs(), dayjs().add(30, "day")] as [dayjs.Dayjs, dayjs.Dayjs],
+    range: [dayjs(), dayjs().add(29, "day")] as [dayjs.Dayjs, dayjs.Dayjs],
   },
   {
     value: "next-60",
     label: "Next 60 Days",
-    range: [dayjs(), dayjs().add(60, "day")] as [dayjs.Dayjs, dayjs.Dayjs],
+    range: [dayjs(), dayjs().add(59, "day")] as [dayjs.Dayjs, dayjs.Dayjs],
   },
   {
     value: "next-90",
     label: "Next 90 Days",
-    range: [dayjs(), dayjs().add(90, "day")] as [dayjs.Dayjs, dayjs.Dayjs],
+    range: [dayjs(), dayjs().add(89, "day")] as [dayjs.Dayjs, dayjs.Dayjs],
   },
   {
     value: "this-quarter",

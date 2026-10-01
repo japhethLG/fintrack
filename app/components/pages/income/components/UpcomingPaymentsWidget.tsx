@@ -4,7 +4,7 @@ import React, { useState, useMemo } from "react";
 import { useFinancial } from "@/contexts/FinancialContext";
 import { Transaction } from "@/lib/types";
 import { Card, Icon, Select, Badge } from "@/components/common";
-import { addDays, formatDate, getTodayKey, parseDate } from "@/lib/utils/dateUtils";
+import { getTodayKey, lastDayOfNextDays, parseDate } from "@/lib/utils/dateUtils";
 import { useCurrency } from "@/lib/hooks/useCurrency";
 import { useModal } from "@/components/modals";
 import { categoryLabel } from "@/lib/utils/categoryLabel";
@@ -25,7 +25,7 @@ const UpcomingPaymentsWidget: React.FC = () => {
     // "Next N days" is exactly N calendar days: today .. today + N - 1
     const today = getTodayKey();
     const daysAhead = parseInt(selectedDays, 10);
-    const endDateStr = formatDate(addDays(parseDate(today), daysAhead - 1));
+    const endDateStr = lastDayOfNextDays(today, daysAhead);
 
     return transactions
       .filter((t) => {

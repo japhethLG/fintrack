@@ -49,15 +49,15 @@ const IncomeExpenseChart: React.FC<IProps> = ({ transactions, dateRange }) => {
 
     switch (selectedRange) {
       case "last7":
-        start = today.subtract(7, "day").format("YYYY-MM-DD");
+        start = today.subtract(6, "day").format("YYYY-MM-DD");
         end = today.format("YYYY-MM-DD");
         break;
       case "last30":
-        start = today.subtract(30, "day").format("YYYY-MM-DD");
+        start = today.subtract(29, "day").format("YYYY-MM-DD");
         end = today.format("YYYY-MM-DD");
         break;
       case "last90":
-        start = today.subtract(90, "day").format("YYYY-MM-DD");
+        start = today.subtract(89, "day").format("YYYY-MM-DD");
         end = today.format("YYYY-MM-DD");
         break;
       case "ytd":

@@ -28,7 +28,7 @@ export const DASHBOARD_PRESETS = [
   {
     value: "last30",
     label: "Last 30 Days",
-    range: [dayjs().subtract(30, "day"), dayjs()] as [dayjs.Dayjs, dayjs.Dayjs],
+    range: [dayjs().subtract(29, "day"), dayjs()] as [dayjs.Dayjs, dayjs.Dayjs],
   },
   {
     value: "thisQuarter",
@@ -38,6 +38,6 @@ export const DASHBOARD_PRESETS = [
   {
     value: "last90",
     label: "Last 90 Days",
-    range: [dayjs().subtract(90, "day"), dayjs()] as [dayjs.Dayjs, dayjs.Dayjs],
+    range: [dayjs().subtract(89, "day"), dayjs()] as [dayjs.Dayjs, dayjs.Dayjs],
   },
 ];
