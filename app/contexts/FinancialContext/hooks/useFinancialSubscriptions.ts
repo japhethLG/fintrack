@@ -2,6 +2,13 @@ import { useEffect, useRef, Dispatch, SetStateAction } from "react";
 import { User } from "firebase/auth";
 import { UserProfile, IncomeSource, ExpenseRule, Transaction, Alert } from "@/lib/types";
 import {
+  sanitizeExpenseRules,
+  sanitizeIncomeSources,
+  sanitizeTransactions,
+  type DataIssue,
+  type DataIssueKind,
+} from "@/lib/utils/sanitizeData";
+import {
   subscribeToUserProfile,
   subscribeToIncomeSources,
   subscribeToExpenseRules,
@@ -17,6 +24,8 @@ interface UseFinancialSubscriptionsParams {
   setExpenseRules: Dispatch<SetStateAction<ExpenseRule[]>>;
   setStoredTransactions: Dispatch<SetStateAction<Transaction[]>>;
   setAlerts: Dispatch<SetStateAction<Alert[]>>;
+  /** Records the documents that failed validation at the ingestion boundary, per collection. */
+  setDataIssues: (kind: DataIssueKind, issues: DataIssue[]) => void;
   setIsLoading: Dispatch<SetStateAction<boolean>>;
   setIsInitialized: Dispatch<SetStateAction<boolean>>;
 }
@@ -33,6 +42,7 @@ export function useFinancialSubscriptions({
   setExpenseRules,
   setStoredTransactions,
   setAlerts,
+  setDataIssues,
   setIsLoading,
   setIsInitialized,
 }: UseFinancialSubscriptionsParams) {
@@ -53,6 +63,9 @@ export function useFinancialSubscriptions({
       setExpenseRules([]);
       setStoredTransactions([]);
       setAlerts([]);
+      setDataIssues("income_source", []);
+      setDataIssues("expense_rule", []);
+      setDataIssues("transaction", []);
       setIsLoading(false);
       setIsInitialized(true);
       return;
@@ -65,6 +78,9 @@ export function useFinancialSubscriptions({
       setExpenseRules([]);
       setStoredTransactions([]);
       setAlerts([]);
+      setDataIssues("income_source", []);
+      setDataIssues("expense_rule", []);
+      setDataIssues("transaction", []);
     }
 
     setIsLoading(true);
@@ -78,20 +94,27 @@ export function useFinancialSubscriptions({
 
     // Subscribe to income sources
     const unsubIncome = subscribeToIncomeSources(user.uid, (sources) => {
-      setIncomeSources(sources);
+      // Hostile / legacy documents are repaired here, once, and reported (never silently dropped)
+      const { items, issues } = sanitizeIncomeSources(sources);
+      setIncomeSources(items);
+      setDataIssues("income_source", issues);
     });
     unsubscribers.push(unsubIncome);
 
     // Subscribe to expense rules
     const unsubExpenses = subscribeToExpenseRules(user.uid, (rules) => {
-      setExpenseRules(rules);
+      const { items, issues } = sanitizeExpenseRules(rules);
+      setExpenseRules(items);
+      setDataIssues("expense_rule", issues);
     });
     unsubscribers.push(unsubExpenses);
 
     // Subscribe to stored transactions only (completed, skipped)
     // Projections are computed on-the-fly, not stored
     const unsubTransactions = subscribeToStoredTransactions(user.uid, (txns) => {
-      setStoredTransactions(txns);
+      const { items, issues } = sanitizeTransactions(txns);
+      setStoredTransactions(items);
+      setDataIssues("transaction", issues);
     });
     unsubscribers.push(unsubTransactions);
 
@@ -119,6 +142,7 @@ export function useFinancialSubscriptions({
     setExpenseRules,
     setStoredTransactions,
     setAlerts,
+    setDataIssues,
     setIsLoading,
     setIsInitialized,
   ]);

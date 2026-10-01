@@ -45,7 +45,7 @@ const KPICards: React.FC<IProps> = ({ currentBalance, stats }) => {
     },
     {
       label: "Total Expenses",
-      value: formatCurrencyWithSign(-stats.expenses),
+      value: formatCurrency(-stats.expenses),
       color: "text-danger",
       icon: "trending_down",
       iconColor: "text-danger",

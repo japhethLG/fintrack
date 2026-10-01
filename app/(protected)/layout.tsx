@@ -1,6 +1,7 @@
 import ProtectedRoute from "@/components/ProtectedRoute";
 import Sidebar from "@/components/Sidebar";
 import MobileNav from "@/components/MobileNav";
+import DataIssuesNotice from "@/components/DataIssuesNotice";
 
 export default function ProtectedLayout({ children }: { children: React.ReactNode }) {
   return (
@@ -21,6 +22,7 @@ export default function ProtectedLayout({ children }: { children: React.ReactNod
             }}
           ></div>
 
+          <DataIssuesNotice />
           <div className="relative z-10">{children}</div>
         </main>
       </div>

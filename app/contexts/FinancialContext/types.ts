@@ -12,6 +12,7 @@ import {
   CompleteTransactionData,
   OccurrenceOverride,
 } from "@/lib/types";
+import type { DataIssue } from "@/lib/utils/sanitizeData";
 
 /**
  * Financial Context Value Interface
@@ -89,6 +90,9 @@ export interface FinancialContextValue {
   dailyBalances: Map<string, DayBalance>;
   billCoverage: BillCoverageReport | null;
   upcomingBills: UpcomingBill[];
+
+  /** Documents repaired at the ingestion boundary (null/NaN/non-numeric money); see sanitizeData.ts. */
+  dataIssues: DataIssue[];
 
   // Alerts
   alerts: Alert[];
