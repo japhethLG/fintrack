@@ -13,7 +13,7 @@ import { collectOpenItems, getCategoryBreakdown } from "@/lib/logic/balanceCalcu
 import { getTodayKey } from "@/lib/utils/dateUtils";
 import { calculateHealthScore, sampleDayOffsets, summarizePeriod } from "@/lib/logic/healthScore";
 import dayjs from "dayjs";
-import { CHART_COLORS, DASHBOARD_PRESETS } from "./constants";
+import { CHART_COLORS, getDashboardPresets } from "./constants";
 import KPICards from "./components/KPICards";
 import CashFlowChart from "./components/CashFlowChart";
 import CategoryPieChart from "./components/CategoryPieChart";
@@ -21,11 +21,13 @@ import OverdueAlert from "./components/OverdueAlert";
 import IncomeExpenseChart from "./components/IncomeExpenseChart";
 import PeriodComparison from "./components/PeriodComparison";
 import FinancialHealthScore from "./components/FinancialHealthScore";
+import { useDatePreferences } from "@/lib/hooks/useDatePreferences";
 
 const Dashboard: React.FC = () => {
   const router = useRouter();
   const { openModal } = useModal();
   const { userProfile, transactions, dailyBalances, isLoading, setViewDateRange } = useFinancial();
+  const { formatDayMonth, formatDayMonthYear } = useDatePreferences();
 
   // Date range state - Default to current month
   const [dateRange, setDateRange] = useState<[dayjs.Dayjs | null, dayjs.Dayjs | null]>([
@@ -175,8 +177,8 @@ const Dashboard: React.FC = () => {
         <div>
           <h1 className="text-2xl font-bold text-white mb-1">Dashboard</h1>
           <p className="text-gray-400 text-sm">
-            Financial overview for {dateRange[0]?.format("MMM D")} -{" "}
-            {dateRange[1]?.format("MMM D, YYYY")}
+            Financial overview for {dateRange[0] ? formatDayMonth(dateRange[0].toDate()) : ""} -{" "}
+            {dateRange[1] ? formatDayMonthYear(dateRange[1].toDate()) : ""}
           </p>
         </div>
 
@@ -184,7 +186,7 @@ const Dashboard: React.FC = () => {
           <DateRangePicker
             value={dateRange as any} // Cast for dayjs compatibility
             onChange={(dates) => setDateRange(dates as any)}
-            presets={DASHBOARD_PRESETS.map((p) => ({
+            presets={getDashboardPresets().map((p) => ({
               ...p,
               range: p.range as any,
             }))}

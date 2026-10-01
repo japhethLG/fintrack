@@ -117,12 +117,12 @@ test.describe("310 rows", () => {
     void testInfo;
   });
 
-  test("rows show the stored scheduled date (3/12/2026 for scheduledDate 2026-03-12), in every timezone", async ({ page }, testInfo) => {
+  test("rows show the stored scheduled date (03/12/2026 for scheduledDate 2026-03-12), in every timezone", async ({ page }, testInfo) => {
     await boot(page);
     await pick(page, "Sort By", "Date");
     await pick(page, "Order By", "Descending");
     // latest date = 3/30 (i mod 20 == 19): Txn 019 etc.
-    await expect(rows(page).first()).toContainText("3/30/2026");
+    await expect(rows(page).first()).toContainText("03/30/2026");
   });
 });
 

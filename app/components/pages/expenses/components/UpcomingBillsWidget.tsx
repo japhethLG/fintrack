@@ -4,8 +4,9 @@ import React, { useState, useMemo } from "react";
 import { useFinancial } from "@/contexts/FinancialContext";
 import { Transaction } from "@/lib/types";
 import { Card, Icon, Select, Badge } from "@/components/common";
-import { getTodayKey, lastDayOfNextDays, parseDate } from "@/lib/utils/dateUtils";
+import { getTodayKey, lastDayOfNextDays } from "@/lib/utils/dateUtils";
 import { useCurrency } from "@/lib/hooks/useCurrency";
+import { useDatePreferences } from "@/lib/hooks/useDatePreferences";
 import { useModal } from "@/components/modals";
 import { categoryLabel } from "@/lib/utils/categoryLabel";
 
@@ -18,6 +19,7 @@ const RANGE_OPTIONS = [
 const UpcomingBillsWidget: React.FC = () => {
   const { transactions } = useFinancial();
   const { formatCurrency } = useCurrency();
+  const { formatWeekdayDayMonth } = useDatePreferences();
   const { openModal } = useModal();
   const [selectedDays, setSelectedDays] = useState("30");
 
@@ -95,11 +97,7 @@ const UpcomingBillsWidget: React.FC = () => {
             .map((date) => (
               <div key={date}>
                 <h4 className="text-gray-400 text-xs font-bold uppercase tracking-wider mb-3">
-                  {parseDate(date).toLocaleDateString(undefined, {
-                    weekday: "long",
-                    month: "short",
-                    day: "numeric",
-                  })}
+                  {formatWeekdayDayMonth(date)}
                 </h4>
                 <div className="space-y-3">
                   {groupedBills[date].map((t) => (

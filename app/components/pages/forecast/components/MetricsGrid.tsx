@@ -4,8 +4,8 @@ import React from "react";
 import { Card, Icon } from "@/components/common";
 import { cn } from "@/lib/utils/cn";
 import { useCurrency } from "@/lib/hooks/useCurrency";
+import { useDatePreferences } from "@/lib/hooks/useDatePreferences";
 import InsightCard from "./InsightCard";
-import { parseDate } from "@/lib/utils/dateUtils";
 import { TOTAL_DEBT_NOTE } from "@/lib/constants";
 import { RISK_HORIZON_DAYS } from "@/lib/logic/balanceCalculator/runway";
 
@@ -47,6 +47,7 @@ const MetricsGrid: React.FC<IProps> = ({
   periodLabel,
 }) => {
   const { formatCurrency } = useCurrency();
+  const { formatDate } = useDatePreferences();
 
   // Calculate variance percentages
   const incomeVariance =
@@ -92,7 +93,7 @@ const MetricsGrid: React.FC<IProps> = ({
             }
             subtitle={
               metrics.nextCrunch
-                ? `Crunch on ${parseDate(metrics.nextCrunch.date).toLocaleDateString()}`
+                ? `Crunch on ${formatDate(metrics.nextCrunch.date)}`
                 : "No crunch detected"
             }
             status={metrics.runway.runOutDate ? "warning" : "success"}

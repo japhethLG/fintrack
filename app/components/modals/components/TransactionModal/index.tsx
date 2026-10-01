@@ -10,6 +10,7 @@ import { Button, Icon, Alert, Badge, Divider } from "@/components/common";
 import { Form, FormInput, FormDatePicker, FormSelect } from "@/components/formElements";
 import { cn } from "@/lib/utils/cn";
 import { useCurrency } from "@/lib/hooks/useCurrency";
+import { useDatePreferences } from "@/lib/hooks/useDatePreferences";
 import { useFinancial } from "@/contexts/FinancialContext";
 import { useModal } from "@/components/modals";
 import {
@@ -46,6 +47,7 @@ const TransactionModal: React.FC<IProps> = ({ closeModal, modalData }) => {
   } = useFinancial();
   const { openModal } = useModal();
   const { formatCurrencyWithSign, currencySymbol } = useCurrency();
+  const { formatDayMonthYear } = useDatePreferences();
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -71,7 +73,7 @@ const TransactionModal: React.FC<IProps> = ({ closeModal, modalData }) => {
     projected: "default",
   };
 
-  const formatDisplayDate = (dateStr: string) => dayjs(dateStr).format("ddd, MMM D, YYYY");
+  const formatDisplayDate = (dateStr: string) => formatDayMonthYear(dateStr, { weekday: true });
 
   const handleSubmit = async (values: CompleteTransactionFormValues) => {
     setError(null);

@@ -101,7 +101,9 @@ describe("west of UTC (America/New_York): dates parsed with new Date('YYYY-MM-DD
       });
       const rc = card(r.page("forecast"), "Cash Runway");
       expect(rc.textContent).toContain("Crunch on"); // precondition
-      expect(rc.textContent).toContain("Crunch on 3/25/2026");
+      // REWRITTEN (MANUAL-L5): numeric dates follow the Date Format preference; the fixture profile
+      // is YYYY-MM-DD (it used to print the browser's locale format, 3/25/2026)
+      expect(rc.textContent).toContain("Crunch on 2026-03-25");
     }
   );
 });

@@ -6,6 +6,7 @@ import { Transaction } from "@/lib/types";
 import { getPeriodStats, percentChange } from "@/lib/logic/healthScore";
 import { cn } from "@/lib/utils/cn";
 import { useCurrency } from "@/lib/hooks/useCurrency";
+import { useDatePreferences } from "@/lib/hooks/useDatePreferences";
 import { dateFromDayNumber, dayNumberOfDate, formatDate, parseDate } from "@/lib/utils/dateUtils";
 
 interface IProps {
@@ -18,6 +19,7 @@ interface IProps {
 
 const PeriodComparison: React.FC<IProps> = ({ transactions, dateRange }) => {
   const { formatCurrency, formatCurrencyWithSign } = useCurrency();
+  const { formatDayMonth } = useDatePreferences();
 
   // Calculate previous period stats
   const comparisonData = useMemo(() => {
@@ -49,9 +51,9 @@ const PeriodComparison: React.FC<IProps> = ({ transactions, dateRange }) => {
         expenses: calculateChange(currentStats.expenses, prevStats.expenses),
         net: calculateChange(currentStats.net, prevStats.net),
       },
-      prevPeriodLabel: `${prevStart.toLocaleDateString("en-US", { month: "short", day: "numeric" })} - ${prevEnd.toLocaleDateString("en-US", { month: "short", day: "numeric" })}`,
+      prevPeriodLabel: `${formatDayMonth(prevStart)} - ${formatDayMonth(prevEnd)}`,
     };
-  }, [transactions, dateRange]);
+  }, [transactions, dateRange, formatDayMonth]);
 
   const renderChange = (
     percent: number | null,

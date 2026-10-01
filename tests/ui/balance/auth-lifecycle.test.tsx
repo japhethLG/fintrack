@@ -126,8 +126,10 @@ describe("first login: profile creation", () => {
       expect(new Date().getTimezoneOffset()).toBe(-480);
       expect(new Date().getDate()).toBe(15);
       const label = screen.getByText(/^Last updated:/);
-      expect(label.textContent).toMatch(/^Last updated: \d{4}-\d{2}-\d{2}$/);
-      expect(label.textContent).toBe("Last updated: 2026-01-15");
+      // REWRITTEN (MANUAL-L5): the label follows the Date Format preference (default MM/DD/YYYY);
+      // it used to print the stored ISO key.
+      expect(label.textContent).toMatch(/^Last updated: \d{2}\/\d{2}\/\d{4}$/);
+      expect(label.textContent).toBe("Last updated: 01/15/2026");
     }
   );
 
@@ -144,8 +146,10 @@ describe("first login: profile creation", () => {
       expect(new Date().getTimezoneOffset()).toBe(300);
       expect(new Date().getDate()).toBe(15);
       const label = screen.getByText(/^Last updated:/);
-      expect(label.textContent).toMatch(/^Last updated: \d{4}-\d{2}-\d{2}$/);
-      expect(label.textContent).toBe("Last updated: 2026-01-15");
+      // REWRITTEN (MANUAL-L5): the label follows the Date Format preference (default MM/DD/YYYY);
+      // it used to print the stored ISO key.
+      expect(label.textContent).toMatch(/^Last updated: \d{2}\/\d{2}\/\d{4}$/);
+      expect(label.textContent).toBe("Last updated: 01/15/2026");
     }
   );
 });

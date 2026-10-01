@@ -254,11 +254,10 @@ describe("week start and date format preferences (both offered in Settings)", ()
     }
   );
 
-  knownDefect(
-    "UI-BAL-27",
-    "Date Format = DD/MM/YYYY is ignored: Settings still prints 'Last updated' as an ISO date",
+  it(
+    "UI-BAL-27 (fixed, MANUAL-L5): Date Format = DD/MM/YYYY is honoured: Settings prints 'Last updated' day first",
     async () => {
-      // observed: "Last updated: 2026-01-15" for a profile whose dateFormat is DD/MM/YYYY
+      // was: "Last updated: 2026-01-15" for a profile whose dateFormat is DD/MM/YYYY
       await renderApp({
         route: "/settings",
         today: TODAY,

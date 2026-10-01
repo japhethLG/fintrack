@@ -9,6 +9,7 @@ import { Form, FormInput } from "@/components/formElements";
 import { useAuth } from "@/contexts/AuthContext";
 import { useFinancial } from "@/contexts/FinancialContext";
 import { useCurrency } from "@/lib/hooks/useCurrency";
+import { useDatePreferences } from "@/lib/hooks/useDatePreferences";
 import {
   overrideCurrentBalance,
   recalculateBalance,
@@ -40,6 +41,7 @@ const BalanceSection: React.FC = () => {
   // "Recalculate Balance" wrong in both directions (UI-BAL-06/07/08).
   const { ledger, isInitialized } = useFinancial();
   const { formatCurrency, currencySymbol } = useCurrency();
+  const { formatDate } = useDatePreferences();
   const [isEditingCurrent, setIsEditingCurrent] = useState(false);
   const [isEditingInitial, setIsEditingInitial] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -207,7 +209,7 @@ const BalanceSection: React.FC = () => {
             </div>
             {userProfile?.balanceLastUpdatedAt && (
               <p className="text-xs text-gray-500 mt-2">
-                Last updated: {userProfile.balanceLastUpdatedAt}
+                Last updated: {formatDate(userProfile.balanceLastUpdatedAt)}
               </p>
             )}
           </div>

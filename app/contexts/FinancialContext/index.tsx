@@ -19,6 +19,7 @@ import { useViewDateRange } from "./hooks/useViewDateRange";
 import { useFinancialSubscriptions } from "./hooks/useFinancialSubscriptions";
 import { useFinancialActions } from "./hooks/useFinancialActions";
 import { sumLedger } from "@/lib/logic/balanceCalculator/ledgerMath";
+import { applyDayjsWeekStart, resolveStartOfWeek } from "@/lib/utils/datePreferences";
 import type { DataIssue, DataIssueKind } from "@/lib/utils/sanitizeData";
 
 // ============================================================================
@@ -86,6 +87,12 @@ export const FinancialProvider: React.FC<FinancialProviderProps> = ({ children }
   useEffect(() => {
     expenseRulesRef.current = expenseRules;
   }, [expenseRules]);
+
+  // The "start of week" preference also drives dayjs / antd's week (date pickers, "This Week")
+  const startOfWeekPreference = resolveStartOfWeek(userProfile?.preferences?.startOfWeek);
+  useEffect(() => {
+    applyDayjsWeekStart(startOfWeekPreference);
+  }, [startOfWeekPreference]);
 
   // View date range management
   const { viewDateRange, setViewDateRange } = useViewDateRange();

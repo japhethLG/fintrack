@@ -23,7 +23,7 @@ const FormDateRangePicker: FC<IProps> = ({
   isRequired = false,
   startFieldName,
   endFieldName,
-  format = "MM/DD/YYYY",
+  format,
   ...rest
 }) => {
   const {

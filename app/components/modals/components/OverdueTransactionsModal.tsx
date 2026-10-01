@@ -5,6 +5,7 @@ import { Transaction } from "@/lib/types";
 import { Button, Icon, Badge } from "@/components/common";
 import { cn } from "@/lib/utils/cn";
 import { useCurrency } from "@/lib/hooks/useCurrency";
+import { useDatePreferences } from "@/lib/hooks/useDatePreferences";
 import dayjs from "dayjs";
 import { categoryLabel } from "@/lib/utils/categoryLabel";
 
@@ -22,8 +23,9 @@ export interface IProps {
 const OverdueTransactionsModal: React.FC<IProps> = ({ closeModal, modalData }) => {
   const { overdueTransactions, onReview } = modalData;
   const { formatCurrency, formatCurrencyWithSign } = useCurrency();
+  const { formatDayMonthYear } = useDatePreferences();
 
-  const formatDisplayDate = (dateStr: string) => dayjs(dateStr).format("MMM D, YYYY");
+  const formatDisplayDate = (dateStr: string) => formatDayMonthYear(dateStr);
 
   const getDaysOverdue = (dateStr: string) => {
     const today = dayjs();

@@ -20,7 +20,7 @@ const FormDatePicker: FC<IProps> = ({
   className,
   isRequired = false,
   returnIsoString = false,
-  format = "MM/DD/YYYY",
+  format,
   ...rest
 }) => {
   const {

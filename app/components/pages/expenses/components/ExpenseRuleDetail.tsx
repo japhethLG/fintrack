@@ -7,6 +7,7 @@ import { installmentRemaining } from "@/lib/logic/forecasting";
 import { Button, Card, Icon, Badge, Tooltip } from "@/components/common";
 import { cn } from "@/lib/utils/cn";
 import { useCurrency } from "@/lib/hooks/useCurrency";
+import { useDatePreferences } from "@/lib/hooks/useDatePreferences";
 import { EXPENSE_TYPE_ICONS, EXPENSE_TYPE_LABELS, FREQUENCY_LABELS } from "../constants";
 import {
   calculatePayoffSummary,
@@ -30,6 +31,7 @@ const ExpenseRuleDetail: React.FC<IProps> = ({ rule, onEdit, onDelete, onToggleA
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [showPayoffScenarios, setShowPayoffScenarios] = useState(false);
   const { formatCurrency } = useCurrency();
+  const { formatDate } = useDatePreferences();
 
   // Get the display amount based on payment strategy for credit cards
   const getDisplayAmount = () => {
@@ -579,12 +581,12 @@ const ExpenseRuleDetail: React.FC<IProps> = ({ rule, onEdit, onDelete, onToggleA
       <div className="grid grid-cols-2 gap-6 mb-6">
         <div>
           <p className="text-gray-400 text-sm mb-1">Start Date</p>
-          <p className="text-white font-medium">{parseDate(rule.startDate).toLocaleDateString()}</p>
+          <p className="text-white font-medium">{formatDate(rule.startDate)}</p>
         </div>
         <div>
           <p className="text-gray-400 text-sm mb-1">End Date</p>
           <p className="text-white font-medium">
-            {rule.endDate ? parseDate(rule.endDate).toLocaleDateString() : "Ongoing"}
+            {rule.endDate ? formatDate(rule.endDate) : "Ongoing"}
           </p>
         </div>
         <div>

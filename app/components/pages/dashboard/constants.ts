@@ -14,7 +14,11 @@ export const CHART_COLORS = [
   "#e67e22", // Orange
 ];
 
-export const DASHBOARD_PRESETS = [
+/**
+ * Quick ranges of the Dashboard date picker. A FUNCTION (not a constant): "today" and the week start
+ * preference are read when the page renders, not when the module first loads.
+ */
+export const getDashboardPresets = () => [
   {
     value: "thisWeek",
     label: "This Week",

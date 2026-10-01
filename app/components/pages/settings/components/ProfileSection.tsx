@@ -10,6 +10,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { useFinancial } from "@/contexts/FinancialContext";
 import { updateUserProfile } from "@/lib/firebase/firestore";
 import { reauthenticateUser, updateUserEmail, updateUserPassword } from "@/lib/firebase/auth";
+import { useDatePreferences } from "@/lib/hooks/useDatePreferences";
 
 type EditMode = "none" | "displayName" | "email" | "password";
 
@@ -68,6 +69,7 @@ const getAuthErrorMessage = (error: unknown): string => {
 const ProfileSection: React.FC = () => {
   const { user, userProfile } = useAuth();
   const { updateProfilePicture } = useFinancial();
+  const { formatDate } = useDatePreferences();
   const [editMode, setEditMode] = useState<EditMode>("none");
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -371,7 +373,7 @@ const ProfileSection: React.FC = () => {
             <Icon name="calendar_today" size={18} className="text-gray-500" />
             <span className="text-gray-300">
               {userProfile?.createdAt
-                ? new Date(userProfile.createdAt.toDate()).toLocaleDateString()
+                ? formatDate(userProfile.createdAt.toDate())
                 : "Unknown"}
             </span>
           </div>
