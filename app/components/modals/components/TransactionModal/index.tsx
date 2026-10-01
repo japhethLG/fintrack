@@ -22,6 +22,7 @@ import {
   notesForSave,
   type CompleteTransactionFormValues,
 } from "./formHelpers";
+import { categoryLabel } from "@/lib/utils/categoryLabel";
 
 export interface IModalData {
   transaction: Transaction;
@@ -162,7 +163,7 @@ const TransactionModal: React.FC<IProps> = ({ closeModal, modalData }) => {
         </div>
         <div>
           <p className="font-bold text-white">{transaction.name}</p>
-          <p className="text-gray-400 text-sm">{transaction.category}</p>
+          <p className="text-gray-400 text-sm">{categoryLabel(transaction.category)}</p>
         </div>
       </div>
 

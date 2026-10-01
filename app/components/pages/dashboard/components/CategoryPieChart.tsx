@@ -5,6 +5,7 @@ import { ResponsiveContainer, PieChart, Pie, Cell, Tooltip } from "recharts";
 import { Card, Icon, Button } from "@/components/common";
 import { useCurrency } from "@/lib/hooks/useCurrency";
 import { cn } from "@/lib/utils/cn";
+import { categoryLabel } from "@/lib/utils/categoryLabel";
 
 interface CategoryData {
   name: string;
@@ -103,7 +104,7 @@ const CategoryPieChart: React.FC<IProps> = ({
                 }}
                 formatter={(value: number, name: string) => [
                   formatCurrency(value),
-                  name,
+                  categoryLabel(name),
                 ]}
               />
             )}
@@ -137,7 +138,7 @@ const CategoryPieChart: React.FC<IProps> = ({
           {currentData.slice(0, 6).map((entry) => (
             <div key={entry.name} className="flex items-center gap-2">
               <div className="w-2 h-2 rounded-full shrink-0" style={{ backgroundColor: entry.color }} />
-              <span className="text-xs text-gray-300 capitalize truncate">{entry.name}</span>
+              <span className="text-xs text-gray-300 truncate">{categoryLabel(entry.name)}</span>
             </div>
           ))}
         </div>

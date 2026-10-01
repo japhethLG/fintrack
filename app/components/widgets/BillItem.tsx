@@ -6,6 +6,7 @@ import { Button, Icon } from "@/components/common";
 import { cn } from "@/lib/utils/cn";
 import { useCurrency } from "@/lib/hooks/useCurrency";
 import { parseDate } from "@/lib/utils/dateUtils";
+import { categoryLabel } from "@/lib/utils/categoryLabel";
 
 export interface BillItemProps {
   bill: UpcomingBill;
@@ -39,7 +40,7 @@ export const BillItem: React.FC<BillItemProps> = ({ bill, onPay }) => {
         <div>
           <p className="font-medium text-white text-sm">{transaction.name}</p>
           <p className="text-xs text-gray-400">
-            {transaction.category}
+            {categoryLabel(transaction.category)}
             {bill.daysUntilDue < 0 && <span className="ml-2 text-danger font-medium">Overdue</span>}
           </p>
         </div>

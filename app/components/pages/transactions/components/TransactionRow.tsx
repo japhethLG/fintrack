@@ -7,6 +7,7 @@ import { cn } from "@/lib/utils/cn";
 import { useCurrency } from "@/lib/hooks/useCurrency";
 import { STATUS_VARIANTS } from "../constants";
 import { parseDate } from "@/lib/utils/dateUtils";
+import { categoryLabel } from "@/lib/utils/categoryLabel";
 
 interface IProps {
   transaction: Transaction;
@@ -51,7 +52,7 @@ const TransactionRow: React.FC<IProps> = ({ transaction, onAction }) => {
             </div>
             <div className="flex items-center gap-2 mt-1">
               <Badge variant="default" className="text-xs">
-                {transaction.category}
+                {categoryLabel(transaction.category)}
               </Badge>
               {transaction.sourceType === "manual" && (
                 <Badge variant="primary" className="text-xs">
