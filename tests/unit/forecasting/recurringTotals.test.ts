@@ -189,8 +189,8 @@ describe("installmentRemaining (MANUAL-L1)", () => {
     expect(installmentRemaining(plan({ installmentsPaid: 11 }))).toBe(2_083.37);
   });
 
-  it("3 paid leaves 9 installments, the last of them 2,083.37: 8 x 2,083.33 + 2,083.37 = 18,750", () => {
-    expect(installmentRemaining(plan({ installmentsPaid: 3 }))).toBe(18_750);
+  it("3 paid leaves 9 installments, the last of them 2,083.37: 8 x 2,083.33 + 2,083.37 = 18,750.01", () => {
+    expect(installmentRemaining(plan({ installmentsPaid: 3 }))).toBe(18_750.01);
   });
 
   it("a fully paid plan owes nothing", () => {
