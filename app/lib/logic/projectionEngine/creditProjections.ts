@@ -3,9 +3,9 @@
  */
 
 import { ExpenseRule, Transaction } from "@/lib/types";
-import { parseDate } from "@/lib/utils/dateUtils";
+import { formatDate, parseDate } from "@/lib/utils/dateUtils";
 import { buildPayoffSchedule } from "../creditCardCalculator/payoffCalculator";
-import { adjustForWeekend } from "./dateUtils";
+import { adjustForWeekend, byScheduledDate, windowFilter } from "./dateUtils";
 import { generateOccurrenceId } from "./occurrenceIdGenerator";
 import { createProjectedTransaction } from "./transactionFactory";
 
@@ -78,6 +78,7 @@ export const generateCreditProjections = (
   const last = schedule[schedule.length - 1];
   const totalPayments = last.remainingBalance < 0.01 ? made + schedule.length : 0;
   const adjustment = rule.weekendAdjustment === "none" ? undefined : rule.weekendAdjustment;
+  const inWindow = windowFilter(viewStartDate, viewEndDate);
 
   return schedule.flatMap((step) => {
     // A zero payment is no bill (e.g. both minimum-payment fields left blank)
@@ -85,8 +86,6 @@ export const generateCreditProjections = (
 
     const logicalDate = dueDateInMonth(firstYear, firstMonth + step.month - 1, dueDay);
     const paymentDate = adjustment ? adjustForWeekend(logicalDate, adjustment) : logicalDate;
-    // Filter on the date that is actually emitted
-    if (paymentDate < viewStartDate || paymentDate > viewEndDate) return [];
 
     // The id names the logical month, so a weekend shift never changes which bill this is
     const occurrenceId = generateOccurrenceId(
@@ -97,6 +96,8 @@ export const generateCreditProjections = (
       rule.scheduleConfig
     );
     const override = rule.occurrenceOverrides?.[occurrenceId];
+    // Filter on the date that is actually shown: a dragged bill belongs to the window it was dropped in
+    if (!inWindow(override?.scheduledDate ?? formatDate(paymentDate))) return [];
 
     const transaction = createProjectedTransaction(
       { ...rule, amount: step.payment },
@@ -114,5 +115,5 @@ export const generateCreditProjections = (
       override
     );
     return transaction ? [transaction] : [];
-  });
+  }).sort(byScheduledDate);
 };

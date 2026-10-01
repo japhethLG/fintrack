@@ -28,8 +28,10 @@ import { completeTransaction } from "@/lib/firebase/firestore/transactions";
 import * as store from "../helpers/firestoreEmulator";
 import {
   cents,
+  makeCreditRule,
   makeExpenseRule,
   makeIncomeSource,
+  makeInstallmentRule,
   makeLoanRule,
   makeUserProfile,
 } from "../helpers/builders";
@@ -1107,6 +1109,55 @@ describe("loan lifecycle: paying the first of six amortized payments", () => {
     expect(view.transactions.filter((t) => t.occurrenceId === "loan-1_2026-01")).toHaveLength(1);
   });
 
+  // MANUAL-H1 (docs/audit/manual-test-2026-10-01.md): the loan generator windowed on the
+  // logical date, so the regenerated projection of a DRAGGED payment was not found on its new
+  // day; the completion fell back to the rule amount with no breakdown and the whole payment
+  // came off the debt as principal (Jan: 6000 - 1035.29 = 4964.71 instead of 5024.71).
+  describe("a dragged payment keeps its breakdown", () => {
+    const JAN_ID = "proj_loan-1::2026-01-01::loan-1_2026-01";
+    const DRAGGED_JAN_ID = "proj_loan-1::2026-01-10::loan-1_2026-01";
+
+    it("is shown on the day it was dropped, still payment #1 with 60.00 interest", async () => {
+      await rescheduleTransactionAction(JAN_ID, "2026-01-10", USER, liveSources(), liveRules());
+
+      const row = rowOn(loanView(), "2026-01-10");
+      expect(row.id).toBe(DRAGGED_JAN_ID);
+      expect(row.projectedAmount).toBeCloseTo(ORIGINAL_PMT, 2);
+      expect(row.paymentBreakdown).toMatchObject({ paymentNumber: 1, totalPayments: 6 });
+      expect(row.paymentBreakdown!.interestPaid).toBeCloseTo(60, 2);
+    });
+
+    it("completing it reduces the loan by the principal only (5024.71), like an undragged payment", async () => {
+      await rescheduleTransactionAction(JAN_ID, "2026-01-10", USER, liveSources(), liveRules());
+      await completeOccurrence(DRAGGED_JAN_ID, ORIGINAL_PMT);
+
+      const stored = onlyStoredRow();
+      expect(stored.scheduledDate).toBe("2026-01-10");
+      expect(stored.paymentBreakdown!.interestPaid).toBeCloseTo(60, 2);
+      expect(stored.paymentBreakdown!.principalPaid).toBeCloseTo(975.29, 2);
+      expect(storedRule("loan-1").loanConfig!.currentBalance).toBeCloseTo(5_024.71, 2);
+      expect(storedRule("loan-1").loanConfig!.paymentsMade).toBe(1);
+      expect(balance()).toBe(cents(20_000 - ORIGINAL_PMT));
+    });
+
+    it("a payment dragged into the previous month is shown there, not lost from both months", async () => {
+      // February's payment pulled back to Jan 25: Jan now holds payments #1 and #2.
+      await rescheduleTransactionAction(
+        "proj_loan-1::2026-02-01::loan-1_2026-02",
+        "2026-01-25",
+        USER,
+        liveSources(),
+        liveRules()
+      );
+
+      const jan = snapshot({ start: "2026-01-01", end: "2026-01-31" });
+      expect(dates(jan.transactions)).toEqual(["2026-01-01", "2026-01-25"]);
+      expect(jan.transactions[1].paymentBreakdown!.paymentNumber).toBe(2);
+      const feb = snapshot({ start: "2026-02-01", end: "2026-02-28" });
+      expect(feb.transactions).toHaveLength(0);
+    });
+  });
+
   describe("known defects", () => {
     /**
      * DEFECT: `markTransactionCompleteAction` increments
@@ -1204,6 +1255,62 @@ describe("loan lifecycle: paying the first of six amortized payments", () => {
         expect(onlyStoredRow().projectedAmount).toBe(projectedAmount);
       }
     );
+  });
+});
+
+describe("card and installment: a dragged payment keeps its breakdown (MANUAL-H1)", () => {
+  const seed = (rule: ExpenseRule): void => {
+    store.__seed(
+      "users",
+      USER,
+      makeUserProfile({ uid: USER, currentBalance: 20_000 }) as unknown as Record<string, unknown>
+    );
+    store.__seedEntities("expense_rules", [rule]);
+  };
+
+  beforeEach(() => freezeToday("2026-01-01"));
+
+  it("card: 5000 at 24% paying 500 fixed, dragged Jan 15 -> Jan 20, comes off as 400 principal (4600 left)", async () => {
+    // month 1 interest = 5000 x 24%/12 = 100.00, so 500 pays 400.00 of principal
+    seed(
+      makeCreditRule(
+        { amount: 500, startDate: "2026-01-01" },
+        { paymentStrategy: "fixed", fixedPaymentAmount: 500 }
+      )
+    );
+    await rescheduleTransactionAction(
+      "proj_card-1::2026-01-15::card-1_2026-01",
+      "2026-01-20",
+      USER,
+      liveSources(),
+      liveRules()
+    );
+    const row = rowOn(snapshot({ start: "2026-01-01", end: "2026-01-31" }), "2026-01-20");
+    expect(row.paymentBreakdown!.interestPaid).toBeCloseTo(100, 2);
+
+    await completeOccurrence(row.id, 500);
+
+    expect(onlyStoredRow().paymentBreakdown!.principalPaid).toBeCloseTo(400, 2);
+    expect(storedRule("card-1").creditConfig!.currentBalance).toBeCloseTo(4_600, 2);
+  });
+
+  it("installment: the 2nd of 6 x 200 dragged into January is shown there with its number and remaining", async () => {
+    seed(makeInstallmentRule({ startDate: "2026-01-05" }));
+    await rescheduleTransactionAction(
+      "proj_inst-1::2026-02-05::inst-1_2026-02",
+      "2026-01-28",
+      USER,
+      liveSources(),
+      liveRules()
+    );
+
+    const jan = snapshot({ start: "2026-01-01", end: "2026-01-31" });
+    expect(dates(jan.transactions)).toEqual(["2026-01-05", "2026-01-28"]);
+    expect(jan.transactions[1].paymentBreakdown).toMatchObject({
+      paymentNumber: 2,
+      remainingBalance: 800,
+    });
+    expect(snapshot({ start: "2026-02-01", end: "2026-02-28" }).transactions).toHaveLength(0);
   });
 });
 

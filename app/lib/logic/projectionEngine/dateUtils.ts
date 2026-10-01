@@ -7,7 +7,7 @@
  * have no wall-clock, DST or time-zone component.
  */
 
-import { addDays, addMonths, weekdayOfDayNumber } from "@/lib/utils/dateUtils";
+import { addDays, addMonths, formatDate, weekdayOfDayNumber } from "@/lib/utils/dateUtils";
 import type { ScheduleConfig } from "@/lib/types";
 
 export {
@@ -116,6 +116,25 @@ export const monthlyPaymentDate = (anchor: Date, dayOfMonth: unknown, index: num
   const m = monthIndex % 12;
   return new Date(y, m, clampDayToMonth(day, y, m));
 };
+
+// ============================================================================
+// View windows
+// ============================================================================
+
+/**
+ * Membership test for a view window on `YYYY-MM-DD` strings. Generators apply it to the
+ * date a row is SHOWN on (an override's `scheduledDate` when it has one), so a dragged
+ * row belongs to the window it was dropped in.
+ */
+export const windowFilter = (viewStartDate: Date, viewEndDate: Date) => {
+  const start = formatDate(viewStartDate);
+  const end = formatDate(viewEndDate);
+  return (ymd: string): boolean => ymd >= start && ymd <= end;
+};
+
+/** Sort comparator: chronological by `scheduledDate` (YYYY-MM-DD strings order as dates). */
+export const byScheduledDate = (a: { scheduledDate: string }, b: { scheduledDate: string }): number =>
+  a.scheduledDate < b.scheduledDate ? -1 : a.scheduledDate > b.scheduledDate ? 1 : 0;
 
 // ============================================================================
 // ScheduleConfig sanitising (shared by the calculator and the id generator so

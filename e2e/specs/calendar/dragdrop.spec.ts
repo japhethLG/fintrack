@@ -14,7 +14,7 @@
  * April (before any drag): Payday 4/17 (+777, overridden), Rent 4/18 (-200)
  *   -> opening 1300, closing 1300 + 777 - 200 = 1877.
  */
-import { test, expect, seedAndLogin, userProfile, incomeSource, fixedExpense, completedTransaction, readStore } from "../../index";
+import { test, expect, seedAndLogin, userProfile, incomeSource, fixedExpense, completedTransaction, readStore, cashLoan, creditCard, readCollection, COLLECTIONS } from "../../index";
 import {
   completeInDialog,
   dragTo,
@@ -385,6 +385,48 @@ test.describe("complete and revert a rescheduled occurrence", () => {
     // ... and April's own payday (4/17, override amount 777) is untouched and still projected.
     expect(await daysShowing(page, "2026-04", "Payday")).toEqual(["2026-04-01", "2026-04-17"]);
     await expect(summaryTile(page, "Transactions")).toHaveText("1 / 3"); // completed 1 (moved March payday) of 3 (+ April payday + Rent)
+  });
+});
+
+/**
+ * MANUAL-H1 (docs/audit/manual-test-2026-10-01.md): a dragged debt payment used to be completed
+ * WITHOUT its interest/principal split, so the whole payment came off the debt.
+ *   Loan 6000 @ 12%/6 months, 1035.29/month on the 15th: March interest 6000 x 1% = 60.00,
+ *   principal 975.29 -> 5024.71 left (the bug left 4964.71).
+ *   Card 5000 @ 24%, 500 fixed, due the 15th: March interest 5000 x 2% = 100.00,
+ *   principal 400.00 -> 4600.00 left (the bug left 4500.00).
+ */
+test.describe("debt payments keep their breakdown when dragged (MANUAL-H1)", () => {
+  type DebtRule = { id: string; loanConfig?: { currentBalance: number; paymentsMade: number }; creditConfig?: { currentBalance: number } };
+  const debtRule = async (page: import("@playwright/test").Page, id: string) =>
+    (await readCollection<DebtRule>(page, COLLECTIONS.expenseRules)).find((r) => r.id === id)!;
+
+  test("loan: drag 3/15 -> 3/20, complete: the loan drops by the principal only", async ({ page }) => {
+    const loan = cashLoan(
+      { id: "loan", name: "Car Loan", amount: 1035.29, startDate: "2026-03-15" },
+      { principalAmount: 6000, currentBalance: 6000, termMonths: 6, monthlyPayment: 1035.29, loanStartDate: "2026-03-15", firstPaymentDate: "2026-03-15" }
+    );
+    await boot(page, { expenseRules: [rent(), loan] });
+    await dragTo(page, monthCell(page, "2026-03", "2026-03-15").getByText("Car Loan"), monthCell(page, "2026-03", "2026-03-20"));
+    await openTxnFromCell(page, monthCell(page, "2026-03", "2026-03-20"), "Car Loan");
+    await completeInDialog(page);
+
+    await expect.poll(async () => (await debtRule(page, "loan")).loanConfig!.currentBalance).toBeCloseTo(5024.71, 2);
+    expect((await debtRule(page, "loan")).loanConfig!.paymentsMade).toBe(1);
+    expect(await userBalance(page)).toBeCloseTo(1000 - 1035.29, 2);
+  });
+
+  test("card: drag 3/15 -> 3/20, complete: the card drops by the principal only", async ({ page }) => {
+    const card = creditCard(
+      { id: "card", name: "Visa", amount: 500, startDate: "2026-03-01" },
+      { paymentStrategy: "fixed", fixedPaymentAmount: 500 }
+    );
+    await boot(page, { expenseRules: [rent(), card] });
+    await dragTo(page, monthCell(page, "2026-03", "2026-03-15").getByText("Visa"), monthCell(page, "2026-03", "2026-03-20"));
+    await openTxnFromCell(page, monthCell(page, "2026-03", "2026-03-20"), "Visa");
+    await completeInDialog(page);
+
+    await expect.poll(async () => (await debtRule(page, "card")).creditConfig!.currentBalance).toBeCloseTo(4600, 2);
   });
 });
 

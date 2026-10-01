@@ -3,8 +3,8 @@
  */
 
 import { ExpenseRule, InstallmentConfig, Transaction } from "@/lib/types";
-import { parseDate } from "@/lib/utils/dateUtils";
-import { adjustForWeekend, monthlyPaymentDate } from "./dateUtils";
+import { formatDate, parseDate } from "@/lib/utils/dateUtils";
+import { adjustForWeekend, byScheduledDate, monthlyPaymentDate, windowFilter } from "./dateUtils";
 import { generateOccurrenceId } from "./occurrenceIdGenerator";
 import { createProjectedTransaction } from "./transactionFactory";
 
@@ -82,11 +82,11 @@ export const generateInstallmentProjections = (
   const anchor = parseDate(rule.startDate);
   const adjustment = rule.weekendAdjustment === "none" ? undefined : rule.weekendAdjustment;
   const projections: ProjectedTransaction[] = [];
+  const inWindow = windowFilter(viewStartDate, viewEndDate);
 
   for (let i = paid; i < count; i++) {
     const logicalDate = monthlyPaymentDate(anchor, rule.scheduleConfig?.dayOfMonth, i);
     const emittedDate = adjustment ? adjustForWeekend(logicalDate, adjustment) : logicalDate;
-    if (emittedDate < viewStartDate || emittedDate > viewEndDate) continue;
 
     const paymentNumber = i + 1;
     const occurrenceId = generateOccurrenceId(
@@ -97,6 +97,8 @@ export const generateInstallmentProjections = (
       rule.scheduleConfig
     );
     const override = rule.occurrenceOverrides?.[occurrenceId];
+    // The window applies to where the row is shown (a dragged installment moves with its override)
+    if (!inWindow(override?.scheduledDate ?? formatDate(emittedDate))) continue;
 
     // what is still to be paid after this installment, exact to the cent
     const remainingBalance = round2(amounts.slice(i + 1).reduce((sum, a) => sum + a, 0));
@@ -122,5 +124,5 @@ export const generateInstallmentProjections = (
     }
   }
 
-  return projections;
+  return projections.sort(byScheduledDate);
 };

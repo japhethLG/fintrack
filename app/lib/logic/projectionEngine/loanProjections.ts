@@ -3,9 +3,9 @@
  */
 
 import { ExpenseRule, LoanConfig, Transaction } from "@/lib/types";
-import { parseDate } from "@/lib/utils/dateUtils";
+import { formatDate, parseDate } from "@/lib/utils/dateUtils";
 import { AmortizationStep, calculateAmortizationSchedule } from "../amortization";
-import { adjustForWeekend, monthlyPaymentDate } from "./dateUtils";
+import { adjustForWeekend, byScheduledDate, monthlyPaymentDate, windowFilter } from "./dateUtils";
 import { generateOccurrenceId } from "./occurrenceIdGenerator";
 import { createProjectedTransaction } from "./transactionFactory";
 
@@ -116,6 +116,7 @@ export const generateLoanProjections = (
   const { steps, made } = plan;
   const totalPayments = made + steps.length;
   const adjustment = rule.weekendAdjustment === "none" ? undefined : rule.weekendAdjustment;
+  const inWindow = windowFilter(viewStartDate, viewEndDate);
 
   // Number EVERY step first, then filter: a payment's number is its absolute
   // position in the loan and must not depend on what the viewport shows.
@@ -131,9 +132,10 @@ export const generateLoanProjections = (
         rule.scheduleConfig
       );
       const emittedDate = adjustment ? adjustForWeekend(step.date, adjustment) : step.date;
-      if (emittedDate < viewStartDate || emittedDate > viewEndDate) return [];
-
+      // The window applies to where the row is SHOWN: a dragged payment (override
+      // `scheduledDate`) belongs to the window it was dropped in, with its breakdown.
       const override = rule.occurrenceOverrides?.[occurrenceId];
+      if (!inWindow(override?.scheduledDate ?? formatDate(emittedDate))) return [];
       const transaction = createProjectedTransaction(
         { ...rule, amount: step.payment },
         emittedDate,
@@ -150,5 +152,6 @@ export const generateLoanProjections = (
         override
       );
       return transaction ? [transaction] : [];
-    });
+    })
+    .sort(byScheduledDate);
 };
