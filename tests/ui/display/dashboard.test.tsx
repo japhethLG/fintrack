@@ -576,7 +576,8 @@ describe("Dashboard category pie", () => {
     await app.user.click(within(pie).getByRole("button", { name: /Income/ }));
     expect(within(pie).getByText("Income by Category")).toBeInTheDocument();
     expect(money(pie, "Total")).toBe(5_120);
-    for (const name of ["salary", "freelance", "gift"]) expect(within(pie).getByText(name)).toBeInTheDocument();
+    // REWRITTEN (MANUAL cosmetic): category codes read as labels
+    for (const name of ["Salary", "Freelance", "Gift"]) expect(within(pie).getByText(name)).toBeInTheDocument();
   });
 
   it("no expenses: shows the empty placeholder, not NaN", async () => {

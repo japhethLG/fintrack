@@ -120,7 +120,8 @@ describe("dates as the Transactions list prints them (America/New_York, UTC-5)",
       expect(within(dlg).getByText(/Sat, Jan 10, 2026/)).toBeInTheDocument(); // precondition: the modal is right
       await app.user.click(within(dlg).getByRole("button", { name: "Cancel" }));
       await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
-      expect(rowFor(app, tx.id).textContent).toContain("1/10/2026");
+      // REWRITTEN (MANUAL-L5): numeric dates follow the Date Format preference (default MM/DD/YYYY, zero padded)
+      expect(rowFor(app, tx.id).textContent).toContain("01/10/2026");
     },
     T
   );

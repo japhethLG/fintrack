@@ -69,7 +69,8 @@ describe("saving preferences", () => {
     await settings().findByText("Preferences saved successfully!");
     await app.settle();
     const after = app.store.__get<Record<string, unknown>>("users", "user-1")!;
-    expect(prefsOf(app)).toMatchObject({ currency: "EUR", dateFormat: "YYYY-MM-DD", startOfWeek: 0, theme: "dark", defaultWarningThreshold: 500 });
+    // REWRITTEN (MANUAL-L5): the fixture profile now carries the real default date format
+    expect(prefsOf(app)).toMatchObject({ currency: "EUR", dateFormat: "MM/DD/YYYY", startOfWeek: 0, theme: "dark", defaultWarningThreshold: 500 });
     // only `preferences` and `updatedAt` moved: balance fields, identity and stamps are byte-identical
     for (const key of ["currentBalance", "initialBalance", "balanceLastUpdatedAt", "email", "displayName", "uid"]) {
       expect(after[key]).toEqual(before[key]);

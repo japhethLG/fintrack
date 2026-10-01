@@ -121,7 +121,8 @@ describe("the Preferences form and live profile updates", () => {
     const { updateDoc, doc } = await import("firebase/firestore");
     await act(async () => {
       await updateDoc(doc(null as never, "users", app.uid), {
-        preferences: { currency: "GBP", dateFormat: "YYYY-MM-DD", startOfWeek: 0, theme: "dark", defaultWarningThreshold: 500 },
+        // REWRITTEN (MANUAL-L5): same as the fixture profile apart from the currency (its date format is now MM/DD/YYYY)
+        preferences: { currency: "GBP", dateFormat: "MM/DD/YYYY", startOfWeek: 0, theme: "dark", defaultWarningThreshold: 500 },
       });
     });
     await app.settle();

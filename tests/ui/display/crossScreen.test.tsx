@@ -113,14 +113,15 @@ describe("H1 March 2026: totals every screen prints", () => {
     // healthcare 250; personal 200; utilities 90  (sum 2,930.8317)
     const pie = card(page("dashboard"), /Spending by Category/);
     expect(money(pie, "Total")).toBe(2_930.83); // 2,930.8317 (cents, like every other amount)
-    const legend = ["housing", "food", "debt_payment", "healthcare", "personal", "Other"];
+    // REWRITTEN (MANUAL cosmetic): category codes read as labels ("debt_payment" -> "Debt Payment")
+    const legend = ["Housing", "Food", "Debt Payment", "Healthcare", "Personal", "Other"];
     for (const name of legend) expect(within(pie).getByText(name)).toBeInTheDocument();
     // Forecast lists the top 5 categories with cents.
     const overview = card(page("forecast"), "Monthly Overview");
-    expect(amounts(within(overview).getByText("housing").closest("div")!.parentElement!)).toEqual([
+    expect(amounts(within(overview).getByText("Housing").closest("div")!.parentElement!)).toEqual([
       1_200,
     ]);
-    expect(within(overview).getByText("food")).toBeInTheDocument();
+    expect(within(overview).getByText("Food")).toBeInTheDocument();
     expect(overview.textContent).toContain("$600.95");
     expect(overview.textContent).toContain("$589.88");
   });
