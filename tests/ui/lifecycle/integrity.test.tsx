@@ -161,5 +161,6 @@ describe("decisions not made yet", () => {
   // "overdue unpaid bill (D5): every view owes it, none moves the realized balance" in
   // tests/ui/display/forecast.test.tsx.
   it.todo("DECISION: is a variance attributed to the scheduled month or the month it was actually paid?");
-  it.todo("DECISION: does the overdue modal's 'Total Overdue' add missed income to missed bills?");
+  // RESOLVED (MANUAL-M5): the overdue dialog totals bills and missed income SEPARATELY, never added.
+  // Test: tests/ui/display/labels.test.tsx.
 });

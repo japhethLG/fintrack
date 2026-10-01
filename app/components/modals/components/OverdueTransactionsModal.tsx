@@ -6,6 +6,7 @@ import { Button, Icon, Badge } from "@/components/common";
 import { cn } from "@/lib/utils/cn";
 import { useCurrency } from "@/lib/hooks/useCurrency";
 import dayjs from "dayjs";
+import { categoryLabel } from "@/lib/utils/categoryLabel";
 
 export interface IModalData {
   overdueTransactions: Transaction[];
@@ -30,7 +31,16 @@ const OverdueTransactionsModal: React.FC<IProps> = ({ closeModal, modalData }) =
     return today.diff(scheduled, "day");
   };
 
-  const totalOverdueAmount = overdueTransactions.reduce((sum, t) => sum + t.projectedAmount, 0);
+  // Unpaid bills and unreceived income are different things (one is owed, the other is expected):
+  // they are totalled separately and never added together (MANUAL-M5).
+  const overdueBillsTotal = overdueTransactions
+    .filter((t) => t.type !== "income")
+    .reduce((sum, t) => sum + t.projectedAmount, 0);
+  const overdueIncomeTotal = overdueTransactions
+    .filter((t) => t.type === "income")
+    .reduce((sum, t) => sum + t.projectedAmount, 0);
+  const hasOverdueBills = overdueTransactions.some((t) => t.type !== "income");
+  const hasOverdueIncome = overdueTransactions.some((t) => t.type === "income");
 
   const handleReview = (transaction: Transaction) => {
     onReview(transaction);
@@ -53,14 +63,28 @@ const OverdueTransactionsModal: React.FC<IProps> = ({ closeModal, modalData }) =
         </div>
       </div>
 
-      {/* Summary */}
+      {/* Summary: bills owed and income not yet received, never added together */}
       <div className="bg-danger/10 border border-danger/20 rounded-lg p-4 mb-4">
-        <div className="flex items-center justify-between">
-          <div>
-            <p className="text-xs text-gray-400 uppercase tracking-wide">Total Overdue</p>
-            <p className="text-2xl font-bold text-danger">{formatCurrency(totalOverdueAmount)}</p>
+        <div className="flex items-center justify-between gap-4">
+          <div className="flex flex-wrap gap-x-8 gap-y-3">
+            {hasOverdueBills && (
+              <div>
+                <p className="text-xs text-gray-400 uppercase tracking-wide">Overdue Bills</p>
+                <p className="text-2xl font-bold text-danger">{formatCurrency(overdueBillsTotal)}</p>
+              </div>
+            )}
+            {hasOverdueIncome && (
+              <div>
+                <p className="text-xs text-gray-400 uppercase tracking-wide">
+                  Income Not Yet Recorded
+                </p>
+                <p className="text-2xl font-bold text-success">
+                  {formatCurrency(overdueIncomeTotal)}
+                </p>
+              </div>
+            )}
           </div>
-          <div className="text-right">
+          <div className="text-right shrink-0">
             <p className="text-xs text-gray-400">Mark as paid or skip</p>
             <p className="text-sm text-gray-300">to keep your records accurate</p>
           </div>
@@ -92,7 +116,7 @@ const OverdueTransactionsModal: React.FC<IProps> = ({ closeModal, modalData }) =
                   <div className="min-w-0">
                     <p className="font-medium text-white truncate">{transaction.name}</p>
                     <div className="flex items-center gap-2 text-sm">
-                      <span className="text-gray-400">{transaction.category}</span>
+                      <span className="text-gray-400">{categoryLabel(transaction.category)}</span>
                       <span className="text-gray-600">•</span>
                       <span className="text-gray-400">
                         {formatDisplayDate(transaction.scheduledDate)}
