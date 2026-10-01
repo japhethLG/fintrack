@@ -213,7 +213,7 @@ export const LandingHero: React.FC = () => {
                 Get Started Free
               </Button>
             </Link>
-            <a href="#features">
+            <a href="#how-it-works">
               <Button variant="secondary" size="lg" className="px-8 py-4 text-lg">
                 <Icon name="play_circle" size={22} className="mr-2" />
                 See How It Works

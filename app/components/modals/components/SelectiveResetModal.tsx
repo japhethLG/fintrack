@@ -133,9 +133,6 @@ const SelectiveResetModal: React.FC<IProps> = ({ closeModal, modalData }) => {
                 disabled={isSubmitting}
                 className="flex-1"
               />
-              <span className="text-xs text-gray-500 whitespace-nowrap">
-                Type: <span className="font-mono text-gray-300">{key}</span>
-              </span>
             </div>
           </div>
         ))}
