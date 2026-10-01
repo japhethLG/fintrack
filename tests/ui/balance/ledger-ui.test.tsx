@@ -99,15 +99,19 @@ describe("account deletion and resets report exactly what happened", () => {
     transactions: [makeManualTransaction({ id: "t1", name: "Groceries", status: "completed", projectedAmount: 1_000, actualAmount: 1_000, scheduledDate: "2026-01-05", actualDate: "2026-01-05" })],
   };
 
-  it("when the login is deleted but the data batch is then rejected, the user is told their data remains", async () => {
+  it("when the data batch is rejected the account is NOT deleted (the login is kept) and the user is told nothing changed", async () => {
     const app = await renderApp({ route: "/settings", today: TODAY, seed: world });
     await app.user.click(screen.getAllByRole("button", { name: "Delete Account" }).at(-1)!);
     const dialog = await screen.findByRole("dialog");
     await within(dialog).findByText(/permanently delete your account/); // (the body is lazy)
     await app.user.type(within(dialog).getByPlaceholderText(/Type "test@example.com"/), "test@example.com");
+    await app.user.type(within(dialog).getByLabelText("Current password"), "s3cret");
     app.store.__injectFault({ collection: "transactions", error: new Error("Firestore unavailable") });
     await app.user.click(within(dialog).getByRole("button", { name: "Delete My Account" }));
-    expect(await screen.findByText(/Your sign-in was deleted, but your stored data could not be removed \(Firestore unavailable\)/)).toBeInTheDocument();
+    expect(await screen.findByText(/Your account was not deleted: your data could not be removed \(Firestore unavailable\)\. Nothing was changed/)).toBeInTheDocument();
+    // the login is only deleted AFTER the data: it is still there and the user is still signed in
+    expect(app.auth.__callsTo("deleteUser")).toHaveLength(0);
+    expect(app.authContext().user).not.toBeNull();
     // one batch: nothing was half-deleted
     expect(app.store.__count("transactions")).toBe(1);
     expect(app.store.__count("expense_rules")).toBe(1);

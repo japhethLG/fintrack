@@ -449,7 +449,7 @@ const buildUser = (u: E2EUser): FakeUser => ({
   emailVerified: true,
   isAnonymous: false,
   phoneNumber: null,
-  providerData: [],
+  providerData: [{ providerId: u.providerId ?? "password" }],
   getIdToken: async () => "e2e-fake-id-token",
   reload: async () => undefined,
 });

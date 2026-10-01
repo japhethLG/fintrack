@@ -410,6 +410,9 @@ describe("Delete Account", () => {
     expect(go).toBeDisabled();
     await app.user.clear(input);
     await app.user.type(input, "test@example.com");
+    // an email user must also prove it is them: the password is part of the confirmation
+    expect(go).toBeDisabled();
+    await app.user.type(within(dialog).getByLabelText("Current password"), "s3cret");
     expect(go).toBeEnabled();
     await app.user.click(go);
     await waitFor(() => expect(app.auth.__callsTo("deleteUser")).toHaveLength(1));
@@ -425,18 +428,21 @@ describe("Delete Account", () => {
   }, 40_000);
 
   it(
-    "UI-BAL-23 — when Firebase refuses to delete the auth user (requires-recent-login) the user's data and profile are already gone",
+    "UI-BAL-23 — when Firebase refuses the identity check (requires-recent-login) nothing is deleted: not the data, not the profile, not the login",
     async () => {
-      // observed: error banner shown, but income_sources/expense_rules/transactions/alerts/users/{uid} are all deleted,
-      // and the user is still signed in with an empty account.
+      // old order (login first, data second) and the one before it (data first) both left half an account.
+      // The sequence is now (a) reauthenticate, (b) data + profile, (c) login; a refusal at (a) touches nothing.
+      // See delete-account.test.tsx for every other failure point.
       const app = await renderApp({ route: "/settings", today: "2026-01-15", seed: world() });
       const dialog = await openDelete(app);
       await app.user.type(within(dialog).getByPlaceholderText(/Type "test@example.com"/), "test@example.com");
-      app.auth.__failNext("deleteUser", new Error("Firebase: Error (auth/requires-recent-login)."));
+      await app.user.type(within(dialog).getByLabelText("Current password"), "s3cret");
+      app.auth.__failNext("reauthenticateWithCredential", new Error("Firebase: Error (auth/requires-recent-login)."));
       await app.user.click(within(dialog).getByRole("button", { name: "Delete My Account" }));
-      // preconditions: the deletion was attempted, failed, and the user is told so
-      await waitFor(() => expect(app.auth.__callsTo("deleteUser")).toHaveLength(1));
-      expect(await screen.findByText(/requires-recent-login/)).toBeInTheDocument();
+      // preconditions: the identity check was attempted, failed, and the user is told nothing was deleted
+      await waitFor(() => expect(app.auth.__callsTo("reauthenticateWithCredential")).toHaveLength(1));
+      expect(await screen.findByText(/Nothing was deleted/)).toBeInTheDocument();
+      expect(app.auth.__callsTo("deleteUser")).toHaveLength(0);
       expect(app.authContext().user).not.toBeNull(); // still signed in
       // money assertion: a failed deletion must not have destroyed anything
       expect(app.store.__get("users", "user-1")).toBeDefined();

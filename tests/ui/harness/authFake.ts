@@ -9,6 +9,7 @@
  *   vi.mock("firebase/auth", () => import("./harness/authFake"));
  *
  * Test-side controls (all prefixed `__`):
+ *   __beforeCall(name, cb)   observe the world at the instant the app makes a call
  *   __setUser(user | null)   emit a new auth state to every listener
  *   __signOutCalls, __calls  observe what the app asked the SDK to do
  *   __failNext(name, error)  make the next call to a fn reject (error paths)
@@ -74,6 +75,7 @@ export const __reset = (): void => {
   listeners.clear();
   __calls.length = 0;
   failures.clear();
+  beforeCall.clear();
 };
 
 /** Make the next call to `fn` (e.g. "signInWithEmailAndPassword") reject. */
@@ -83,8 +85,24 @@ export const __failNext = (fn: string, error: Error): void => {
 
 export const __callsTo = (fn: string) => __calls.filter((c) => c.fn === fn);
 
+const beforeCall = new Map<string, () => void>();
+
+/**
+ * Run `cb` the moment the app calls `fn` (before any queued failure is applied), once. Lets a test observe
+ * the state of OTHER fakes (e.g. the data store) at the instant an auth call is made, which is how the
+ * delete-account ORDER is proven.
+ */
+export const __beforeCall = (fn: string, cb: () => void): void => {
+  beforeCall.set(fn, cb);
+};
+
 const record = async (fn: string, args: unknown[]): Promise<void> => {
   __calls.push({ fn, args });
+  const hook = beforeCall.get(fn);
+  if (hook) {
+    beforeCall.delete(fn);
+    hook();
+  }
   const failure = failures.get(fn);
   if (failure) {
     failures.delete(fn);
@@ -135,7 +153,11 @@ export const createUserWithEmailAndPassword = vi.fn(
 
 export const signInWithPopup = vi.fn(async (_a: unknown, provider: unknown) => {
   await record("signInWithPopup", [provider]);
-  const user = makeFakeUser({ uid: "google-user", email: "google@example.com" });
+  const user = makeFakeUser({
+    uid: "google-user",
+    email: "google@example.com",
+    providerData: [{ providerId: "google.com" }],
+  });
   __setUser(user);
   return { user };
 });
@@ -160,6 +182,11 @@ export const updatePassword = vi.fn(async (_user: unknown, password: string) => 
 
 export const reauthenticateWithCredential = vi.fn(async (_user: unknown, credential: unknown) => {
   await record("reauthenticateWithCredential", [credential]);
+});
+
+/** Reauthentication with the Google popup (what a Google-only user does instead of typing a password). */
+export const reauthenticateWithPopup = vi.fn(async (_user: unknown, provider: unknown) => {
+  await record("reauthenticateWithPopup", [provider]);
 });
 
 export class GoogleAuthProvider {

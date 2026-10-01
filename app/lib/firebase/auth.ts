@@ -8,6 +8,7 @@ import {
   updateEmail as firebaseUpdateEmail,
   updatePassword as firebaseUpdatePassword,
   reauthenticateWithCredential,
+  reauthenticateWithPopup,
   EmailAuthProvider,
   User,
   onAuthStateChanged as firebaseOnAuthStateChanged,
@@ -54,6 +55,21 @@ export const reauthenticateUser = async (password: string): Promise<void> => {
   }
   const credential = EmailAuthProvider.credential(user.email, password);
   await reauthenticateWithCredential(user, credential);
+};
+
+/** Reauthenticate a Google user with the Google popup (the equivalent of typing the password). */
+export const reauthenticateWithGoogle = async (): Promise<void> => {
+  const user = auth.currentUser;
+  if (!user) {
+    throw new Error("No user logged in");
+  }
+  await reauthenticateWithPopup(user, googleProvider);
+};
+
+/** True when the signed-in user can only prove who they are with Google (no password on the account). */
+export const isGoogleOnlyUser = (user: Pick<User, "providerData"> | null): boolean => {
+  const providers = (user?.providerData ?? []).map((p) => p?.providerId);
+  return providers.includes("google.com") && !providers.includes("password");
 };
 
 export const updateUserEmail = async (newEmail: string): Promise<void> => {
