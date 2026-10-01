@@ -94,7 +94,7 @@ test.describe("drag a projected occurrence to another day", () => {
     expect(await userBalance(page)).toBe(1000);
     // Totals for the month are unchanged by a move inside the month.
     await expect(summaryTile(page, "Expenses")).toHaveText("-$200.00");
-    await expect(periodFigure(page, "Closing")).toHaveText("$1,300");
+    await expect(periodFigure(page, "Closing")).toHaveText("$1,300.00");
     // No drag side effect: dialog not opened, nothing selected.
     await expect(txnDialog(page)).toBeHidden();
   });
@@ -180,16 +180,16 @@ test.describe("drag a projected occurrence to another day", () => {
     await expect(summaryTile(page, "Income")).toHaveText("+$0.00");
     expect(await daysShowing(page, "2026-03", "Payday")).toEqual([]);
     // March closing = 1000 - 200.
-    await expect(periodFigure(page, "Closing")).toHaveText("$800");
+    await expect(periodFigure(page, "Closing")).toHaveText("$800.00");
     expect((await overridesOf(page, "income_sources", "payday"))?.["payday_2026-03"]).toEqual({ scheduledDate: "2026-04-01" });
 
     await navigateToMonth(page, "2026-03", "2026-04");
     // April: moved March payday on 4/1, native April payday on 4/17 (overridden amount 777), rent 4/18.
     expect(await daysShowing(page, "2026-04", "Payday")).toEqual(["2026-04-01", "2026-04-17"]);
     // Opening chain: April opening == March closing == 800.
-    await expect(periodFigure(page, "Opening")).toHaveText("$800");
+    await expect(periodFigure(page, "Opening")).toHaveText("$800.00");
     // 800 + 500 + 777 - 200
-    await expect(periodFigure(page, "Closing")).toHaveText("$1,877");
+    await expect(periodFigure(page, "Closing")).toHaveText("$1,877.00");
     await expect(summaryTile(page, "Income")).toHaveText("+$1,277.00");
     await page.reload();
     await navigateToMonth(page, "2026-03", "2026-04");

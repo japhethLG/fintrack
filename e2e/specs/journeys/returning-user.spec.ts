@@ -68,7 +68,7 @@ test.describe("returning user, 9 months of history", () => {
     await page.reload();
     await expect(page.getByRole("heading", { name: "Financial Calendar", level: 1 })).toBeVisible();
     await expect(page.getByText("Opening", { exact: true }).first()).toBeVisible(); // Monthly Balance Overview card
-    await expect(page.locator("p.text-2xl.font-bold").first()).toHaveText("$16,400");
+    await expect(page.locator("p.text-2xl.font-bold").first()).toHaveText("$16,400.00");
   });
 
   test("legacy profile WITHOUT history: migration sets initialBalance = currentBalance and nothing mismatches", async ({ page }) => {

@@ -57,8 +57,8 @@ test.describe("semi-monthly [15,30], weekend 'after' (Sun 3/15 -> Mon 3/16, Mon 
     await boot(page, semi());
     expect(await daysShowing(page, "2026-03", "Semi")).toEqual(["2026-03-16", "2026-03-30"]);
     await expect(summaryTile(page, "Income")).toHaveText("+$200.00");
-    await expect(periodFigure(page, "Opening")).toHaveText("$1,000");
-    await expect(periodFigure(page, "Closing")).toHaveText("$1,200");
+    await expect(periodFigure(page, "Opening")).toHaveText("$1,000.00");
+    await expect(periodFigure(page, "Closing")).toHaveText("$1,200.00");
     await expect(summaryTile(page, "Transactions")).toHaveText("0 / 2");
   });
 
@@ -86,8 +86,8 @@ test.describe("semi-monthly [15,30], weekend 'after' (Sun 3/15 -> Mon 3/16, Mon 
     // ... and the calendar must agree: each payday once, both completed, opening unchanged.
     expect(await daysShowing(page, "2026-03", "Semi")).toEqual(["2026-03-16", "2026-03-30"]);
     await expect(summaryTile(page, "Transactions")).toHaveText("2 / 2");
-    await expect(periodFigure(page, "Opening")).toHaveText("$1,000");
-    await expect(periodFigure(page, "Closing")).toHaveText("$1,200");
+    await expect(periodFigure(page, "Opening")).toHaveText("$1,000.00");
+    await expect(periodFigure(page, "Closing")).toHaveText("$1,200.00");
   });
 
   test("dragging one payday moves only that payday", async ({ page }) => {
@@ -102,7 +102,7 @@ test.describe("monthly on the 1st, weekend 'before' (Sat Aug 1 is paid Fri Jul 3
   const toJuly = async (page: import("@playwright/test").Page) => {
     await navigateToMonth(page, "2026-03", "2026-07");
     // Hand values: Jun 1 (+100) happened before July => July opens at 1000 + 100.
-    await expect(periodFigure(page, "Opening")).toHaveText("$1,100");
+    await expect(periodFigure(page, "Opening")).toHaveText("$1,100.00");
     await expect(monthCell(page, "2026-07", "2026-07-01").getByText("First")).toBeVisible();
   };
 
@@ -110,7 +110,7 @@ test.describe("monthly on the 1st, weekend 'before' (Sat Aug 1 is paid Fri Jul 3
     await boot(page, firstBefore());
     await toJuly(page);
     expect(await daysShowing(page, "2026-07", "First")).toEqual(["2026-07-01", "2026-07-31"]);
-    await expect(periodFigure(page, "Closing")).toHaveText("$1,300"); // 1100 + Jul 1 + Jul 31
+    await expect(periodFigure(page, "Closing")).toHaveText("$1,300.00"); // 1100 + Jul 1 + Jul 31
   });
 
   test("visiting August first makes 7/31 appear: July's closing figure depends on navigation history", async ({ page }) => {

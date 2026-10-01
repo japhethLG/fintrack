@@ -126,7 +126,7 @@ describe("ExpenseManager summary cards", () => {
     // 564.8817 + card A minimum 2% of 5,000 = 100 + card B fixed 300 = 2,064.8817 -> $2,065.
     // The laptop instalment (2 of 6 paid) has its next payment on Mar 1, so January has none.
     await renderApp({ route: "/expenses", today: TODAY, seed: { expenseRules: rules() } });
-    expect(moneyNear("Monthly Recurring")).toBe(2065);
+    expect(moneyNear("Monthly Recurring")).toBe(2064.88); // 2,064.8817
     expect(moneyNear("One-time")).toBe(400);
     expect(cardValue("Active Expenses")).toBe("7");
     expect(cardValue("Priority Bills")).toBe("1");

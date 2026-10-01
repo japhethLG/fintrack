@@ -107,9 +107,9 @@ describe("calendar balance vs the stored balance", () => {
     });
     const today = await calendarToday(app);
     expect(today).toEqual({ opening: 1_000, closing: 1_000 });
-    expect(gridCellBalance(19)).toBe("$1,000");
-    expect(gridCellBalance(20)).toBe("$750");
-    expect(gridCellBalance(31)).toBe("$750");
+    expect(gridCellBalance(19)).toBe("$1,000.00");
+    expect(gridCellBalance(20)).toBe("$750.00");
+    expect(gridCellBalance(31)).toBe("$750.00");
   }, 40_000);
 });
 
@@ -131,7 +131,7 @@ describe("calendar presentation of money", () => {
       const panel = (await within(screenEl("calendar")).findByText(/^\w+day, Jan 25$/)).closest("div.sticky, div")!.parentElement!;
       expect(moneyNear("Closing", { within: panel })).toBe(-20);
       // money assertion: the grid must agree with the panel's sign
-      expect(gridCellBalance(25)).toBe("-$20");
+      expect(gridCellBalance(25)).toBe("-$20.00");
     },
     40_000
   );
@@ -176,9 +176,9 @@ describe("calendar presentation of money", () => {
     while (!/Opening/.test(overview.textContent ?? "")) overview = overview.parentElement!;
     expect(moneyNear("Opening", { within: overview })).toBe(1_700);
     expect(moneyNear("Closing", { within: overview })).toBe(1_300);
-    expect(gridCellBalance(1)).toBe("$1,700");
-    expect(gridCellBalance(3)).toBe("$2,000");
-    expect(gridCellBalance(31)).toBe("$1,300");
+    expect(gridCellBalance(1)).toBe("$1,700.00");
+    expect(gridCellBalance(3)).toBe("$2,000.00");
+    expect(gridCellBalance(31)).toBe("$1,300.00");
     expect((await calendarToday(app)).closing).toBe(2_000);
   }, 40_000);
 });

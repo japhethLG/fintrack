@@ -132,8 +132,8 @@ test.describe("date labels and buckets (America/New_York shows the previous day)
     await seedAndLogin(page, household());
     await expect(page.getByText("Weekly view")).toBeVisible();
     // Mar 1 is a Sunday (week starts Mar 1); Mar 31 is a Tuesday (week starts Sun Mar 29)
-    await expect(page.getByText("Week of Mar 1", { exact: true })).toBeVisible();
-    await expect(page.getByText("Week of Mar 29", { exact: true })).toBeVisible();
+    await expect(page.getByText("Week of Mar 1", { exact: true }).first()).toBeVisible();
+    await expect(page.getByText("Week of Mar 29", { exact: true }).first()).toBeVisible();
   });
 
   test("Period Comparison for Mar 1-31 compares with Jan 29 - Feb 28 (income was $3,000)", async ({ page }, testInfo) => {

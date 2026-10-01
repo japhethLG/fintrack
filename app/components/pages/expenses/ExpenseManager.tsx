@@ -193,20 +193,20 @@ const ExpenseManager: React.FC = () => {
           <Card padding="md">
             <p className="text-gray-400 text-xs lg:text-sm mb-1">Monthly Recurring</p>
             <p className="text-lg lg:text-3xl font-bold text-danger">
-              {formatCurrency(recurringMonthly, { maximumFractionDigits: 0 })}
+              {formatCurrency(recurringMonthly)}
             </p>
             <p className="text-[10px] lg:text-xs text-gray-500 mt-1">Scheduled for {monthLabel}</p>
           </Card>
           <Card padding="md">
             <p className="text-gray-400 text-xs lg:text-sm mb-1">One-time</p>
             <p className="text-lg lg:text-3xl font-bold text-warning">
-              {formatCurrency(oneTimeTotal, { maximumFractionDigits: 0 })}
+              {formatCurrency(oneTimeTotal)}
             </p>
           </Card>
           <Card padding="md">
             <p className="text-gray-400 text-xs lg:text-sm mb-1">Total Debt</p>
             <p className="text-lg lg:text-3xl font-bold text-danger">
-              {formatCurrency(debtOwed, { maximumFractionDigits: 0 })}
+              {formatCurrency(debtOwed)}
             </p>
           </Card>
           <Card padding="md">

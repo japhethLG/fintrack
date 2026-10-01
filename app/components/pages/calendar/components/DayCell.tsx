@@ -121,7 +121,7 @@ const DayCell: React.FC<IProps> = ({ day, isSelected, onClick, onTransactionClic
           {/* Balance indicator */}
           {dayBalance && isCurrentMonth && (
             <span className={cn("text-xs font-medium", STATUS_COLORS[dayBalance.status])}>
-              {formatCurrency(dayBalance.closingBalance, { maximumFractionDigits: 0 })}
+              {formatCurrency(dayBalance.closingBalance)}
             </span>
           )}
         </div>

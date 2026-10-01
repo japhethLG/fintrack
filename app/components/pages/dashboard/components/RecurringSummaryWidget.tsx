@@ -67,7 +67,7 @@ const RecurringSummaryWidget: React.FC = () => {
             <p className="text-xs text-gray-400 mb-0.5">Monthly Income</p>
             <div className="flex items-center gap-2">
               <span className="font-bold text-white">
-                {formatCurrency(stats.monthlyIncome, { maximumFractionDigits: 0 })}
+                {formatCurrency(stats.monthlyIncome)}
               </span>
               <span className="text-xs bg-dark-700 px-1.5 py-0.5 rounded text-gray-400">
                 {stats.activeIncomeCount} sources
@@ -88,7 +88,7 @@ const RecurringSummaryWidget: React.FC = () => {
             <p className="text-xs text-gray-400 mb-0.5">Monthly Expenses</p>
             <div className="flex items-center gap-2">
               <span className="font-bold text-white">
-                {formatCurrency(stats.monthlyExpenses, { maximumFractionDigits: 0 })}
+                {formatCurrency(stats.monthlyExpenses)}
               </span>
               <span className="text-xs bg-dark-700 px-1.5 py-0.5 rounded text-gray-400">
                 {stats.activeExpenseCount} rules
@@ -107,7 +107,7 @@ const RecurringSummaryWidget: React.FC = () => {
         <div className="pt-2 border-t border-gray-800 flex justify-between items-center">
           <span className="text-sm text-gray-400">Net Recurring</span>
           <span className={cn("font-bold", stats.net >= 0 ? "text-success" : "text-danger")}>
-            {formatCurrencyWithSign(stats.net, { maximumFractionDigits: 0 })}
+            {formatCurrencyWithSign(stats.net)}
             <span className="text-xs font-normal text-gray-500 ml-1">this month</span>
           </span>
         </div>

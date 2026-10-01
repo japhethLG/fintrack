@@ -60,7 +60,7 @@ describe("mutation: complete a projected bill with a different actual (Electrici
     // Expenses page: upcoming 30-day total loses the 90; the month's recurring occurrences take the
     // actual 95 instead of 90: 2,680.8317 - 90 + 95 = 2,685.8317 -> $2,686
     expect(money(card(m.page("expenses"), "Upcoming Bills"), "Total Due")).toBe(2_839.88);
-    expect(money(m.page("expenses"), "Monthly Recurring")).toBe(2_686);
+    expect(money(m.page("expenses"), "Monthly Recurring")).toBe(2_685.83); // 2,685.8317
   });
 
   it("the Bills tab projected balance follows: 13,874.05 - 1,339.8817 = 12,534.17 (14-day window, no Mar 30 payroll)", async () => {
@@ -163,9 +163,9 @@ describe("mutation: add a weekly expense rule (Gym 40 every Saturday from Mar 21
     expect(within(kpi(m)).getByText("3 completed, 9 projected")).toBeInTheDocument();
     expect(money(m.page("calendar"), "Expenses", { occurrence: 0 })).toBe(-3_010.83); // 3,010.8317
     // recurring (occurrences): 2,680.8317 + 2 x 40 (Mar 21, Mar 28) = 2,760.8317 -> $2,761
-    expect(money(card(m.page("dashboard"), "Recurring Summary"), "Monthly Expenses")).toBe(2_761);
-    expect(money(card(m.page("dashboard"), "Recurring Summary"), "Net Recurring")).toBe(2_059); // 4,820 - 2,760.8317 = 2,059.1683
-    expect(money(m.page("expenses"), "Monthly Recurring")).toBe(2_761);
+    expect(money(card(m.page("dashboard"), "Recurring Summary"), "Monthly Expenses")).toBe(2_760.83);
+    expect(money(card(m.page("dashboard"), "Recurring Summary"), "Net Recurring")).toBe(2_059.17); // 4,820 - 2,760.8317 = 2,059.1683
+    expect(money(m.page("expenses"), "Monthly Recurring")).toBe(2_760.83);
     expect(stat(m.page("expenses"), "Active Expenses")).toBe("8");
     // Upcoming 30 days: Mar 21, Mar 28, Apr 4, Apr 11 = 4 x 40 more: 2,929.8817 + 160 = 3,089.8817
     expect(money(card(m.page("expenses"), "Upcoming Bills"), "Total Due")).toBe(3_089.88);
@@ -259,7 +259,7 @@ describe("mutation: pay the first Car Loan instalment (Mar 20, 564.88)", () => {
       // observed: $14,200 before and after.  correct: 14,200 - 444.88 = 13,755.12
       const m = await pay();
       expect(within(kpi(m)).getByText("4 completed, 6 projected")).toBeInTheDocument(); // precondition
-      expect(money(m.page("expenses"), "Total Debt")).toBe(13_755);
+      expect(money(m.page("expenses"), "Total Debt")).toBe(13_755.12);
     }
   );
 });

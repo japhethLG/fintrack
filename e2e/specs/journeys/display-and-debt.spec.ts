@@ -55,7 +55,7 @@ test.describe("loan paid for 4 months (8,000 @ 12% APR, 8 months, first payment 
     await expect(page.getByRole("heading", { name: "Financial Calendar", level: 1 })).toBeVisible();
     await payMonths(page, FOUR);
     await S.gotoPage(page, "Expense Manager");
-    await expect(page.getByText("Total Debt").locator("xpath=following-sibling::p")).toHaveText("$4,080");
+    await expect(page.getByText("Total Debt").locator("xpath=following-sibling::p")).toHaveText("$4,079.60"); // 8,000 -> 7,034.48 -> 6,059.30 -> 5,074.38 -> 4,079.60 (1%/month, 1,045.52 paid each time; cents, like every amount)
     await expect(page.getByText("Progress").locator("xpath=following-sibling::span")).toHaveText("49%");
     // REWRITTEN (decision: "Next N days" is exactly N days). Today is Jun 15, so Jul 15 is day 30 and is
     // outside "Next 30 days" (Jun 15 .. Jul 14): the widget is empty, and Jul 15 appears with 90 days.
@@ -108,7 +108,7 @@ test.describe("installment plan and credit card journeys", () => {
       await S.openCalendarTxn(page, 20, "Phone Plan");
       await S.completeInDialog(page);
       await S.gotoPage(page, "Expense Manager");
-      await expect(page.getByText("Total Debt").locator("xpath=following-sibling::p")).toHaveText(`$${(1200 - 200 * n).toLocaleString("en-US")}`);
+      await expect(page.getByText("Total Debt").locator("xpath=following-sibling::p")).toHaveText(`$${(1200 - 200 * n).toLocaleString("en-US")}.00`);
       await expect(page.getByText("Payment Progress").or(page.getByText("Progress")).first()).toBeVisible();
     }
     expect((await S.readUser(page)).currentBalance).toBe(5000 - 400);
@@ -129,7 +129,7 @@ test.describe("installment plan and credit card journeys", () => {
     }
     expect((await S.readUser(page)).currentBalance).toBe(5000 - 800);
     await S.gotoPage(page, "Expense Manager");
-    await expect(page.getByText("Total Debt").locator("xpath=following-sibling::p")).toHaveText("$200");
+    await expect(page.getByText("Total Debt").locator("xpath=following-sibling::p")).toHaveText("$200.00");
   });
 
   test("Total Debt is the same on Expenses and Forecast: 12,000 loan + 5,000 card + 1,200 installment = 18,200", async ({ page }) => {
@@ -138,9 +138,9 @@ test.describe("installment plan and credit card journeys", () => {
       expenseRules: [cashLoan(), creditCard(), installment()].map((r) => ({ ...r, startDate: "2026-03-10" })),
     }, { path: "/expenses" });
     await expect(page.getByRole("heading", { name: "Expense Management", level: 1 })).toBeVisible();
-    await expect(page.getByText("Total Debt").locator("xpath=following-sibling::p")).toHaveText("$18,200");
+    await expect(page.getByText("Total Debt").locator("xpath=following-sibling::p")).toHaveText("$18,200.00");
     await S.gotoPage(page, "AI Forecast");
-    await expect(page.getByText("Total Debt", { exact: true }).locator("xpath=following-sibling::p").first()).toHaveText("$18,200");
+    await expect(page.getByText("Total Debt", { exact: true }).locator("xpath=following-sibling::p").first()).toHaveText("$18,200.00");
   });
 });
 

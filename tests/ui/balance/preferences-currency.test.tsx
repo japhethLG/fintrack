@@ -206,7 +206,7 @@ describe("low-balance threshold drives the calendar status colours", () => {
         .queryAllByText("15")
         .filter((el) => el.nextElementSibling && /\d/.test(el.nextElementSibling.textContent ?? ""))
         .map((el) => el.nextElementSibling!.textContent);
-      expect(cells).toEqual(["$800"]);
+      expect(cells).toEqual(["$800.00"]);
     },
     30_000
   );

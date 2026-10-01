@@ -84,7 +84,7 @@ const PeriodBalanceSummary: React.FC<IProps> = ({
           </div>
           <p className="text-2xl font-bold text-white">
             {openingBalance !== null
-              ? formatCurrency(openingBalance, { maximumFractionDigits: 0 })
+              ? formatCurrency(openingBalance)
               : "—"}
           </p>
           {startDateLabel && (
@@ -105,7 +105,7 @@ const PeriodBalanceSummary: React.FC<IProps> = ({
               : "text-white"
           )}>
             {closingBalance !== null
-              ? formatCurrency(closingBalance, { maximumFractionDigits: 0 })
+              ? formatCurrency(closingBalance)
               : "—"}
           </p>
           {endDateLabel && (

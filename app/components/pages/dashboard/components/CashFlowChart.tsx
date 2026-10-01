@@ -141,7 +141,7 @@ const CashFlowChart: React.FC<IProps> = ({ data }) => {
           </div>
           <p className="text-xl font-bold text-white">
             {openingBalance !== null
-              ? formatCurrency(openingBalance, { maximumFractionDigits: 0 })
+              ? formatCurrency(openingBalance)
               : "—"}
           </p>
         </div>
@@ -159,7 +159,7 @@ const CashFlowChart: React.FC<IProps> = ({ data }) => {
             )}
           >
             {closingBalance !== null
-              ? formatCurrency(closingBalance, { maximumFractionDigits: 0 })
+              ? formatCurrency(closingBalance)
               : "—"}
           </p>
         </div>

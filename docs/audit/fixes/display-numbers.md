@@ -109,9 +109,9 @@ categories listed.
 | forwardLooking: `getMonthlyMultiplier` daily; `prorateToDateRange` (8) | 30; 30-day divisor (3,100, 2,800) | 365/12; calendar days (3,000, 3,000, 1,961.2903 across Mar 20 .. Apr 8: 12 x 3,000/31 + 8 x 3,000/30) | user decision: no approximations; UI-OBS-01 |
 | balances: `calculateVarianceReport` "counts only completed" | projected 100 | plan 1,099 (100 + pending 999; skipped 888 out), actual 120, variance -979 (-89.08%) | HS-11 |
 | balances: 8 daily-balance tests | implicit time independence | `freezeToday("2026-01-01")` in the describe; 4 tests with rows completed on 01-02..01-04 pass `today` explicitly | the series now depends on today (what is history, overdue, upcoming); fixtures meant "upcoming" |
-| lifecycle: scenarios | frozen at 2026-01-02, the 01-01 salary a day overdue | frozen at 2026-01-01; early payments are filed on the payment day; each changed curve hand-derived in comments (e.g. paying the 1,200 rent on 01-01: 01-01 = 2,000 + 3,000 - 1,200 = 3,800) | D5; an unpaid overdue salary is not credited |
+| lifecycle: scenarios | frozen at 2026-01-02, the 01-01 salary a day overdue | frozen at 2026-01-01; an early payment moves its money on the payment day (listed on its due date); each changed curve hand-derived in comments (e.g. paying the 1,200 rent on 01-01: 01-01 = 2,000 + 3,000 - 1,200 = 3,800) | D5; an unpaid overdue salary is not credited |
 | lifecycle: "overdue" suite (4) | overdue bill spent on its own day, dropped from coverage | owed from today (02-10: 2,000 - 1,200 = 800), listed in coverage (daysUntilDue -5, projected 800) | D5; the older rows are settled as skipped so the 02-05 rent is the only overdue row |
-| lifecycle: invariant guard | `closing = opening + income - expenses` | `... - overdueOwed`, overdue rows out of totals | documented identity of the new model |
+| lifecycle: invariant guard | `closing = opening + income - expenses` | `... - overdueOwed`, overdue rows out of totals, a completed row dated after today moves on today | documented identity of the new model |
 | lifecycle: variance (2), late payment | income variance 0; Feb variance 0 | plan includes the pending salary (-3,000 / -100%); Feb plan 1,200, actual 0 | HS-11 |
 | timezone offsets: coverage (4), runway (1) | today+14 in, yesterday out, stale expense ignored | today+13 last day, yesterday listed as overdue (`-1`), the stale expense runs out today | 14-day decision, D5 |
 | healthScore tests: chart buckets (12), tz invariance (1) | sparse | zero-filled (31 days in March, 61 in Mar+Apr, 5 weekly buckets); activity read through a `withActivity` filter AND a bucket-count assertion | HS-10 (a range with no activity stays `[]`) |
@@ -154,3 +154,11 @@ Leftovers and risks:
 - `OverdueTransactionsModal` "Total Overdue", `geminiService` "Upcoming (next 30 days)" (E2E-ROB-12), `SchedulePreview` are outside this stream.
 - Forecast "Budgeted" includes manual rows (their plan equals what they were entered at).
 - The day panel's tiles are by displayed day; the Calendar month tiles include overdue rows (they are part of the month's plan).
+
+## 7. After merging the currency stream (def776d)
+
+- Merged `claude/financial-projections-engine-g5fgkv`; their formatting calls were kept (`useCurrency`), mine only changed numbers.
+- Opening/Closing balances (calendar overview, day chips, Dashboard cash-flow card), the pie total, the Recurring Summary widget and the Income/Expense
+  manager summary cards no longer pass `maximumFractionDigits: 0`: they print cents like every other amount. Pins updated with derivations
+  (e.g. H1 March closing 14,539.1683 -> 14,539.17, today 13,969.05, Mar 1 opens 12,350.00).
+- Calendar, journey and robustness e2e pins gained `.00`; the cash figures that changed value are in the rewritten navigation spec (D5).

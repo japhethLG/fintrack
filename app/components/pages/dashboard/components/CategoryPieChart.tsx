@@ -119,7 +119,7 @@ const CategoryPieChart: React.FC<IProps> = ({
                   isExpenseView ? "text-danger" : "text-success"
                 )}
               >
-                {formatCurrency(currentTotal, { maximumFractionDigits: 0 })}
+                {formatCurrency(currentTotal)}
               </span>
             </>
           ) : (

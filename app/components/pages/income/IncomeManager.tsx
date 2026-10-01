@@ -184,21 +184,21 @@ const IncomeManager: React.FC = () => {
           <Card padding="md">
             <p className="text-gray-400 text-xs lg:text-sm mb-1">Monthly Recurring</p>
             <p className="text-xl lg:text-3xl font-bold text-success">
-              {formatCurrency(recurringMonthly, { maximumFractionDigits: 0 })}
+              {formatCurrency(recurringMonthly)}
             </p>
             <p className="text-[10px] lg:text-xs text-gray-500 mt-1">Scheduled for {monthLabel}</p>
           </Card>
           <Card padding="md">
             <p className="text-gray-400 text-xs lg:text-sm mb-1">Annual Projection</p>
             <p className="text-xl lg:text-3xl font-bold text-success">
-              {formatCurrency(annualRecurring, { maximumFractionDigits: 0 })}
+              {formatCurrency(annualRecurring)}
             </p>
             <p className="text-[10px] lg:text-xs text-gray-500 mt-1">Next 12 months</p>
           </Card>
           <Card padding="md">
             <p className="text-gray-400 text-xs lg:text-sm mb-1">One-time Income</p>
             <p className="text-xl lg:text-3xl font-bold text-primary">
-              {formatCurrency(oneTimeTotal, { maximumFractionDigits: 0 })}
+              {formatCurrency(oneTimeTotal)}
             </p>
           </Card>
         </div>

@@ -112,7 +112,7 @@ describe("H1 March 2026: totals every screen prints", () => {
     // housing 1,200; food 138.40+162.55+150+150 = 600.95; debt 564.8817+25 = 589.8817;
     // healthcare 250; personal 200; utilities 90  (sum 2,930.8317)
     const pie = card(page("dashboard"), /Spending by Category/);
-    expect(money(pie, "Total")).toBe(2_931);
+    expect(money(pie, "Total")).toBe(2_930.83); // 2,930.8317 (cents, like every other amount)
     const legend = ["housing", "food", "debt_payment", "healthcare", "personal", "Other"];
     for (const name of legend) expect(within(pie).getByText(name)).toBeInTheDocument();
     // Forecast lists the top 5 categories with cents.
@@ -133,12 +133,12 @@ describe("H1 March 2026: totals every screen prints", () => {
     // expense: rent 1,200 + groceries Mar 7 138.40 + Mar 14 162.55 + Mar 21 150 + Mar 28 150 (= 600.95)
     //          + power 90 + loan 564.8817 + card 25 + laptop 200 = 2,680.8317 (one-time dentist excluded)
     expect(money(rec, "Monthly Income")).toBe(4_820);
-    expect(money(rec, "Monthly Expenses")).toBe(2_681);
-    expect(money(rec, "Net Recurring")).toBe(2_139); // 4,820 - 2,680.8317 = 2,139.1683
+    expect(money(rec, "Monthly Expenses")).toBe(2_680.83); // 2,680.8317
+    expect(money(rec, "Net Recurring")).toBe(2_139.17); // 4,820 - 2,680.8317 = 2,139.1683
     expect(money(page("income"), "Monthly Recurring")).toBe(4_820);
     // next 12 months: payroll 24 x 2,000 + freelance 12 x 750 = 57,000
     expect(money(page("income"), "Annual Projection")).toBe(57_000);
-    expect(money(page("expenses"), "Monthly Recurring")).toBe(2_681);
+    expect(money(page("expenses"), "Monthly Recurring")).toBe(2_680.83);
     expect(money(page("expenses"), "One-time")).toBe(250);
     expect(stat(page("expenses"), "Active Expenses")).toBe("7");
     expect(stat(page("expenses"), "Priority Bills")).toBe("1");
@@ -207,7 +207,7 @@ describe("H1 pre-window history (completed before the default window, Dec 2025: 
       // observed: Closing $13,639 / $13,639.17 (sidebar); correct 12,350 + 2,189.1683 = 14,539.17
       const { page } = await mountH1();
       expect(money(card(page("calendar"), "Monthly range"), "Expenses")).toBe(-2_930.83); // precondition
-      expect(money(page("calendar"), "Closing", { occurrence: 0 })).toBe(14_539);
+      expect(money(page("calendar"), "Closing", { occurrence: 0 })).toBe(14_539.17);
       expect(money(card(page("calendar"), "Monthly range"), "Closing")).toBe(14_539.17);
     }
   );
@@ -220,8 +220,8 @@ describe("H1 pre-window history (completed before the default window, Dec 2025: 
       const { page } = await mountH1();
       expect(money(card(page("dashboard"), "Period Summary"), "Current Balance")).toBe(13_969.05);
       const cal = page("calendar");
-      expect(dayCellBalance(cal, 15)).toBe(13_969);
-      expect(dayCellBalance(cal, 16)).toBe(13_969);
+      expect(dayCellBalance(cal, 15)).toBe(13_969.05);
+      expect(dayCellBalance(cal, 16)).toBe(13_969.05);
     }
   );
 
@@ -237,7 +237,7 @@ describe("H1 pre-window history (completed before the default window, Dec 2025: 
       const chart = card(dash, /Projected Cash Flow/);
       const closing = money(chart, "Closing");
       const opening = money(chart, "Opening");
-      expect(closing - opening).toBe(2_189); // closing - opening must equal the period's net (rounded)
+      expect(closing - opening).toBeCloseTo(2_189.17, 2); // 14,539.17 - 12,350.00 must equal the period's net
     }
   );
 
@@ -260,7 +260,7 @@ describe("H1 pre-window history (completed before the default window, Dec 2025: 
       await openTab(app, page("dashboard"), /Bills/);
       const projected = money(card(page("dashboard"), /Upcoming Activity/), "Projected Balance");
       expect(projected).toBe(12_539.17); // 13,969.05 - 1,429.8817: the Bills tab
-      expect(dayCellBalance(page("calendar"), 29)).toBe(12_539); // the whole-dollar day chip
+      expect(dayCellBalance(page("calendar"), 29)).toBe(12_539.17); // the day chip prints cents
     }
   );
 });

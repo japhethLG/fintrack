@@ -107,7 +107,7 @@ describe("Calendar: month view on H1", () => {
     const cal = page("calendar");
     // Whole-month movement inside the grid: Mar 1 closing -> Mar 31 closing = net of Mar 2..31
     // = (5,120 - 2,930.8317) - (-1,200 on Mar 1) => +3,389.1683 -> 3,389 on the whole-dollar chips
-    expect(dayCellBalance(cal, 31) - dayCellBalance(cal, 1)).toBe(3_389);
+    expect(dayCellBalance(cal, 31) - dayCellBalance(cal, 1)).toBeCloseTo(3_389.17, 2); // 14,539.17 - 11,150.00
     expect(dayCellBalance(cal, 31)).toBe(dayCellBalance(cal, 30)); // nothing on Mar 31
   });
 });
@@ -135,9 +135,9 @@ describe("Calendar: week view on H1 (week of Sun Mar 15 - Sat Mar 21)", () => {
       await app.user.click(within(cal).getByRole("button", { name: "Week" }));
       expect(money(card(cal, "Weekly range"), "Expenses")).toBe(-804.88); // precondition
       // opening at start of Mar 15 = 12,350 + Mar1..14 net (-1200 +300 -138.40 +820 -162.55 = -380.95) = 11,969.05
-      expect(money(cal, "Opening", { occurrence: 0 })).toBe(11_969);
+      expect(money(cal, "Opening", { occurrence: 0 })).toBe(11_969.05);
       // closing Mar 21 = 13,969.05 - 90 - 564.8817 - 150 = 13,164.1683
-      expect(money(cal, "Closing", { occurrence: 0 })).toBe(13_164);
+      expect(money(cal, "Closing", { occurrence: 0 })).toBe(13_164.17); // 13,164.1683
     }
   );
 });
