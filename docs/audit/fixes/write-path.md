@@ -156,6 +156,29 @@ Mar 15, Apr 15 and pays Jan 10, Feb 10, Mar 10, Apr 10 after migration; a second
 afterwards (25) survives; installments are migrated (missing `scheduleConfig` is created); fixed and card rules
 and other users' rules are untouched; a login runs it once.
 
+### 1.7 Found by the Playwright run (fixes after the first report)
+
+- **Money is stored in cents** (E2E "ledger invariant after 4 payments"). A completed amortized payment was
+  stored as 1045.5223363...; nobody pays that, and the cache's 1e-6 rounding then differed from the unrounded
+  sum by 1.4e-6. Every amount a gesture writes (projected and actual, manual or rule-based) is now rounded to
+  whole cents at the write boundary (`roundCents`), so `currentBalance` equals the sum of the stored cents
+  exactly. The loan schedule absorbs the sub-cent difference in its last payment.
+- **A card's schedule started in the month just paid** (E2E-JRN-17 follow-up: payments 400 then 200). Cards have
+  no payment counter, so after a 400 payment on a 1,000 balance the schedule rebuilt from 600 began at the same
+  first due date: the stored paid row consumed the 400 slot and the next bill shrank to 200 (hand check: the
+  remaining 600 must bill 400 then 200 starting NEXT month). `creditConfig.paymentsMade` is now maintained by the
+  ledger (+1/-1 like a loan's) and `generateCreditProjections` starts after it (`paymentNumber` stays absolute).
+  A minimal change in `creditProjections.ts`.
+- **"Pending 3, expected 4" after 4 loan payments was a wrong expectation**: 8 terms - 4 paid = 4 payments
+  remain (Jul, Aug, Sep, Oct), but the Transactions page counts the default view window, which ends on the last
+  day of today's month + 3. With the clock at Jun 15 that is Sep 30, so Oct 15 is outside: 3 pending. Test fixed
+  with the derivation.
+- Settings wording: the E2E selector now accepts the singular "Computed from 1 transaction".
+- `ContextMenu` re-subscribed its Escape listener on every render (inline `onClose`) and attached it in a
+  deferred timeout, so an Escape right after opening was lost: the flaky "Escape closes it" test. The listener is
+  attached at once and reads `onClose` through a ref.
+- E2E-ROB-06 now passes (fixed by the forms stream); marker removed.
+
 ---
 
 ## 2. Defects fixed

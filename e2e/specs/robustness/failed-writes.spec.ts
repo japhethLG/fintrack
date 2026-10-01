@@ -138,10 +138,6 @@ test.describe("rules, balance and reset", () => {
   });
 
   test("add a Fixed expense: a rejected write must be reported to the user", async ({ page }) => {
-    knownDefect(
-      "E2E-ROB-06",
-      "no error is rendered for Fixed/Variable/One-time expense creation (ReviewStep, the only place error is shown, exists only for 4-step types); wizard silently stays on step 3"
-    );
     await seedAndLogin(page, { user: userProfile() }, { path: "/expenses" });
     await setFault(page, { code: "permission-denied", collections: [COLLECTIONS.expenseRules] });
     await addFixedExpenseViaWizard(page, "Doomed Rent", 500);

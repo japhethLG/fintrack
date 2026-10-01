@@ -32,6 +32,7 @@ import {
   transactionRef,
 } from "./ledger";
 import { patternDateOfOccurrence } from "./occurrenceDates";
+import { roundCents } from "@/lib/logic/balanceCalculator/ledgerMath";
 
 export const addTransaction = async (
   userId: string,
@@ -190,19 +191,22 @@ const assertValidActualAmount = (amount: number): void => {
 /** The completed version of a row: amount, date, variance and stamp set together. */
 const completedRow = (
   old: StoredRow,
-  actualAmount: number,
+  amountPaid: number,
   actualDate: string | undefined,
   notes: string | undefined
-): StoredRow => ({
-  ...old,
-  actualAmount,
-  actualDate: actualDate || old.scheduledDate,
-  variance: actualAmount - old.projectedAmount,
-  status: "completed",
-  completedAt: Timestamp.now(),
-  // only `undefined` means "leave the note alone"; "" clears it
-  notes: notes !== undefined ? notes : old.notes,
-});
+): StoredRow => {
+  const actualAmount = roundCents(amountPaid);
+  return {
+    ...old,
+    actualAmount,
+    actualDate: actualDate || old.scheduledDate,
+    variance: roundCents(actualAmount - old.projectedAmount),
+    status: "completed",
+    completedAt: Timestamp.now(),
+    // only `undefined` means "leave the note alone"; "" clears it
+    notes: notes !== undefined ? notes : old.notes,
+  };
+};
 
 /** The row as it is after leaving the completed state (no stale actual amount/date/variance). */
 const skippedRow = (old: StoredRow, notes: string | undefined): StoredRow => {
@@ -248,7 +252,11 @@ export const completeTransaction = async (
 };
 
 /** Skip a STORED row; a previously completed row gives its contribution back. */
-export const skipTransaction = async (id: string, notes?: string, userId?: string): Promise<void> => {
+export const skipTransaction = async (
+  id: string,
+  notes?: string,
+  userId?: string
+): Promise<void> => {
   const uid = await actingUser(id, userId);
   await runLedgerTransaction({
     userId: uid,
@@ -294,11 +302,19 @@ export const revertToProjected = async (
       let override: OverrideChange | undefined;
       if (old.occurrenceId && source) {
         const isIncome = old.sourceType === "income_source";
-        const pattern = patternDateOfOccurrence(source, isIncome, old.occurrenceId, old.scheduledDate);
+        const pattern = patternDateOfOccurrence(
+          source,
+          isIncome,
+          old.occurrenceId,
+          old.scheduledDate
+        );
         const existing = source.occurrenceOverrides?.[old.occurrenceId]?.scheduledDate;
         if (pattern !== old.scheduledDate) {
           // the user moved it: keep that date (other override fields survive)
-          override = { occurrenceId: old.occurrenceId, patch: { scheduledDate: old.scheduledDate } };
+          override = {
+            occurrenceId: old.occurrenceId,
+            patch: { scheduledDate: old.scheduledDate },
+          };
         } else if (existing !== undefined && existing !== old.scheduledDate) {
           // a stale override would move the regenerated projection away from the row's date
           override = { occurrenceId: old.occurrenceId, unset: ["scheduledDate"] };
@@ -322,12 +338,26 @@ export const revertToProjected = async (
  */
 export type OccurrenceBase = Omit<
   Transaction,
-  "id" | "userId" | "createdAt" | "updatedAt" | "status" | "actualAmount" | "actualDate" | "variance"
+  | "id"
+  | "userId"
+  | "createdAt"
+  | "updatedAt"
+  | "status"
+  | "actualAmount"
+  | "actualDate"
+  | "variance"
 > & { occurrenceId: string; sourceId: string; sourceType: "income_source" | "expense_rule" };
 
 /** Existing row as the start state, or a fresh projected row for a first-time gesture. */
 const startRow = (old: Transaction | null, base: OccurrenceBase, userId: string): StoredRow =>
-  old ? rowData(old) : ({ ...base, userId, status: "projected" } as StoredRow);
+  old
+    ? rowData(old)
+    : ({
+        ...base,
+        projectedAmount: roundCents(base.projectedAmount),
+        userId,
+        status: "projected",
+      } as StoredRow);
 
 /**
  * Complete a PROJECTION: materialise its stored row as completed, in one commit
@@ -350,7 +380,12 @@ export const completeOccurrence = async (
     rowRef: transactionRef(occurrenceRowId(userId, base.occurrenceId)),
     sourceHint: { sourceType: base.sourceType, sourceId: base.sourceId },
     plan: ({ old }) => ({
-      after: completedRow(startRow(old, base, userId), data.actualAmount, data.actualDate, data.notes),
+      after: completedRow(
+        startRow(old, base, userId),
+        data.actualAmount,
+        data.actualDate,
+        data.notes
+      ),
       override: options.removeOverride
         ? { occurrenceId: base.occurrenceId, remove: true }
         : undefined,
@@ -395,6 +430,10 @@ export const addTransactionWithBalance = async (
     plan: () => ({
       after: {
         ...transaction,
+        projectedAmount: roundCents(transaction.projectedAmount),
+        ...(transaction.actualAmount !== undefined
+          ? { actualAmount: roundCents(transaction.actualAmount) }
+          : {}),
         userId,
         createdAt: now,
         updatedAt: now,
@@ -429,6 +468,10 @@ export const updateManualTransactionWithBalance = async (
         throw new Error("This action is only for manual transactions");
       }
       const defined = removeUndefined(updates as Record<string, unknown>) as Partial<StoredRow>;
+      if (typeof defined.projectedAmount === "number")
+        defined.projectedAmount = roundCents(defined.projectedAmount);
+      if (typeof defined.actualAmount === "number")
+        defined.actualAmount = roundCents(defined.actualAmount);
       const merged: StoredRow = { ...rowData(old), ...defined };
       if (old.status === "completed" && merged.status !== "completed") {
         // leaving the completed state: no stale actual amount, date or variance survives
@@ -441,7 +484,7 @@ export const updateManualTransactionWithBalance = async (
         if (old.status !== "completed") merged.completedAt = Timestamp.now();
         // variance always follows the amounts the row now carries
         if (merged.actualAmount !== undefined) {
-          merged.variance = merged.actualAmount - merged.projectedAmount;
+          merged.variance = roundCents(merged.actualAmount - merged.projectedAmount);
         }
       }
       return { after: merged };

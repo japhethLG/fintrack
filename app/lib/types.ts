@@ -143,6 +143,14 @@ export interface CreditConfig {
   dueDate: number;
   paymentStrategy: CreditPaymentStrategy;
   fixedPaymentAmount?: number;
+  /**
+   * Payments completed against the balance above, maintained by the write path (+1 per completed
+   * payment, -1 when it is reverted/skipped/deleted). The payoff schedule is built from the
+   * CURRENT balance, so it must start after the payments already made: without this the month
+   * just paid takes the first slot of the new schedule and the next bill shrinks (1,000 at 0%,
+   * 400 paid: schedule 400, 200 instead of 400, 200 for the REMAINING 600 starting next month).
+   */
+  paymentsMade?: number;
 }
 
 export interface InstallmentConfig {

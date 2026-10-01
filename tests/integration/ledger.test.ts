@@ -824,5 +824,53 @@ describe("an overdue, still-projected row does not move the realized balance unt
   });
 });
 
+// ===========================================================================
+// 8. MONEY IS STORED IN CENTS; A CARD'S SCHEDULE STARTS AFTER THE PAYMENTS MADE
+// ===========================================================================
+
+describe("amounts are written in whole cents", () => {
+  it("an amortized payment of 1045.5223363... is stored as 1045.52 and the balance moves by exactly that", async () => {
+    seedWorld();
+    store.__seedEntities("expense_rules", [
+      { ...rent(), id: "emi", name: "EMI", amount: 1_045.522336346522, startDate: "2026-01-10", endDate: "2026-01-10" },
+    ]);
+    await complete(occ("emi", "2026-01").id, 1_045.522336346522);
+    const row = rows().find((t) => t.sourceId === "emi")!;
+    expect(row.actualAmount).toBe(1_045.52);
+    expect(row.projectedAmount).toBe(1_045.52);
+    expect(row.variance).toBe(0);
+    // 10,000 - 1,045.52 = 8,954.48, no fraction of a cent
+    expect(balance()).toBe(8_954.48);
+  });
+
+  it("a manual row created with a fractional amount is rounded to cents", async () => {
+    seedWorld();
+    const created = await addManualTransactionAction(
+      { sourceType: "manual", name: "Odd", type: "expense", category: "other", projectedAmount: 10.004, actualAmount: 10.006, scheduledDate: "2026-01-14", actualDate: "2026-01-14", status: "completed" },
+      USER
+    );
+    // 10.004 -> 10.00, 10.006 -> 10.01; the balance follows the stored actual: 10,000 - 10.01
+    expect(store.__get<Transaction>("transactions", created.id)).toMatchObject({ projectedAmount: 10, actualAmount: 10.01 });
+    expect(balance()).toBe(9_989.99);
+  });
+});
+
+describe("a card's payoff schedule starts after the payments already made", () => {
+  it("1,000 at 0% paid 400: the REMAINING 600 is billed 400 then 200, not 200 in the month just paid", async () => {
+    seedWorld();
+    await complete(occ("card", "2026-01").id, 400);
+    expect(rule("card").creditConfig).toMatchObject({ currentBalance: 600, paymentsMade: 1 });
+    // projections for the rest: Feb 25 = 400, Mar 25 = 200 (600 = 400 + 200); Jan is the stored row
+    const cardRows = merged().filter((t) => t.sourceId === "card");
+    expect(
+      cardRows.map((t) => `${t.scheduledDate}:${t.status}:${t.status === "completed" ? t.actualAmount : t.projectedAmount}`)
+    ).toEqual(["2026-01-25:completed:400", "2026-02-25:projected:400", "2026-03-25:projected:200"]);
+    expect(cardRows[1].paymentBreakdown!.paymentNumber).toBe(2);
+    // reverting restores the counter
+    await revertTransactionToProjectedAction(rows().find((t) => t.sourceId === "card")!.id, USER);
+    expect(rule("card").creditConfig).toMatchObject({ currentBalance: 1_000, paymentsMade: 0 });
+  });
+});
+
 const _unused = { makeLoanConfig };
 void _unused;

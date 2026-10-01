@@ -27,6 +27,13 @@ type RowLike = Pick<Transaction, "status" | "type" | "projectedAmount"> &
 /** Sub-cent noise from float addition is removed; real sub-cent amounts survive. */
 export const cleanMoney = (value: number): number => Math.round(value * 1e6) / 1e6;
 
+/**
+ * Money is stored in whole cents. An amortized payment is 1045.5223363...; nobody pays that, and
+ * keeping the fraction makes the stored ledger depend on float noise. Every amount a gesture
+ * WRITES (projected and actual) goes through this.
+ */
+export const roundCents = (value: number): number => Math.round((value + Number.EPSILON) * 100) / 100;
+
 /** What was (or will be) paid: the recorded actual, else the projected amount. */
 export const paidAmount = (row: Pick<Transaction, "projectedAmount" | "actualAmount">): number =>
   row.actualAmount ?? row.projectedAmount;
@@ -77,7 +84,7 @@ export const debtEffectOf = (rule: DebtBearing | null | undefined, row: RowLike 
   }
   const principal = cleanMoney(paidAmount(row) - (row.paymentBreakdown?.interestPaid ?? 0));
   if (rule.loanConfig) return { payments: 1, principal };
-  if (rule.creditConfig) return { payments: 0, principal };
+  if (rule.creditConfig) return { payments: 1, principal };
   if (rule.installmentConfig) return { payments: 1, principal: 0 };
   return NO_DEBT_EFFECT;
 };
@@ -130,6 +137,7 @@ export const planDebtUpdate = (
       creditConfig: {
         ...previous,
         currentBalance: Math.max(0, cleanMoney(previous.currentBalance - dPrincipal)),
+        paymentsMade: Math.max(0, (previous.paymentsMade ?? 0) + dPayments),
       },
     };
   }

@@ -62,13 +62,21 @@ export const generateCreditProjections = (
     firstYear += Math.floor(firstMonth / 12);
     firstMonth %= 12;
   }
+  // The schedule starts from the CURRENT balance, so it starts after the payments already made
+  // (like a loan's `paymentsMade`); `paymentNumber` stays absolute.
+  const made = Number.isFinite(creditConfig.paymentsMade)
+    ? Math.max(0, Math.floor(creditConfig.paymentsMade as number))
+    : 0;
+  firstMonth += made;
+  firstYear += Math.floor(firstMonth / 12);
+  firstMonth %= 12;
 
   const schedule = buildPayoffSchedule(creditConfig, dueDateInMonth(firstYear, firstMonth, dueDay));
   if (schedule.length === 0) return [];
 
   // A card that never pays off has no known number of payments
   const last = schedule[schedule.length - 1];
-  const totalPayments = last.remainingBalance < 0.01 ? schedule.length : 0;
+  const totalPayments = last.remainingBalance < 0.01 ? made + schedule.length : 0;
   const adjustment = rule.weekendAdjustment === "none" ? undefined : rule.weekendAdjustment;
 
   return schedule.flatMap((step) => {
@@ -99,7 +107,7 @@ export const generateCreditProjections = (
         principalPaid: step.principal,
         interestPaid: step.interest,
         remainingBalance: step.remainingBalance,
-        paymentNumber: step.month,
+        paymentNumber: made + step.month,
         totalPayments,
       },
       occurrenceId,

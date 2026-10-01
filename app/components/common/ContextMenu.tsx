@@ -46,31 +46,35 @@ export const ContextMenu: React.FC<ContextMenuProps> = ({
 }) => {
   const menuRef = useRef<HTMLDivElement>(null);
 
-  // Close on click outside
+  // The latest onClose, read at event time: the parent passes a new function every render, and
+  // re-subscribing on each render left windows with no Escape listener (a keypress right after the
+  // menu opened was lost, which made "Escape closes it" flaky).
+  const onCloseRef = useRef(onClose);
+  useEffect(() => {
+    onCloseRef.current = onClose;
+  }, [onClose]);
+
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
-        onClose();
+        onCloseRef.current();
       }
     };
-
     const handleEscape = (event: KeyboardEvent) => {
-      if (event.key === "Escape") {
-        onClose();
-      }
+      if (event.key === "Escape") onCloseRef.current();
     };
 
-    // Add listeners with a slight delay to prevent immediate close
-    setTimeout(() => {
-      document.addEventListener("mousedown", handleClickOutside);
-      document.addEventListener("keydown", handleEscape);
-    }, 0);
+    // Escape has no "opening event" to ignore: listen at once. Only the outside click is
+    // deferred a tick so the right-click that opened the menu does not close it.
+    document.addEventListener("keydown", handleEscape);
+    const timer = setTimeout(() => document.addEventListener("mousedown", handleClickOutside), 0);
 
     return () => {
+      clearTimeout(timer);
       document.removeEventListener("mousedown", handleClickOutside);
       document.removeEventListener("keydown", handleEscape);
     };
-  }, [onClose]);
+  }, []);
 
   // Adjust position to keep menu in viewport
   useEffect(() => {

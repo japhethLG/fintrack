@@ -395,7 +395,7 @@ export const forecastBalanceText = async (page: Page): Promise<string> => {
 export const settingsBalanceTexts = async (page: Page): Promise<{ current: string; computed: string }> => {
   const cur = page.locator("p", { hasText: /^Current$/ }).locator("xpath=following-sibling::p").first();
   await expect(cur).toBeVisible();
-  const comp = page.getByText(/^Computed from \d+ transactions$/).locator("xpath=following-sibling::span").first();
+  const comp = page.getByText(/^Computed from \d+ transactions?$/).locator("xpath=following-sibling::span").first();
   return { current: (await cur.innerText()).trim(), computed: (await comp.innerText()).trim() };
 };
 

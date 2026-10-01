@@ -59,7 +59,12 @@ test.describe("loan paid for 4 months (8,000 @ 12% APR, 8 months, first payment 
     await expect(page.getByText("Progress").locator("xpath=following-sibling::span")).toHaveText("49%");
     await expect(page.locator("h4.uppercase")).toHaveText(/THURSDAY, JUL 16|WEDNESDAY, JUL 15/i);
     await S.gotoPage(page, "Transactions");
-    await expect(page.getByText("Pending", { exact: true }).locator("xpath=following-sibling::p")).toHaveText("4");
+    await expect(page.getByText("Pending", { exact: true }).locator("xpath=following-sibling::p")).toHaveText("3");
+    // REWRITTEN (write-path stream, with a derivation). The loan still has 4 payments to make
+    // (Jul 15, Aug 15, Sep 15, Oct 15: 8 terms - 4 paid), but the
+    // Transactions page counts the rows inside the default view window: 2 months back to the LAST
+    // DAY of today's month + 3. Today is Jun 15 (the clock of the 4th payment), so the window ends
+    // Sep 30 and the Oct 15 payment is outside it: Jul, Aug, Sep = 3 pending.
   });
 
   test("after 4 payments the user's money is 20,000 - 4 x 1,045.52 = 15,817.91 and pages agree with the ledger", async ({ page }) => {
