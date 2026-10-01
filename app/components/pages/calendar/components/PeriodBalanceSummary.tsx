@@ -54,7 +54,7 @@ const PeriodBalanceSummary: React.FC<IProps> = ({
         </div>
         {change !== null && (
           <div className={cn(
-            "flex items-center gap-1 px-3 py-1.5 rounded-full text-sm font-medium",
+            "flex items-center gap-1 px-3 py-1.5 rounded-full text-sm font-medium whitespace-nowrap",
             change >= 0
               ? "bg-success/20 text-success"
               : "bg-danger/20 text-danger"

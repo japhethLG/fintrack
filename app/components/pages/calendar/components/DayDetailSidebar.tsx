@@ -4,6 +4,9 @@ import React from "react";
 import { Transaction, DayBalance, BalanceStatus } from "@/lib/types";
 import { Card, Icon } from "@/components/common";
 import { cn } from "@/lib/utils/cn";
+import { rowDate } from "@/lib/logic/balanceCalculator/openItems";
+import { categoryLabel } from "@/lib/utils/categoryLabel";
+import { parseDate } from "@/lib/utils/dateUtils";
 import { useCurrency } from "@/lib/hooks/useCurrency";
 import { STATUS_COLORS, STATUS_BG_COLORS } from "../constants";
 import TransactionItem from "./TransactionItem";
@@ -37,6 +40,8 @@ interface DetailPanelProps {
   closing: number | null;
   income: number;
   expenses: number;
+  /** Today only: rows listed on a later day that were paid ahead of their date and moved today. */
+  paidAhead?: Transaction[];
   transactions: Transaction[];
   onTransactionClick?: (transaction: Transaction) => void;
 }
@@ -51,23 +56,58 @@ const DetailPanel: React.FC<DetailPanelProps> = ({
   closing,
   income,
   expenses,
+  paidAhead,
   transactions,
   onTransactionClick,
 }) => {
   const { formatCurrency, formatCurrencyWithSign } = useCurrency();
 
+  // Label left, amount right, one row each: the sign stays glued to its amount whatever the width.
   const renderSummaryTiles = () => {
     if (income <= 0 && expenses <= 0) return null;
     return (
-      <div className="grid grid-cols-2 gap-2 mb-4">
-        <div className="bg-success/10 rounded-lg p-2 text-center">
+      <div className="grid grid-cols-1 gap-2 mb-4">
+        <div className="bg-success/10 rounded-lg p-2 flex items-center justify-between gap-2">
           <p className="text-xs text-gray-400">Income</p>
-          <p className="text-success font-bold">{formatCurrencyWithSign(income)}</p>
+          <p className="text-success font-bold whitespace-nowrap">{formatCurrencyWithSign(income)}</p>
         </div>
-        <div className="bg-danger/10 rounded-lg p-2 text-center">
+        <div className="bg-danger/10 rounded-lg p-2 flex items-center justify-between gap-2">
           <p className="text-xs text-gray-400">Expenses</p>
-          <p className="text-danger font-bold">{formatCurrency(-expenses)}</p>
+          <p className="text-danger font-bold whitespace-nowrap">{formatCurrency(-expenses)}</p>
         </div>
+      </div>
+    );
+  };
+
+  const renderPaidAhead = () => {
+    if (!paidAhead || paidAhead.length === 0) return null;
+    return (
+      <div className="mb-4 rounded-lg border border-gray-700 p-2">
+        <h4 className="text-sm font-medium text-gray-400">Paid ahead of their date</h4>
+        <p className="text-xs text-gray-500 mb-1">Already counted in today&apos;s totals.</p>
+        <ul className="space-y-1">
+          {paidAhead.map((t) => (
+            <li key={t.id} className="flex items-center justify-between gap-2 text-xs">
+              <span className="min-w-0 truncate text-gray-300">
+                {t.name}{" "}
+                <span className="text-gray-500">
+                  (due {parseDate(rowDate(t)).toLocaleDateString("en-US", { month: "short", day: "numeric" })},{" "}
+                  {categoryLabel(t.category)})
+                </span>
+              </span>
+              <span
+                className={cn(
+                  "font-bold whitespace-nowrap",
+                  t.type === "income" ? "text-success" : "text-danger"
+                )}
+              >
+                {formatCurrencyWithSign(
+                  (t.type === "income" ? 1 : -1) * (t.actualAmount ?? t.projectedAmount)
+                )}
+              </span>
+            </li>
+          ))}
+        </ul>
       </div>
     );
   };
@@ -123,6 +163,7 @@ const DetailPanel: React.FC<DetailPanelProps> = ({
       </div>
 
       {renderSummaryTiles()}
+      {renderPaidAhead()}
       {renderTransactionsList()}
     </>
   );
@@ -158,8 +199,10 @@ const DayDetailSidebar: React.FC<IProps> = ({
           openingStatus={dayOpeningStatus}
           opening={dayBalance?.openingBalance ?? null}
           closing={dayBalance?.closingBalance ?? null}
-          income={dayBalance?.totalIncome ?? 0}
-          expenses={dayBalance?.totalExpenses ?? 0}
+          // what MOVED the balance that day, so the totals agree with Opening -> Closing (MANUAL-M10)
+          income={dayBalance?.movedIncome ?? dayBalance?.totalIncome ?? 0}
+          expenses={dayBalance?.movedExpenses ?? dayBalance?.totalExpenses ?? 0}
+          paidAhead={dayBalance?.paidAhead}
           transactions={transactions}
           onTransactionClick={onTransactionClick}
         />

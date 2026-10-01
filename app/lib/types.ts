@@ -336,10 +336,20 @@ export interface DayBalance {
   closingBalance: number;
   totalIncome: number;
   totalExpenses: number;
+  /**
+   * What actually MOVED the balance this day: closing = opening + movedIncome - movedExpenses
+   * - overdueOwed. Equals totalIncome / totalExpenses except for a completed row dated after today
+   * (paid ahead of its date): that row is listed on its own day but its money moved on today.
+   * Absent (hand-built days): the same as totalIncome / totalExpenses.
+   */
+  movedIncome?: number;
+  movedExpenses?: number;
   projectedIncome: number;
   projectedExpenses: number;
   transactions: Transaction[];
   status: BalanceStatus;
+  /** Set on TODAY only: completed rows listed on a LATER day whose money moved today (paid ahead). */
+  paidAhead?: Transaction[];
   /**
    * Set on TODAY only: the sum of overdue, still-projected expenses that were deducted from this
    * day's closing balance (they do not move the realized balance, see balanceCalculator/openItems.ts).
