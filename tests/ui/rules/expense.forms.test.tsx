@@ -156,6 +156,26 @@ describe("expense wizard: variable, priority, one-time", () => {
     expect(engine).toEqual(["2026-01-20", "2026-02-20", "2026-03-20", "2026-04-20"]);
   });
 
+  it("Enter in the date field of a last step with no other text field confirms the date, it does not create the rule (MANUAL-M3)", async () => {
+    // A weekly variable rule's Schedule step is its LAST step and its only text field is the date, so the
+    // browser's implicit submission used to save the rule the moment the typed date was confirmed.
+    // jsdom does not reproduce that submission (this passed before the fix too); the regression guard is
+    // e2e/specs/robustness/wizard-enter.spec.ts. This pins the intended flow: date confirmed, then Create.
+    const app = await renderApp({ route: "/expenses", today: TODAY });
+    await d.fillExpenseToSchedule(app, {
+      kind: "Variable",
+      name: "Groceries",
+      amount: "300",
+      frequency: "Weekly",
+      start: "2026-01-23", // typed and confirmed with Enter by the driver
+    });
+    expect(screen.getByRole("button", { name: "Create Expense" })).toBeTruthy();
+    expect(app.financial().expenseRules).toHaveLength(0);
+
+    const doc = await d.finishExpense(app, { weekend: "none" });
+    expect(doc).toMatchObject({ name: "Groceries", frequency: "weekly", startDate: "2026-01-23" });
+  });
+
   it("the Priority Bill checkbox persists isPriority", async () => {
     const { doc } = await run({
       name: "Rent",

@@ -630,10 +630,30 @@ describe("income wizard: field mapping and validation", () => {
     "Government",
     "Gift",
     "Other",
-  ])("source type card '%s' is persisted as its lower-case sourceType", async (type) => {
+  ])("source type card '%s' is persisted as its lower-case sourceType, and the Category follows it", async (type) => {
     const app = await renderApp({ route: "/income", today: TODAY });
     const doc = await d.createIncome(app, { type, name: `${type} src`, frequency: "One-time" });
     expect(doc.sourceType).toBe(type.toLowerCase());
+    // MANUAL-M8: every type used to be saved under category "Salary"
+    expect(doc.category).toBe(type);
+  });
+
+  it("a Category the user picked themselves is kept when they go back and change the type", async () => {
+    const app = await renderApp({ route: "/income", today: TODAY });
+    await d.openIncomeForm(app);
+    await app.user.click(screen.getByRole("heading", { name: "Freelance" }));
+    await d.next(app);
+    await d.pick(app, /^Category/, "Rental");
+    await app.user.click(screen.getByRole("button", { name: /^Back$/ }));
+    await app.user.click(screen.getByRole("heading", { name: "Business" }));
+    await d.next(app);
+    await d.fill(app, /^Source Name/, "Side gig");
+    await d.fill(app, /^Amount/, "500");
+    await d.next(app);
+    await screen.findByText("Schedule Configuration");
+    await d.applyIncomeSchedule(app, { frequency: "One-time" });
+    const doc = await d.finishIncome(app, {});
+    expect(doc).toMatchObject({ sourceType: "business", category: "Rental" });
   });
 
   it("an unchecked 'Set End Date' persists no endDate key", async () => {

@@ -211,12 +211,20 @@ const IncomeSourceForm: React.FC<IProps> = ({
 
   const categoryOptions = INCOME_CATEGORIES.map((c) => ({ value: c, label: c }));
 
+  // The Category follows the chosen type (Freelance -> "Freelance") while it still names the previous
+  // type; one the user picked themselves is kept.
+  const selectSourceType = (value: IncomeSourceFormValues["sourceType"]) => {
+    const labelOf = (v: string) => INCOME_SOURCE_TYPES.find((t) => t.value === v)?.label;
+    if (category === labelOf(sourceType)) {
+      const next = labelOf(value);
+      if (next) setValue("category", next, { shouldValidate: true });
+    }
+    setValue("sourceType", value);
+  };
+
   return (
-    // Enter inside an input submits the <form>; only the last step may save
-    <Form
-      methods={methods}
-      onSubmit={(values) => (step === totalSteps ? handleSubmit(values) : undefined)}
-    >
+    // Saving happens only from the Create/Save button: Enter in a field (e.g. confirming a typed date) never saves
+    <Form methods={methods} onSubmit={() => undefined} submitOnEnter={false}>
       <div className="space-y-6">
         <FormStepIndicator currentStep={step} totalSteps={totalSteps} />
 
@@ -235,7 +243,7 @@ const IncomeSourceForm: React.FC<IProps> = ({
                     sourceType === type.value && "border-primary bg-primary/10"
                   )}
                   padding="sm"
-                  onClick={() => setValue("sourceType", type.value)}
+                  onClick={() => selectSourceType(type.value)}
                 >
                   <h4 className="font-bold text-white">{type.label}</h4>
                   <p className="text-xs text-gray-400 mt-1">{type.description}</p>

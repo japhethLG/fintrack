@@ -61,6 +61,12 @@ Installments are unaffected.
   - Every later interest figure is computed from the wrong balance.
   - Editing the loan then re-prices its monthly payment from the wrong balance (see M1).
 - **Likely area:** the projection-with-override path loses `paymentBreakdown` before the ledger sees it.
+- **Status: FIXED (2026-10-01).**
+  - **Real cause:** the loan, card and installment generators decided which payments fell in the date range by the *original* due date, ignoring the drag. Completing a dragged payment regenerates it on its new day, found nothing, and fell back to the rule amount with no breakdown.
+  - **Same cause, second symptom:** a debt payment dragged into another month disappeared from both months. Installments had this too.
+  - **Fix:** the three generators now filter on the date the row is shown (the drag's date when there is one), as plain recurring rules already did.
+  - **Regression tests:** `tests/integration/lifecycle.test.ts` ("a dragged payment keeps its breakdown", "card and installment ...") and `e2e/specs/calendar/dragdrop.spec.ts` ("debt payments keep their breakdown when dragged"). 4 of the 5 integration tests fail on the old code.
+  - **Not repaired:** a debt balance that was already over-reduced by this bug before the fix.
 
 ### Medium
 
@@ -75,6 +81,9 @@ For the week of 27 Dec – 2 Jan, the four tiles show January's Income ₱40,000
 **M3. Pressing Enter in the wizard's date field creates the expense.**
 
 On the Schedule step, Enter in "First Payment Date" submitted the wizard and **created** the Groceries expense, skipping review. It didn't happen for Rent (a monthly rule), so it's inconsistent.
+
+- **Correction:** variable and fixed expenses have no review step; Schedule is their last step. The browser submits a form on Enter when it has a single text field. A weekly rule's last step has only the date (the selects are native), so it submitted. Rent's step also has "Day of Month", so it didn't.
+- **Status: FIXED (2026-10-01).** Both wizards now save only from their Create/Save button; Enter in a field never submits (`Form`'s new `submitOnEnter={false}`, handled in the capture phase because the date picker stops Enter's propagation). Other forms such as login keep Enter-to-submit. Regression test: `e2e/specs/robustness/wizard-enter.spec.ts`.
 
 **M4. On a phone, the calendar grid is unreadable.**
 
@@ -257,7 +266,7 @@ A fresh email account (`types@test.com`), starting balance ₱50,000, clock at 2
 | ID | Severity | Issue |
 | --- | --- | --- |
 | H1 (widened) | High | See H1 above: dragging any loan type or credit-card payment drops its breakdown and over-reduces the debt |
-| M8 | Medium | **Income category ignores the chosen type.** The "Select Income Type" choice is saved as `sourceType`, but the Category dropdown stays "Salary". Freelance, Business, Investment, Government, Gift and Other were all saved with category Salary. The dashboard's income breakdown shows only "Salary" and "Rental" for ₱68,700 of income, and lists label tips and pension as "Salary". Step 1's Continue is also enabled before any type is picked, silently meaning Salary. |
+| M8 | Medium | **Income category ignores the chosen type.** The "Select Income Type" choice is saved as `sourceType`, but the Category dropdown stays "Salary". Freelance, Business, Investment, Government, Gift and Other were all saved with category Salary. The dashboard's income breakdown shows only "Salary" and "Rental" for ₱68,700 of income, and lists label tips and pension as "Salary". Step 1's Continue is also enabled before any type is picked, silently meaning Salary. **FIXED (2026-10-01):** the Category now follows the chosen type unless the user picked a different one; tests in `tests/ui/rules/income.forms.test.tsx`. Sources saved before the fix keep "Salary" until edited. |
 | M9 | Medium | **Reverting an earlier loan payment while a later one is completed makes the earlier one vanish.** I reverted the reducing loan's 10 Oct payment while 12 Nov was completed. The October occurrence then disappeared from the calendar and upcoming lists, so it can't be paid or seen again. The schedule positions itself from the payments-made count and assumes payments happen in order. The ₱19,800 balance is still spread over December to March, so no money is lost, but the owed payment isn't visible. |
 | M10 | Medium | **The day panel's income doesn't match its opening-to-closing change for a payment completed early.** 12 Oct shows "Income +₱12,700" but only moves from ₱70,000 to ₱73,200, because the ₱9,500 freelance completed early counts on its scheduled day while its money moved on the day it was completed. |
 | L6 | Low | **Total Debt mixes two bases.** Loans count principal only (the flat loan will really cost ₱66,000), while installments count the total with interest (₱37,800). Total ₱144,800. |

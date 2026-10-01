@@ -225,8 +225,8 @@ const ExpenseRuleForm: React.FC<IProps> = ({
   };
 
   return (
-    // Enter inside an input submits the <form>; only the last step may save
-    <Form methods={methods} onSubmit={(values) => (step === totalSteps ? handleSubmit(values) : undefined)}>
+    // Saving happens only from the Create/Save button: Enter in a field (e.g. confirming a typed date) never saves
+    <Form methods={methods} onSubmit={() => undefined} submitOnEnter={false}>
       <div className="space-y-6">
         <FormStepIndicator currentStep={step} totalSteps={totalSteps} />
 
