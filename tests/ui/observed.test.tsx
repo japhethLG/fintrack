@@ -135,9 +135,8 @@ describe("Settings page", () => {
 });
 
 describe("Modals", () => {
-  knownDefect(
-    "UI-OBS-06",
-    "Every modal Dialog.Content is missing a Description (Radix accessibility warning)",
+  it(
+    "UI-OBS-06 — Every modal Dialog.Content is missing a Description (Radix accessibility warning)",
     async () => {
       // observed: console.warn "Missing `Description` or `aria-describedby={undefined}` for {DialogContent}."
       const app = await renderApp({ route: "/transactions" });

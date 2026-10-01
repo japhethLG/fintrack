@@ -49,6 +49,11 @@ export const BaseModal = memo((props: IBaseModalProps) => {
           )}
           data-testid={dataTestId}
         >
+          {/* Screen-reader description for every modal (Radix warns without one) and a title when none is shown */}
+          {!title && <Dialog.Title className="sr-only">Dialog</Dialog.Title>}
+          <Dialog.Description className="sr-only">
+            {typeof title === "string" && title ? `${title} dialog` : "Dialog content"}
+          </Dialog.Description>
           <div className="bg-gray-900 border border-gray-800 rounded-xl shadow-2xl overflow-hidden animate-fade-in">
             {/* Header */}
             {(title || closable) && (

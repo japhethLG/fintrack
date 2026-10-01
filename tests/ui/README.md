@@ -232,8 +232,8 @@ except jsdom-only noise (`ENV_NOISE`: recharts' pre-measurement size warning,
 styled-jsx `jsx` attribute on the landing page), which is recorded but silenced.
 `allowConsole(/pattern/)` pre-approves a message for one test.
 `UI_STRICT_CONSOLE=1` turns any other console output into a test failure;
-`KNOWN_APP_WARNINGS` (currently the Radix "Missing Description" warning, see
-UI-OBS-06) is tolerated so strict mode is usable. During harness development
+`KNOWN_APP_WARNINGS` lists warnings the app emits today and strict mode tolerates (currently empty:
+the Radix "Missing Description" warning, UI-OBS-06, was fixed). During harness development
 every route rendered with **zero** other console output: no act() warnings, no
 React key warnings.
 
