@@ -2,7 +2,7 @@
 
 import React, { useMemo } from "react";
 import { useFinancial } from "@/contexts/FinancialContext";
-import { Transaction } from "@/lib/types";
+import { calculateProjectedVsActual } from "@/lib/logic/balanceCalculator";
 import { Card, Icon } from "@/components/common";
 import { cn } from "@/lib/utils/cn";
 import { useCurrency } from "@/lib/hooks/useCurrency";
@@ -15,49 +15,12 @@ const ProjectedVsActualWidget: React.FC<IProps> = ({ dateRange }) => {
   const { transactions } = useFinancial();
   const { formatCurrency } = useCurrency();
 
-  const stats = useMemo(() => {
-    const { start, end } = dateRange;
-
-    // Filter transactions in range
-    const inRange = transactions.filter((t) => {
-      const date = t.actualDate || t.scheduledDate;
-      return date >= start && date <= end;
-    });
-
-    const income = {
-      projected: 0,
-      actual: 0,
-    };
-
-    const expense = {
-      projected: 0,
-      actual: 0,
-    };
-
-    inRange.forEach((t) => {
-      const amount = t.actualAmount ?? t.projectedAmount;
-      const isCompleted = t.status === "completed";
-      const isSkipped = t.status === "skipped";
-
-      if (isSkipped) return;
-
-      if (t.type === "income") {
-        // For projected total, include everything except skipped
-        income.projected += t.projectedAmount;
-        // For actual, only completed
-        if (isCompleted) {
-          income.actual += t.actualAmount || t.projectedAmount;
-        }
-      } else {
-        expense.projected += t.projectedAmount;
-        if (isCompleted) {
-          expense.actual += t.actualAmount || t.projectedAmount;
-        }
-      }
-    });
-
-    return { income, expense };
-  }, [transactions, dateRange]);
+  // The plan is bucketed by the day it was scheduled for, what was actually paid or received by the
+  // day it moved (and an actual of 0 is a real 0): see calculateProjectedVsActual.
+  const stats = useMemo(
+    () => calculateProjectedVsActual(transactions, dateRange.start, dateRange.end),
+    [transactions, dateRange]
+  );
 
   const calculateProgress = (actual: number, projected: number) => {
     if (projected === 0) return 0;

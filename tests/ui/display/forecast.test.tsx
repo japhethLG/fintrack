@@ -84,9 +84,8 @@ describe("Forecast: runway and next crunch", () => {
     expect(colorToken(within(upc).getByText("-$200"))).toBe("danger");
   });
 
-  knownDefect(
-    "UI-DISP-33",
-    "Forecast 'Cash Runway' declares 0 days / crunch today for a user whose balance ALREADY includes a bill completed today",
+  it(
+    "UI-DISP-33 — Forecast 'Cash Runway' declares 0 days / crunch today for a user whose balance ALREADY includes a bill completed today",
     async () => {
       // balance 100 (= 300 - the 200 bill paid today), nothing else scheduled.
       // observed: Forecast '0 days' + 'Crunch on 3/16/2026' while the Dashboard health card scores the same
@@ -106,24 +105,50 @@ describe("Forecast: runway and next crunch", () => {
     }
   );
 
-  knownDefect(
-    "UI-DISP-34",
-    "runway shows a finite run-out ('120 days') while the same card says 'No crunch detected'",
+  it(
+    "UI-DISP-34 — the runway and the crunch share one horizon, so the card never contradicts itself",
     async () => {
-      // balance 1,000; a 1,500 manual bill on 2026-07-14 (today + 120 days). getRunway scans 365 days,
-      // getNextCrunch only 90, so the card contradicts itself.
-      const { f } = await fc({
+      // observed before: '120 days' next to 'No crunch detected' (runway scanned 365 days, the crunch 90).
+      // REWRITTEN: both read ONE 90-day walk (the default projection window always covers 90 days;
+      // a longer claim would over-state the runway once the generated rows run out, BAL-7).
+      // balance 1,000 and a 1,500 bill 60 days out (2026-05-15): '60 days' AND 'Crunch on 5/15/2026'.
+      const near = await fc({
+        profile: { currentBalance: 1_000, initialBalance: 1_000 },
+        transactions: [manual("Roof", "expense", 1_500, "2026-05-15", "projected")],
+      });
+      const rcNear = runwayCard(near.f);
+      expect(within(rcNear).getByText("60 days")).toBeInTheDocument();
+      expect(within(rcNear).getByText("Crunch on 5/15/2026")).toBeInTheDocument();
+      expect(rcNear.textContent).not.toContain("No crunch detected");
+      near.app.unmount();
+
+      // the same bill 120 days out (2026-07-14) is beyond the horizon: '90+ days' AND no crunch
+      const far = await fc({
         profile: { currentBalance: 1_000, initialBalance: 1_000 },
         transactions: [manual("Roof", "expense", 1_500, "2026-07-14", "projected")],
       });
-      const rc = runwayCard(f);
-      expect(within(rc).getByText("120 days")).toBeInTheDocument(); // precondition
-      expect(rc.textContent).not.toContain("No crunch detected");
+      const rcFar = runwayCard(far.f);
+      expect(within(rcFar).getByText("90+ days")).toBeInTheDocument();
+      expect(within(rcFar).getByText("No crunch detected")).toBeInTheDocument();
     }
   );
 
-  it("no bills and a positive balance: '90+ days' and 'No crunch detected' in green", async () => {
+  it("no data at all: the runway card says 'Not enough data yet', never '90+ days'", async () => {
+    // REWRITTEN (decision: an empty account is a neutral state): it asserted '90+ days' and a green
+    // 'No crunch detected' for a user with a balance and nothing else.
     const { f } = await fc({ profile: { currentBalance: 2_500, initialBalance: 2_500 } });
+    const rc = runwayCard(f);
+    expect(within(rc).getByText("Not enough data yet")).toBeInTheDocument();
+    expect(rc.textContent).not.toMatch(/90\+ days|No crunch/);
+    expect(colorToken(rc)).not.toBe("success");
+  });
+
+  it("data but no bills in the horizon and a positive balance: '90+ days' and 'No crunch detected' in green", async () => {
+    // one projected 100 income next week, nothing owed: the runway is the whole 90-day horizon
+    const { f } = await fc({
+      profile: { currentBalance: 2_500, initialBalance: 2_500 },
+      transactions: [manual("Refund", "income", 100, "2026-03-23", "projected")],
+    });
     const rc = runwayCard(f);
     expect(within(rc).getByText("90+ days")).toBeInTheDocument();
     expect(within(rc).getByText("No crunch detected")).toBeInTheDocument();
@@ -145,26 +170,43 @@ describe("Forecast: runway and next crunch", () => {
     expect(within(f).getByText("1 Bill at Risk")).toBeInTheDocument();
   });
 
-  it("overdue unpaid bill: Calendar and the Dashboard cash-flow chart both count it (balance goes to -$100)", async () => {
-    const { page } = await fc(
+  it("overdue unpaid bill (D5): every view owes it, none moves the realized balance", async () => {
+    // RESOLVED (was the DECISION todo, user decision D5). 300 in the account, a 400 bill dated Mar 10
+    // that nobody paid: it is OVERDUE. The realized balance stays 300 (Dashboard/Forecast print it);
+    // every projection owes the bill from today:
+    //   Calendar: the day Mar 10 lists the bill (flagged) but does not move; today (Mar 16) opens at
+    //   300 and closes at 300 - 400 = -100; the month closes at -100. Runway: 0 days (crunch today,
+    //   short 100). Bill coverage: the bill is listed, needs 100. Health runway: 0.
+    const { app, page } = await fc(
       {
         profile: { currentBalance: 300, initialBalance: 300 },
         transactions: [manual("Old bill", "expense", 400, "2026-03-10", "projected")],
       },
       ["forecast", "dashboard", "calendar"]
     );
+    expect(money(page("forecast"), "Current Balance")).toBe(300);
+    expect(money(card(page("dashboard"), "Period Summary"), "Current Balance")).toBe(300);
+    // the calendar: month closing -100, today opens at the realized 300
     expect(money(page("calendar"), "Closing", { occurrence: 0 })).toBe(-100);
     expect(money(card(page("dashboard"), /Projected Cash Flow/), "Closing")).toBe(-100);
+    const cal = page("calendar");
+    await app.user.click(within(cal).getByRole("button", { name: "Today" }));
+    const today = card(cal, "Monday, Mar 16");
+    expect(money(today, "Opening")).toBe(300);
+    expect(money(today, "Overdue owed")).toBe(-400);
+    expect(money(today, "Closing")).toBe(-100);
+    // the risk views
+    const rc = runwayCard(page("forecast"));
+    expect(within(rc).getByText("0 days")).toBeInTheDocument();
+    expect(within(rc).getByText("Crunch on 3/16/2026")).toBeInTheDocument();
+    expect(healthComponent(card(page("dashboard"), "Financial Health"), "Cash Runway")).toBe(0);
+    expect(within(page("forecast")).getByText("1 Bill at Risk")).toBeInTheDocument();
   });
-  it.todo(
-    "DECISION: an overdue, still-projected bill (300 balance, unpaid 400 bill dated Mar 10) is counted by the Calendar/cash-flow chart (-$100) but ignored by Forecast runway ('90+ days'), bill coverage and the health runway; should it reduce today's displayed balance?"
-  );
 });
 
 describe("Forecast: Actual metrics and overview", () => {
-  knownDefect(
-    "UI-DISP-35",
-    "'Negative Cash Flow' warning never appears when a period has expenses but NO income",
+  it(
+    "UI-DISP-35 — 'Negative Cash Flow' warning never appears when a period has expenses but NO income",
     async () => {
       // March: expenses 700 (300 + 400), income 0. observed: savings rate 0.0% (status warning) and no alert.
       const { f } = await fc(tight());
@@ -197,9 +239,8 @@ describe("Forecast: Actual metrics and overview", () => {
     expect(within(overview).getByText("+$2,189")).toBeInTheDocument(); // net 2,189.1683 (whole-dollar signed format)
   });
 
-  knownDefect(
-    "UI-DISP-36",
-    "picking 'Next 30 Days' keeps the savings-rate subtitle saying '... this month'",
+  it(
+    "UI-DISP-36 — picking 'Next 30 Days' keeps the savings-rate subtitle saying '... this month'",
     async () => {
       // Mar 16..Apr 15: income 4,750 (Payroll Mar30 2,000 + Freelance Apr10 750 + Payroll Apr15 2,000);
       // expenses 2,929.8817 (see households.ts window list) -> surplus 1,820.1183, rate 38.3%.
@@ -224,7 +265,7 @@ describe("Dashboard Bills tab (bill coverage)", () => {
     return { ...r, upc: card(r.page("dashboard"), /Upcoming Activity/) };
   };
 
-  it("the coverage window is today through today+14 INCLUSIVE (15 calendar days), day 15 is excluded", async () => {
+  it("the coverage window is EXACTLY 14 days: today through today+13; today+14 is excluded", async () => {
     const { upc } = await bills({
       profile: { currentBalance: 10_000, initialBalance: 10_000 },
       transactions: [
@@ -234,15 +275,13 @@ describe("Dashboard Bills tab (bill coverage)", () => {
         manual("D15", "expense", 10, "2026-03-31", "projected"),
       ],
     });
+    // REWRITTEN (user decision, SPECIFICATION "Next 14 days of bills"): Mar 16 .. Mar 29 is 14 days.
     expect(within(upc).getByText("D0")).toBeInTheDocument();
     expect(within(upc).getByText("D13")).toBeInTheDocument();
-    expect(within(upc).getByText("D14")).toBeInTheDocument(); // the 15th calendar day is inside a '14 day' window
+    expect(within(upc).queryByText("D14")).toBeNull(); // the 15th calendar day is outside
     expect(within(upc).queryByText("D15")).toBeNull();
-    expect(money(upc, "Projected Balance")).toBe(9_970); // 10,000 - 3 x 10
+    expect(money(upc, "Projected Balance")).toBe(9_980); // 10,000 - 2 x 10
   });
-  it.todo(
-    "DECISION: 'Next 14 days' currently spans 15 calendar days (today .. today+14 inclusive) on every widget; should today+14 be excluded (or today)?"
-  );
 
   it("a bill due today is included and completed rows are excluded from coverage", async () => {
     const { upc } = await bills({
@@ -272,9 +311,8 @@ describe("Dashboard Bills tab (bill coverage)", () => {
     expect(money(upc, "Projected Balance")).toBe(150);
   });
 
-  knownDefect(
-    "UI-DISP-37",
-    "the SAME scenario with a MANUAL same-day income says 'Need $50' (coverage depends on which list the income sits in)",
+  it(
+    "UI-DISP-37 — the SAME scenario with a MANUAL same-day income says 'Need $50' (coverage depends on which list the income sits in)",
     async () => {
       // balance 100; rule bill 150 + manual income 200, both Mar 20. Day nets +50.
       // observed: bill row 'Need $50' (manual rows are appended after rule rows, so the bill is walked first).
@@ -290,7 +328,35 @@ describe("Dashboard Bills tab (bill coverage)", () => {
     }
   );
 
-  it.todo(
-    "DECISION: 'Need $X' is cumulative (a 100 bill after a 200 shortfall says 'Need $300'); should it be the bill's own uncovered part?"
-  );
+  it("'Need $X' is each bill's OWN uncovered part, not a cumulative carry", async () => {
+    // RESOLVED (was a DECISION todo). Balance 100; Water 200 on Mar 20 (needs 100), then Electric 300
+    // on Mar 22: nothing is left, so it needs its own full 300 (the old figure, 400, added Water's
+    // 100 again). The end balance is still 100 - 200 - 300 = -400.
+    const { upc } = await bills({
+      profile: { currentBalance: 100, initialBalance: 100 },
+      transactions: [
+        manual("Water", "expense", 200, "2026-03-20", "projected"),
+        manual("Electric", "expense", 300, "2026-03-22", "projected"),
+      ],
+    });
+    expect(billRow(upc, "Water")).toMatchObject({ covered: false, need: 100 });
+    expect(billRow(upc, "Electric")).toMatchObject({ covered: false, need: 300 });
+    expect(money(upc, "Projected Balance")).toBe(-400);
+  });
+
+  it("an OVERDUE bill is walked first and flagged 'Overdue' (D5)", async () => {
+    // 1,000 balance; Rent 700 was due Mar 10 and is unpaid (overdue); Gym 400 is due Mar 20.
+    // Rent is owed now (1,000 -> 300), then Gym needs 100 of its 400.
+    const { upc } = await bills({
+      profile: { currentBalance: 1_000, initialBalance: 1_000 },
+      transactions: [
+        manual("Rent", "expense", 700, "2026-03-10", "projected"),
+        manual("Gym", "expense", 400, "2026-03-20", "projected"),
+      ],
+    });
+    expect(billRow(upc, "Rent").text).toContain("Overdue");
+    expect(billRow(upc, "Rent")).toMatchObject({ covered: true });
+    expect(billRow(upc, "Gym")).toMatchObject({ covered: false, need: 100 });
+    expect(money(upc, "Projected Balance")).toBe(-100);
+  });
 });

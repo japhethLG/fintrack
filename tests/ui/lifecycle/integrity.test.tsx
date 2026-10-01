@@ -156,7 +156,10 @@ describe("dates as the Transactions list prints them (America/New_York, UTC-5)",
 });
 
 describe("decisions not made yet", () => {
-  it.todo("DECISION: does an overdue, still-projected bill reduce the balance the Calendar shows for today?");
+  // RESOLVED by D5 (the first decision here): an overdue, still-projected bill does NOT reduce the
+  // realized balance, and the Calendar owes it from today. The real test is
+  // "overdue unpaid bill (D5): every view owes it, none moves the realized balance" in
+  // tests/ui/display/forecast.test.tsx.
   it.todo("DECISION: is a variance attributed to the scheduled month or the month it was actually paid?");
   it.todo("DECISION: does the overdue modal's 'Total Overdue' add missed income to missed bills?");
 });

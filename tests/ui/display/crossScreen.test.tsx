@@ -95,14 +95,16 @@ describe("H1 March 2026: totals every screen prints", () => {
 
   it("Upcoming Activity (next 14 days) totals and the Expense/Income 30-day widgets", async () => {
     const { page } = await mountH1({ timeZone: "UTC" });
-    // Mar16..Mar30 inclusive: income Payroll Mar30 2,000.
+    // REWRITTEN (14-day decision: "Next N days" is exactly N days, today .. today + N - 1).
+    // Mar16..Mar29: Payroll Mar30 is day 15 and is OUT, so income 0.
     // expenses Mar18 90 + Mar20 564.8817 + Mar21 150 + Mar22 25 + Mar25 200 + Mar27 250 + Mar28 150 = 1,429.8817
     const upc = card(page("dashboard"), /Upcoming Activity/);
-    expect(amounts(upc).slice(0, 3)).toEqual([2_000, -1_429.88, 570]); // net 570.1183 prints as +$570
-    // Expenses page, 30 days (Mar16..Apr15): 1,429.8817 + Rent Apr1 1,200 + Groc Apr4 150 + Apr11 150 = 2,929.8817
+    expect(amounts(upc).slice(0, 3)).toEqual([0, -1_429.88, -1_430]); // net -1,429.8817 prints as -$1,430
+    // Expenses page, 30 days (Mar16..Apr14): 1,429.8817 + Rent Apr1 1,200 + Groc Apr4 150 + Apr11 150 = 2,929.8817
     expect(money(card(page("expenses"), "Upcoming Bills"), "Total Due")).toBe(2_929.88);
-    // Income page, 30 days: Payroll Mar30 2,000 + Freelance Apr10 750 + Payroll Apr15 2,000 = 4,750
-    expect(money(card(page("income"), "Upcoming Payments"), "Total Expected")).toBe(4_750);
+    // Income page, 30 days (Mar16..Apr14): Payroll Mar30 2,000 + Freelance Apr10 750 = 2,750
+    // (Payroll Apr15 is day 31 and is out; it used to make this 4,750)
+    expect(money(card(page("income"), "Upcoming Payments"), "Total Expected")).toBe(2_750);
   });
 
   it("category views agree: pie total, legend order and Forecast top categories", async () => {
@@ -123,17 +125,20 @@ describe("H1 March 2026: totals every screen prints", () => {
     expect(overview.textContent).toContain("$589.88");
   });
 
-  it("Recurring Summary (Dashboard) and the Income / Expense pages estimate the same monthly totals", async () => {
+  it("Recurring Summary (Dashboard) and the Income / Expense pages count the same March occurrences", async () => {
     const { page } = await mountH1();
     const rec = card(page("dashboard"), "Recurring Summary");
-    // income: payroll 2,000 x2 + freelance 750 = 4,750
-    // expense: rent 1,200 + groceries 150*52/12 (=650) + power 90 + loan 564.88 + card 25 + laptop 200 = 2,729.88 (one-time dentist excluded)
-    expect(money(rec, "Monthly Income")).toBe(4_750);
-    expect(money(rec, "Monthly Expenses")).toBe(2_730);
-    expect(money(rec, "Net Recurring")).toBe(2_020); // 4,750 - 2,729.88 = 2,020.12
-    expect(money(page("income"), "Monthly Recurring")).toBe(4_750);
+    // REWRITTEN (occurrence counting, no amount x multiplier). March 2026 RECURRING rows:
+    // income: payroll Mar 15 2,000 + Mar 30 2,000 + freelance Mar 10 (paid 820, not the planned 750) = 4,820
+    // expense: rent 1,200 + groceries Mar 7 138.40 + Mar 14 162.55 + Mar 21 150 + Mar 28 150 (= 600.95)
+    //          + power 90 + loan 564.8817 + card 25 + laptop 200 = 2,680.8317 (one-time dentist excluded)
+    expect(money(rec, "Monthly Income")).toBe(4_820);
+    expect(money(rec, "Monthly Expenses")).toBe(2_681);
+    expect(money(rec, "Net Recurring")).toBe(2_139); // 4,820 - 2,680.8317 = 2,139.1683
+    expect(money(page("income"), "Monthly Recurring")).toBe(4_820);
+    // next 12 months: payroll 24 x 2,000 + freelance 12 x 750 = 57,000
     expect(money(page("income"), "Annual Projection")).toBe(57_000);
-    expect(money(page("expenses"), "Monthly Recurring")).toBe(2_730);
+    expect(money(page("expenses"), "Monthly Recurring")).toBe(2_681);
     expect(money(page("expenses"), "One-time")).toBe(250);
     expect(stat(page("expenses"), "Active Expenses")).toBe("7");
     expect(stat(page("expenses"), "Priority Bills")).toBe("1");
@@ -182,9 +187,8 @@ describe("H1 calendar day-by-day movement (replay within the window is correct)"
 });
 
 describe("H1 pre-window history (completed before the default window, Dec 2025: +1,500 bonus, -600 flights = +900)", () => {
-  knownDefect(
-    "UI-DISP-01",
-    "Calendar month opening balance loses completed history from before the default window",
+  it(
+    "UI-DISP-01 — Calendar month opening balance loses completed history from before the default window",
     async () => {
       // observed: Opening $11,450 (= 12,350 - 900). The pre-window rows are subtracted from the
       // opening and never replayed because the day loop starts at the window start.
@@ -197,9 +201,8 @@ describe("H1 pre-window history (completed before the default window, Dec 2025: 
     }
   );
 
-  knownDefect(
-    "UI-DISP-02",
-    "Calendar month closing balance is short by the same pre-window history",
+  it(
+    "UI-DISP-02 — Calendar month closing balance is short by the same pre-window history",
     async () => {
       // observed: Closing $13,639 / $13,639.17 (sidebar); correct 12,350 + 2,189.1683 = 14,539.17
       const { page } = await mountH1();
@@ -209,9 +212,8 @@ describe("H1 pre-window history (completed before the default window, Dec 2025: 
     }
   );
 
-  knownDefect(
-    "UI-DISP-03",
-    "Calendar balance for today (no rows dated after the last completed one) differs from Current Balance",
+  it(
+    "UI-DISP-03 — Calendar balance for today (no rows dated after the last completed one) differs from Current Balance",
     async () => {
       // observed: today's cell $13,069 vs Current Balance $13,969.05 (900 short). With nothing overdue
       // and nothing completed after Mar 15, the balance on Mar 15 and Mar 16 IS the current balance.
@@ -223,9 +225,8 @@ describe("H1 pre-window history (completed before the default window, Dec 2025: 
     }
   );
 
-  knownDefect(
-    "UI-DISP-04",
-    "Dashboard cash-flow change badge disagrees with the Period Summary net flow of the same period",
+  it(
+    "UI-DISP-04 — Dashboard cash-flow change badge disagrees with the Period Summary net flow of the same period",
     async () => {
       // observed: badge +$3,389 (+33.1%) vs Net Flow +$2,189.17. 'Opening' is Mar 1's CLOSING balance,
       // so Mar 1's rent (-1,200) is missing from the change.  (Independent of the pre-window bug: the
@@ -244,29 +245,29 @@ describe("H1 pre-window history (completed before the default window, Dec 2025: 
     const { app, page } = await mountH1({ timeZone: "UTC" });
     await openTab(app, page("dashboard"), /Bills/);
     const upc = card(page("dashboard"), /Upcoming Activity/);
-    // 13,969.05 + 2,000 (Mar30 payroll) - 1,429.8817 = 14,539.1683
-    expect(money(upc, "Projected Balance")).toBe(14_539.17);
+    // REWRITTEN (14-day decision): the window is Mar 16 .. Mar 29, so the Mar 30 payroll (+2,000) is
+    // outside it. 13,969.05 - 1,429.8817 = 12,539.1683
+    expect(money(upc, "Projected Balance")).toBe(12_539.17);
   });
 
-  knownDefect(
-    "UI-DISP-05",
-    "Calendar balance on the last day of the bill-coverage window disagrees with the Bills tab projected balance",
+  it(
+    "UI-DISP-05 — Calendar balance on the last day of the bill-coverage window agrees with the Bills tab projected balance",
     async () => {
-      // Both describe the balance after Mar 30's payroll. observed: Calendar Mar 30 cell $13,639 vs
-      // Bills tab $14,539.17.
+      // Both describe the balance after the last day of the 14-day window (today + 13 = Mar 29).
+      // observed before the fix: Calendar $13,639 vs Bills tab $14,539.17 (900 of pre-window history
+      // missing, and a 15-day window). REWRITTEN for the exact 14-day window: Mar 29 is its last day.
       const { app, page } = await mountH1({ timeZone: "UTC" });
       await openTab(app, page("dashboard"), /Bills/);
       const projected = money(card(page("dashboard"), /Upcoming Activity/), "Projected Balance");
-      expect(projected).toBe(14_539.17); // precondition: the Bills tab is right
-      expect(dayCellBalance(page("calendar"), 30)).toBe(14_539);
+      expect(projected).toBe(12_539.17); // 13,969.05 - 1,429.8817: the Bills tab
+      expect(dayCellBalance(page("calendar"), 29)).toBe(12_539); // the whole-dollar day chip
     }
   );
 });
 
 describe("Forecast vs Expenses page", () => {
-  knownDefect(
-    "UI-DISP-06",
-    "Forecast 'Total Debt' omits installment plans that the Expenses page counts as debt",
+  it(
+    "UI-DISP-06 — Forecast 'Total Debt' omits installment plans that the Expenses page counts as debt",
     async () => {
       // observed: Forecast $13,000 (loan 12,000 + card 1,000) vs Expenses $14,200 (also 6 x 200 BNPL).
       const { page } = await mountH1();
@@ -276,12 +277,18 @@ describe("Forecast vs Expenses page", () => {
     }
   );
 
-  it("Forecast 'Budgeted' expenses use the recurring estimate and never include one-time rules (Dentist 250)", async () => {
-    // Recurring monthly equivalent = 2,729.88 (dentist excluded). The page may additionally prorate it
-    // by days/30 (UI-OBS-01, covered in observed.test.tsx); either way it must NOT contain the 250.
+  it("Forecast 'Budgeted' is the PLAN of the period: every scheduled row, the one-time Dentist 250 included", async () => {
+    // REWRITTEN (occurrence counting; it asserted the amount x multiplier estimate and that the
+    // one-time dentist is excluded). The budget must cover the same rows the actuals cover, or a
+    // paid dentist shows as 250 "over budget". The plan is every non-skipped row scheduled in March
+    // at its projected amount (the same plan the Projected vs Actual widget shows):
+    // income: payroll 2,000 x 2 + freelance 750 + the 300 birthday gift = 5,050
+    // expenses: rent 1,200 + groceries 4 x 150 + power 90 + loan 564.8817 + card 25 + laptop 200
+    //           + dentist 250 = 2,929.8817
     const { page } = await mountH1();
     const fc = card(page("forecast"), /Budgeted vs Actual/);
-    const budgeted = money(fc, "Budgeted", { occurrence: 1 });
-    expect([2_729.88, 2_820.88]).toContain(budgeted); // plain / 31-day-prorated (2,729.88 * 31/30)
+    expect(money(fc, "Budgeted", { occurrence: 0 })).toBe(5_050);
+    expect(money(fc, "Budgeted", { occurrence: 1 })).toBe(2_929.88);
+    expect(money(fc, "Budgeted", { occurrence: 2 })).toBe(2_120.12); // 5,050 - 2,929.8817 = 2,120.1183
   });
 });

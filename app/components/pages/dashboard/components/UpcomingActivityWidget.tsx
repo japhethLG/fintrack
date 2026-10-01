@@ -4,7 +4,7 @@ import React, { useState, useMemo } from "react";
 import { useFinancial } from "@/contexts/FinancialContext";
 import { Transaction } from "@/lib/types";
 import { Card, Icon, Badge, Select, Tabs, Button } from "@/components/common";
-import { formatDate, addDays } from "@/lib/utils/dateUtils";
+import { formatDate, addDays, getTodayKey, parseDate } from "@/lib/utils/dateUtils";
 import { getBillCoverageReport } from "@/lib/logic/balanceCalculator";
 import { BillItem } from "@/components/widgets/BillItem";
 import QuickTransaction from "./QuickTransaction";
@@ -30,9 +30,11 @@ const UpcomingActivityWidget: React.FC<IProps> = ({ onTransactionClick }) => {
 
   // Filter transactions for the selected range
   const upcomingData = useMemo(() => {
-    const today = formatDate(new Date());
+    // "Next N days" is exactly N calendar days: today .. today + N - 1 (the same window the Bills
+    // tab's coverage report uses, so both tabs describe the same rows).
+    const today = getTodayKey();
     const daysAhead = parseInt(selectedDays, 10);
-    const endDateStr = formatDate(addDays(new Date(), daysAhead));
+    const endDateStr = formatDate(addDays(parseDate(today), daysAhead - 1));
 
     const filtered = transactions
       .filter((t) => {

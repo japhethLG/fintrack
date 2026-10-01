@@ -130,9 +130,8 @@ describe("Dashboard cash-flow chart card", () => {
     expect(money(card(d, /Projected Cash Flow/), "Closing")).toBe(11_800); // 10,000 - 1,200 + 3,000
   });
 
-  knownDefect(
-    "UI-DISP-15",
-    "'Opening' on the cash-flow card is the FIRST DAY'S CLOSING balance, so it excludes day 1's own activity",
+  it(
+    "UI-DISP-15 — 'Opening' on the cash-flow card is the FIRST DAY'S CLOSING balance, so it excludes day 1's own activity",
     async () => {
       // observed: Opening $8,800 (Mar 1 after rent), change +$3,000 (+34.1%).
       // correct: Opening $10,000, change +$1,800 (+18.0%) == the Period Summary net flow.
@@ -144,9 +143,8 @@ describe("Dashboard cash-flow chart card", () => {
     }
   );
 
-  knownDefect(
-    "UI-DISP-16",
-    "cash-flow change badge for a month starting with a bill (H2) shows +$3,000 (+34.1%) instead of +$1,800 (+18.0%)",
+  it(
+    "UI-DISP-16 — cash-flow change badge for a month starting with a bill (H2) shows +$3,000 (+34.1%) instead of +$1,800 (+18.0%)",
     async () => {
       const { d } = await dash(h2Seed(), H2_TODAY);
       const chart = card(d, /Projected Cash Flow/);
@@ -234,9 +232,8 @@ describe("Dashboard period comparison", () => {
     expect([net.arrow, net.percent, net.color]).toEqual(["up", 450, "success"]); // net 200 -> 1,100 = +450%
   });
 
-  knownDefect(
-    "UI-DISP-19",
-    "a WORSENING net flow that is negative in both periods renders as a green up-arrow",
+  it(
+    "UI-DISP-19 — a WORSENING net flow that is negative in both periods renders as a green up-arrow",
     async () => {
       // prev period (Jan 29-Feb 28): net -1,000. current March: net -1,500 (worse by 500).
       // observed: Net Flow chip "arrow_upward 50.0%" in green ((-1500 - -1000) / -1000 = +50%).
@@ -256,9 +253,8 @@ describe("Dashboard period comparison", () => {
     }
   );
 
-  knownDefect(
-    "UI-DISP-20",
-    "a net flow that got strictly worse from a $0 baseline shows the neutral '0%'",
+  it(
+    "UI-DISP-20 — a net flow that got strictly worse from a $0 baseline shows the neutral '0%'",
     async () => {
       // prev net 0 (no data), current net -400. observed chip text "0%" (grey).
       const { d } = await dash({
@@ -306,9 +302,17 @@ describe("Dashboard period comparison", () => {
   it.todo(
     "DECISION: previous period for a full-month selection is the same-length window (Jan 29 - Feb 28), not the previous calendar month (Feb 1 - Feb 28); which one does the product want?"
   );
-  it.todo(
-    "DECISION: percent change from a zero baseline (prev income $0 -> $500) currently shows an arbitrary +100%; show 'new'/n.a. instead?"
-  );
+  it("a zero baseline has no percent: new income shows an up-arrow 'new' in green, not an invented +100%", async () => {
+    // RESOLVED (was a DECISION todo). Previous period (Jan 29 - Feb 28) is empty, March has a
+    // completed 500 income: the move is "new", not a percentage.
+    const { d } = await dash({
+      profile: { currentBalance: 10_000, initialBalance: 9_500 },
+      transactions: [manual("gig", "income", 500, "2026-03-05", "completed")],
+    }, H1_TODAY, "UTC");
+    const inc = changeChip(pc(d), "Total Income");
+    expect([inc.arrow, inc.text.includes("new"), inc.color]).toEqual(["up", true, "success"]);
+    expect(inc.percent).toBeNull();
+  });
 });
 
 describe("Dashboard Projected vs Actual", () => {
@@ -319,7 +323,7 @@ describe("Dashboard Projected vs Actual", () => {
     expect(within(pva).getByText(/0\s*%\s*collected/)).toBeInTheDocument();
   });
 
-  it("a bill paid late across a month boundary is bucketed by its ACTUAL date (characterisation)", async () => {
+  it("a bill paid late across a month boundary: the plan stays in the scheduled month, the actual lands in the paid month", async () => {
     // Rule-less row: scheduled Feb 27 for 100, paid Mar 2 for 130.
     const late = makeCompletedTransaction({
       id: "late",
@@ -336,20 +340,17 @@ describe("Dashboard Projected vs Actual", () => {
       profile: { currentBalance: 8_870, initialBalance: 9_000 },
       transactions: [late],
     });
-    // March widget: actual 130 against planned 100 (the plan follows the row into March)
-    expect(amounts(card(d, "Projected vs Actual"))).toEqual([0, 0, 130, 100]);
-    // and the same row is absent from February's plan (see DECISION below)
+    // REWRITTEN (decision: projected by scheduledDate, actual by actualDate). March shows what was
+    // paid in March (130) against what was PLANNED for March (nothing: the 100 was February's plan,
+    // scheduled Feb 27). February's side is pinned in tests/unit/balanceCalculator/projectedVsActual.test.ts.
+    expect(amounts(card(d, "Projected vs Actual"))).toEqual([0, 0, 130, 0]);
   });
-  it.todo(
-    "DECISION: should the 100 planned for a bill scheduled Feb 27 but paid Mar 2 count in February's plan or March's? (today: March's, by actualDate)"
-  );
   it.todo(
     "DECISION: 'X% spent' is capped at 100% even when actual is 130% of plan; print the true percentage?"
   );
 
-  knownDefect(
-    "UI-DISP-23",
-    "an actual amount of 0 (waived fee) counts as 0 in the KPI but as the projected amount in Projected vs Actual",
+  it(
+    "UI-DISP-23 — an actual amount of 0 (waived fee) counts as 0 in the KPI but as the projected amount in Projected vs Actual",
     async () => {
       // observed: Period Summary Total Expenses -$0.00, Projected vs Actual 'Expenses $100 / $100'.
       const { d } = await dash({
@@ -362,7 +363,7 @@ describe("Dashboard Projected vs Actual", () => {
   );
 });
 
-describe("Dashboard Recurring Summary: monthly multipliers", () => {
+describe("Dashboard Recurring Summary: occurrences, not multipliers", () => {
   const mk = (frequency: IncomeFrequency, amount: number, extra = {}) =>
     makeIncomeSource({
       id: `s-${frequency}`,
@@ -373,10 +374,14 @@ describe("Dashboard Recurring Summary: monthly multipliers", () => {
       ...extra,
     });
 
-  it("weekly 100, bi-weekly 200, semi-monthly 1,000, quarterly 300, yearly 1,200 annualise exactly", async () => {
-    // weekly 100 * 52/12 = 433.33 ; bi-weekly 200 * 26/12 = 433.33 ; semi-monthly 1,000 * 2 = 2,000 ;
-    // quarterly 300 / 3 = 100 ; yearly 1,200 / 12 = 100  ->  monthly 3,066.67
-    // annual by counting occurrences: 52*100 + 26*200 + 24*1000 + 4*300 + 1200 = 36,800
+  it("weekly 100, bi-weekly 200, semi-monthly 1,000, quarterly 300, yearly 1,200 count their real occurrences", async () => {
+    // REWRITTEN (occurrence counting). Today is Mar 16 2026, every source starts 2026-01-01.
+    // MARCH 2026 (the month shown): weekly on Fridays Mar 6, 13, 20, 27 = 4 x 100 = 400 ;
+    // bi-weekly on every other Friday from Jan 2 (Jan 2, 16, 30, Feb 13, 27, Mar 13, 27) = 2 x 200 = 400 ;
+    // semi-monthly 15th and 30th = 2 x 1,000 = 2,000 ; quarterly (Jan, Apr, Jul, Oct) and yearly (Jan 1)
+    // have no March occurrence = 0  ->  2,800 (the old multiplier estimate said 3,067).
+    // NEXT 12 MONTHS (Mar 16 2026 .. Mar 15 2027): 52 Fridays x 100 + 26 x 200 + 24 x 1,000
+    // + 4 x 300 (Apr, Jul, Oct, Jan) + 1 x 1,200 (Jan 1 2027) = 5,200 + 5,200 + 24,000 + 1,200 + 1,200 = 36,800
     const { d, page } = await (async () => {
       const r = await renderPages(["dashboard", "income"], {
         today: H1_TODAY,
@@ -392,28 +397,27 @@ describe("Dashboard Recurring Summary: monthly multipliers", () => {
       });
       return { ...r, d: r.page("dashboard") };
     })();
-    expect(money(card(d, "Recurring Summary"), "Monthly Income")).toBe(3_067);
-    expect(money(page("income"), "Monthly Recurring")).toBe(3_067);
+    expect(money(card(d, "Recurring Summary"), "Monthly Income")).toBe(2_800);
+    expect(money(page("income"), "Monthly Recurring")).toBe(2_800);
     expect(money(page("income"), "Annual Projection")).toBe(36_800);
   });
 
-  knownDefect(
-    "UI-DISP-24",
-    "Annual Projection for a daily source assumes a 360-day year",
+  it(
+    "UI-DISP-24 — Annual Projection for a daily source counts the real 365 days, not a 360-day year",
     async () => {
-      // a $10 daily source: 365 occurrences a year = 3,650. observed: Monthly $300 x 12 = $3,600.
+      // a $10 daily source: 365 occurrences a year = 3,650. observed before: Monthly $300 x 12 = $3,600.
+      // REWRITTEN precondition: March has 31 days = 31 x 10 = 310 (it was the estimate 30 x 10).
       const { page } = await renderPages(["income"], {
         today: H1_TODAY,
         seed: { incomeSources: [mk("daily", 10)] },
       });
-      expect(money(page("income"), "Monthly Recurring")).toBe(300); // precondition (30 x 10)
-      expect(money(page("income"), "Annual Projection")).toBe(3_650);
+      expect(money(page("income"), "Monthly Recurring")).toBe(310); // precondition (31 days x 10)
+      expect(money(page("income"), "Annual Projection")).toBe(3_650); // Mar 16 2026 .. Mar 15 2027 = 365 days
     }
   );
 
-  knownDefect(
-    "UI-DISP-25",
-    "Recurring Summary counts an income source whose end date has passed",
+  it(
+    "UI-DISP-25 — Recurring Summary counts an income source whose end date has passed",
     async () => {
       // Contract 3,000/mo ended 2026-02-28; Salary 2,000/mo active. observed: Monthly Income $5,000.
       const { d } = await dash({
@@ -423,14 +427,14 @@ describe("Dashboard Recurring Summary: monthly multipliers", () => {
         ],
       }, H1_TODAY, "UTC");
       const rec = card(d, "Recurring Summary");
-      expect(within(rec).getByText("2 sources")).toBeInTheDocument(); // precondition: both rows are 'active'
+      // REWRITTEN precondition: the ended contract is no longer counted as ACTIVE (it said "2 sources")
+      expect(within(rec).getByText("1 sources")).toBeInTheDocument();
       expect(money(rec, "Monthly Income")).toBe(2_000);
     }
   );
 
-  knownDefect(
-    "UI-DISP-26",
-    "Income page 'Monthly Recurring' counts an ended source that the Forecast budget already excludes",
+  it(
+    "UI-DISP-26 — Income page 'Monthly Recurring' counts an ended source that the Forecast budget already excludes",
     async () => {
       // observed: Income page $5,000; Forecast Budgeted (March) uses only the 2,000 salary.
       const { page } = await renderPages(["income", "forecast"], {
@@ -449,9 +453,8 @@ describe("Dashboard Recurring Summary: monthly multipliers", () => {
     }
   );
 
-  knownDefect(
-    "UI-DISP-27",
-    "Recurring Summary keeps counting an installment plan that is fully paid (6 of 6)",
+  it(
+    "UI-DISP-27 — Recurring Summary keeps counting an installment plan that is fully paid (6 of 6)",
     async () => {
       // observed: Monthly Expenses $200 although no payment is projected any more.
       const { d, app } = await dash({
@@ -467,9 +470,8 @@ describe("Dashboard Recurring Summary: monthly multipliers", () => {
     }
   );
 
-  knownDefect(
-    "UI-DISP-28",
-    "Expenses page 'Monthly Recurring' keeps counting a settled credit card (balance 0, no payments projected)",
+  it(
+    "UI-DISP-28 — Expenses page 'Monthly Recurring' keeps counting a settled credit card (balance 0, no payments projected)",
     async () => {
       // observed: $100 (the rule amount) although the calendar has no card payment at all.
       const { page, app } = await renderPages(["expenses"], {
@@ -493,9 +495,8 @@ describe("Dashboard health score", () => {
     expect(grade).toBe("A");
   });
 
-  knownDefect(
-    "UI-DISP-29",
-    "balance trend is INVERTED for an overdrawn user: a worsening negative balance scores 100/100",
+  it(
+    "UI-DISP-29 — balance trend is INVERTED for an overdrawn user: a worsening negative balance scores 100/100",
     async () => {
       // -1,000 falling to -2,500 (three 500 bills). observed: Balance Trend 100/100.
       const { d } = await dash({
@@ -511,9 +512,8 @@ describe("Dashboard health score", () => {
     }
   );
 
-  knownDefect(
-    "UI-DISP-30",
-    "balance trend is INVERTED the other way: a recovering negative balance scores 2/100",
+  it(
+    "UI-DISP-30 — balance trend is INVERTED the other way: a recovering negative balance scores 2/100",
     async () => {
       // -2,000 rising to -500. observed: Balance Trend 2/100.
       const { d } = await dash({
@@ -529,9 +529,8 @@ describe("Dashboard health score", () => {
     }
   );
 
-  knownDefect(
-    "UI-DISP-31",
-    "savings-rate score is 20/100 (not 0) when there is NO income and a 3,000 expense",
+  it(
+    "UI-DISP-31 — savings-rate score is 20/100 (not 0) when there is NO income and a 3,000 expense",
     async () => {
       // observed: Savings Rate 20/100; correct: spending 100% of nothing = 0/100 (and the
       // 'spending more than you earn' insight must be reachable).
@@ -546,9 +545,8 @@ describe("Dashboard health score", () => {
     }
   );
 
-  knownDefect(
-    "UI-DISP-32",
-    "an unpaid overdue bill still earns a perfect 100/100 Bill Payments score",
+  it(
+    "UI-DISP-32 — an unpaid overdue bill still earns a perfect 100/100 Bill Payments score",
     async () => {
       // 300 balance, a 400 bill due Mar 10 never paid (overdue). observed: Bill Payments 100/100.
       const { d } = await dash({
@@ -560,16 +558,19 @@ describe("Dashboard health score", () => {
     }
   );
 
-  it("brand-new user: the health card renders finite numbers", async () => {
+  it("brand-new user: a neutral 'not enough data yet' state instead of a grade and a runway claim", async () => {
+    // REWRITTEN (decision: an empty account has no score). It rendered "93/100 Grade A" and the
+    // insight "Great cash runway! You have 90+ days of expenses covered.".
     const { d } = await dash({ profile: null });
-    const { score } = healthScore(card(d, "Financial Health"));
-    expect(Number.isFinite(score)).toBe(true);
-    expect(score).toBeGreaterThanOrEqual(0);
-    expect(score).toBeLessThanOrEqual(100);
+    const hs = card(d, "Financial Health");
+    expect(within(hs).getByText("Not enough data yet")).toBeInTheDocument();
+    expect(hs.textContent).not.toMatch(/\/100|Grade|runway/i);
   });
-  it.todo(
-    "DECISION: a brand-new user with no data currently scores 93/A and is told 'Great cash runway! You have 90+ days of expenses covered.'; show 'not enough data' instead?"
-  );
+
+  it("a user with only a balance and no rows is also 'not enough data' (nothing to grade)", async () => {
+    const { d } = await dash({ profile: { currentBalance: 5_000, initialBalance: 5_000 } });
+    expect(within(card(d, "Financial Health")).getByText("Not enough data yet")).toBeInTheDocument();
+  });
 });
 
 describe("Dashboard category pie", () => {

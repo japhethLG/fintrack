@@ -11,8 +11,22 @@ interface IProps {
 }
 
 const FinancialHealthScore: React.FC<IProps> = ({ healthScore }) => {
-  const { score, grade, color, components, insights } = healthScore;
+  const { score, grade, color, components, insights, insufficientData } = healthScore;
   const [showAllInsights, setShowAllInsights] = useState(false);
+
+  // Nothing recorded yet: there is nothing to grade. Say so instead of showing a made-up "A".
+  if (insufficientData) {
+    return (
+      <Card padding="md" className="relative overflow-hidden h-full">
+        <p className="text-gray-400 text-sm font-medium mb-1">Financial Health</p>
+        <h2 className="text-xl font-bold text-white">Not enough data yet</h2>
+        <p className="mt-3 text-xs text-gray-400 flex items-start gap-2">
+          <Icon name="lightbulb" size={14} className="text-primary shrink-0 mt-0.5" />
+          Add income and expenses (or a transaction) and your score will appear here.
+        </p>
+      </Card>
+    );
+  }
 
   // Data for the gauge chart
   const gaugeData = [

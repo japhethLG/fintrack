@@ -27,6 +27,8 @@ interface IProps {
 }
 
 interface DetailPanelProps {
+  /** Overdue expenses deducted from this day's closing balance (today only). */
+  overdueOwed?: number;
   title: string;
   subLabel?: string;
   status: BalanceStatus;
@@ -40,6 +42,7 @@ interface DetailPanelProps {
 }
 
 const DetailPanel: React.FC<DetailPanelProps> = ({
+  overdueOwed,
   title,
   subLabel,
   status,
@@ -103,6 +106,12 @@ const DetailPanel: React.FC<DetailPanelProps> = ({
                 {opening !== null ? formatCurrency(opening) : "—"}
               </span>
             </div>
+            {overdueOwed !== undefined && overdueOwed > 0 && (
+              <div className="flex justify-between items-center mb-2">
+                <span className="text-sm text-danger">Overdue owed</span>
+                <span className="font-bold text-danger">-{formatCurrency(overdueOwed)}</span>
+              </div>
+            )}
             <div className="flex justify-between items-center">
               <span className="text-sm text-gray-400">Closing</span>
               <span className={cn("font-bold", STATUS_COLORS[status])}>
@@ -144,6 +153,7 @@ const DayDetailSidebar: React.FC<IProps> = ({
             month: "short",
             day: "numeric",
           })}
+          overdueOwed={dayBalance?.overdueOwed}
           status={dayBalance?.status ?? "safe"}
           openingStatus={dayOpeningStatus}
           opening={dayBalance?.openingBalance ?? null}

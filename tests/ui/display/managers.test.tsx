@@ -7,8 +7,10 @@ import { card, money, renderPages, screen, stat, within } from "./screens";
 vi.setConfig({ testTimeout: 90_000 });
 
 describe("Expense / Income manager totals vs the calendar's occurrence counts", () => {
-  it("weekly 100 (Saturdays): estimate 433 every month, but May really has 5 Saturdays = 500 (by-design gap, characterised)", async () => {
-    // Saturdays from Mar 7. May 2026: 2, 9, 16, 23, 30 -> 5 x 100 = 500. Estimate: 100 x 52/12 = 433.33.
+  it("weekly 100 (Saturdays): the managers count this month's real occurrences, so they agree with the calendar", async () => {
+    // REWRITTEN (occurrence counting; it pinned the 433 estimate against the calendar's real counts).
+    // Saturdays from Mar 7. March 2026: 7, 14, 21, 28 -> 4 x 100 = 400 on the Dashboard, the
+    // Expenses page AND the calendar's March. May 2026: 2, 9, 16, 23, 30 -> 5 x 100 = 500 (calendar).
     const { app, page } = await renderPages(["calendar", "dashboard", "expenses"], {
       today: H1_TODAY,
       timeZone: "UTC",
@@ -19,14 +21,14 @@ describe("Expense / Income manager totals vs the calendar's occurrence counts", 
         ],
       },
     });
-    expect(money(card(page("dashboard"), "Recurring Summary"), "Monthly Expenses")).toBe(433);
-    expect(money(page("expenses"), "Monthly Recurring")).toBe(433);
+    expect(money(card(page("dashboard"), "Recurring Summary"), "Monthly Expenses")).toBe(400);
+    expect(money(page("expenses"), "Monthly Recurring")).toBe(400);
     const cal = page("calendar");
+    expect(money(cal, "Expenses", { occurrence: 0 })).toBe(-400); // March on the calendar
     for (let i = 0; i < 2; i += 1) await app.user.click(within(cal).getByText("chevron_right").closest("button")!);
     expect(within(cal).getByText("May 2026")).toBeInTheDocument();
     expect(money(cal, "Expenses", { occurrence: 0 })).toBe(-500);
   });
-  it.todo("DECISION: Dashboard/Income/Expense/Forecast show amount x multiplier estimates while the Calendar counts real occurrences (433 vs 500 in a 5-Saturday month); which is authoritative?");
 
   it("deactivating a rule from the list drops it from Active count, monthly recurring and priority count", async () => {
     const { app, page } = await renderPages(["expenses"], {

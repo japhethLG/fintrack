@@ -6,9 +6,12 @@ import { cn } from "@/lib/utils/cn";
 import { useCurrency } from "@/lib/hooks/useCurrency";
 import InsightCard from "./InsightCard";
 import { parseDate } from "@/lib/utils/dateUtils";
+import { RISK_HORIZON_DAYS } from "@/lib/logic/balanceCalculator/runway";
 
 interface Metrics {
   balance: number;
+  /** False for an empty account: there is nothing to project, so no runway is claimed. */
+  hasData?: boolean;
   runway: {
     runOutDate: string | null;
     days: number;
@@ -69,22 +72,36 @@ const MetricsGrid: React.FC<IProps> = ({
           value={formatCurrency(metrics.balance)}
           status={metrics.balance >= 0 ? "success" : "danger"}
         />
-        <InsightCard
-          icon="timeline"
-          title="Cash Runway"
-          value={metrics.runway.runOutDate ? `${metrics.runway.days} days` : "90+ days"}
-          subtitle={
-            metrics.nextCrunch
-              ? `Crunch on ${parseDate(metrics.nextCrunch.date).toLocaleDateString()}`
-              : "No crunch detected"
-          }
-          status={metrics.runway.runOutDate ? "warning" : "success"}
-        />
+        {metrics.hasData === false ? (
+          <InsightCard
+            icon="timeline"
+            title="Cash Runway"
+            value="—"
+            subtitle="Not enough data yet"
+            status="info"
+          />
+        ) : (
+          <InsightCard
+            icon="timeline"
+            title="Cash Runway"
+            value={
+              metrics.runway.runOutDate
+                ? `${metrics.runway.days} days`
+                : `${RISK_HORIZON_DAYS}+ days`
+            }
+            subtitle={
+              metrics.nextCrunch
+                ? `Crunch on ${parseDate(metrics.nextCrunch.date).toLocaleDateString()}`
+                : "No crunch detected"
+            }
+            status={metrics.runway.runOutDate ? "warning" : "success"}
+          />
+        )}
         <InsightCard
           icon="savings"
           title="Actual Savings Rate"
           value={`${actualMetrics.savingsRate.toFixed(1)}%`}
-          subtitle={`${formatCurrency(actualMetrics.monthlySurplus)} this month`}
+          subtitle={`${formatCurrency(actualMetrics.monthlySurplus)} net in ${periodLabel || "the selected period"}`}
           status={
             actualMetrics.savingsRate >= 20
               ? "success"

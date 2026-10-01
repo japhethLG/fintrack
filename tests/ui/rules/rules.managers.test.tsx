@@ -2,7 +2,6 @@ import { describe, expect, it, vi } from "vitest";
 import {
   renderApp,
   screen,
-  knownDefect,
   moneyNear,
   makeIncomeSource,
   makeExpenseRule,
@@ -36,11 +35,17 @@ describe("IncomeManager summary cards", () => {
     makeIncomeSource({ id: "i-1", name: "Tax Refund", amount: 500, frequency: "one-time", startDate: "2026-02-10" }),
   ];
 
-  it("Monthly Recurring / Annual Projection normalise each frequency (52/12, 26/12, 2, 1/3, 1/12) and skip one-time", async () => {
-    // monthly 3000 + weekly 100*52/12 (433.33) + bi-weekly 200*26/12 (433.33) + semi 500*2 (1000)
-    //   + quarterly 300/3 (100) + yearly 1200/12 (100) = 5066.67 -> "$5,067"; x12 = 60,800
+  it("Monthly Recurring / Annual Projection count the real occurrences of each frequency and skip one-time", async () => {
+    // REWRITTEN (occurrence counting; the old test pinned the 52/12, 26/12, 2, 1/3, 1/12 multipliers).
+    // JANUARY 2026 (today Jan 15): monthly on the 1st = 3,000 ; weekly Fridays Jan 2, 9, 16, 23, 30
+    // = 5 x 100 = 500 ; bi-weekly Fridays Jan 2, 16, 30 = 3 x 200 = 600 ; semi-monthly Jan 15 and Jan 30
+    // = 2 x 500 = 1,000 ; quarterly Jan 15 = 300 ; yearly (March 5) = 0  ->  5,400.
+    // NEXT 12 MONTHS (Jan 15 2026 .. Jan 14 2027): monthly Feb 1 .. Jan 1 = 12 x 3,000 = 36,000 ;
+    // weekly Jan 16 .. Jan 8 2027 = 52 x 100 = 5,200 ; bi-weekly Jan 16 every 14 days = 26 x 200 = 5,200 ;
+    // semi-monthly Jan 15 .. Dec 30 = 24 x 500 = 12,000 ; quarterly Jan 15, Apr 15, Jul 15, Oct 15
+    // = 4 x 300 = 1,200 ; yearly Mar 5 = 1,200  ->  60,800.
     await renderApp({ route: "/income", today: TODAY, seed: { incomeSources: sources() } });
-    expect(moneyNear("Monthly Recurring")).toBe(5067);
+    expect(moneyNear("Monthly Recurring")).toBe(5400);
     expect(moneyNear("Annual Projection")).toBe(60_800);
     expect(moneyNear("One-time Income")).toBe(500);
     expect(cardValue("Active Sources")).toBe("7");
@@ -53,27 +58,24 @@ describe("IncomeManager summary cards", () => {
     await screen.findByText("Inactive", { selector: "span" }).catch(() => undefined);
     await app.settle();
     expect(cardValue("Active Sources")).toBe("6");
-    expect(moneyNear("Monthly Recurring")).toBe(2067); // 5066.67 - 3000
+    expect(moneyNear("Monthly Recurring")).toBe(2400); // 5,400 - 3,000 (the January salary)
   });
 
-  it("weekly $100 in a five-Friday month: the Dashboard shows the 5 real paydays ($500) while the Manager's Monthly Recurring is the 52/12 average ($433)", async () => {
-    // documents both definitions; see the DECISION below
+  it("weekly $100 in a five-Friday month: the Dashboard and the Manager both show the 5 real paydays ($500)", async () => {
+    // REWRITTEN (occurrence counting): the manager used to print the 52/12 average, $433
     const seed = { incomeSources: [makeIncomeSource({ id: "i-wk", name: "Weekly Gig", amount: 100, frequency: "weekly" as const, startDate: "2026-01-02", scheduleConfig: { dayOfWeek: 5 } })] };
     const inc = await renderApp({ route: "/income", today: TODAY, seed });
     expect(d.engineDates(inc, "i-wk", { from: "2026-01-01", to: "2026-01-31" })).toEqual([
       "2026-01-02", "2026-01-09", "2026-01-16", "2026-01-23", "2026-01-30",
     ]); // prettier-ignore
-    expect(moneyNear("Monthly Recurring")).toBe(433);
+    expect(moneyNear("Monthly Recurring")).toBe(500);
     inc.unmount();
     await renderApp({ route: "/dashboard", today: TODAY, seed });
     expect(moneyNear("Total Income")).toBe(500);
   });
 
-  it.todo("DECISION: Manager 'Monthly Recurring' is a 52/12 average; the Dashboard/Calendar show actual occurrences per month (5 vs 4 Fridays). Keep both definitions or reconcile?");
-
-  knownDefect(
-    "UI-RULE-67",
-    "Annual Projection of a daily $10 income is $3,600 (30 x 12) instead of 365 x $10 = $3,650",
+  it(
+    "UI-RULE-67 — Annual Projection of a daily $10 income is $3,600 (30 x 12) instead of 365 x $10 = $3,650",
     async () => {
       // observed: Monthly Recurring $300 (x30) and Annual Projection $3,600
       await renderApp({
@@ -86,9 +88,8 @@ describe("IncomeManager summary cards", () => {
     }
   );
 
-  knownDefect(
-    "UI-RULE-68",
-    "an income source whose end date has passed is still counted as Active and in Monthly Recurring",
+  it(
+    "UI-RULE-68 — an income source whose end date has passed is still counted as Active and in Monthly Recurring",
     async () => {
       // ended 2025-12-31, isActive true: no future income is generated, yet Monthly Recurring shows $3,000
       const app = await renderApp({
@@ -119,10 +120,13 @@ describe("ExpenseManager summary cards", () => {
     makeInstallmentRule({ id: "e-inst", name: "Laptop", amount: 200 }, { installmentCount: 6, installmentsPaid: 2, installmentAmount: 200 }),
   ];
 
-  it("Monthly Recurring uses the loan EMI, the card's fixed payment and 52/12 for weekly; one-time is separate", async () => {
-    // 1000 + 25*52/12 (108.33) + 565 + 100 (card A amount) + 300 (card B fixed) + 200 = 2273.33 -> $2,273
+  it("Monthly Recurring counts January's real bills: rent, 4 gym Mondays, the loan EMI and both cards; one-time is separate", async () => {
+    // REWRITTEN (occurrence counting; the old test pinned weekly x 52/12 and a 200 installment).
+    // JANUARY 2026: rent 1,000 (Jan 1) + gym Mondays Jan 5, 12, 19, 26 = 4 x 25 = 100 + car loan EMI
+    // 564.8817 + card A minimum 2% of 5,000 = 100 + card B fixed 300 = 2,064.8817 -> $2,065.
+    // The laptop instalment (2 of 6 paid) has its next payment on Mar 1, so January has none.
     await renderApp({ route: "/expenses", today: TODAY, seed: { expenseRules: rules() } });
-    expect(moneyNear("Monthly Recurring")).toBe(2273);
+    expect(moneyNear("Monthly Recurring")).toBe(2065);
     expect(moneyNear("One-time")).toBe(400);
     expect(cardValue("Active Expenses")).toBe("7");
     expect(cardValue("Priority Bills")).toBe("1");
@@ -142,7 +146,7 @@ describe("ExpenseManager summary cards", () => {
     expect(moneyNear("Monthly Recurring")).toBe(2500);
   });
 
-  it("weekly $25 in a five-Friday month: the Manager shows the 52/12 average ($108) while the engine bills 5 x $25 = $125 in January", async () => {
+  it("weekly $25 in a five-Friday month: the Manager shows the 5 real bills, 5 x $25 = $125 in January", async () => {
     const app = await renderApp({
       route: "/expenses",
       today: TODAY,
@@ -151,12 +155,11 @@ describe("ExpenseManager summary cards", () => {
     expect(d.engineDates(app, "e-gym", { from: "2026-01-01", to: "2026-01-31" })).toEqual([
       "2026-01-02", "2026-01-09", "2026-01-16", "2026-01-23", "2026-01-30",
     ]); // prettier-ignore
-    expect(moneyNear("Monthly Recurring")).toBe(108); // 25 * 52 / 12 = 108.33
+    expect(moneyNear("Monthly Recurring")).toBe(125); // REWRITTEN: it printed the 52/12 average, 108
   });
 
-  knownDefect(
-    "UI-RULE-69",
-    "an expense whose end date has passed is still counted as Active and in Monthly Recurring",
+  it(
+    "UI-RULE-69 — an expense whose end date has passed is still counted as Active and in Monthly Recurring",
     async () => {
       const app = await renderApp({
         route: "/expenses",

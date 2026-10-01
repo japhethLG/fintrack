@@ -2,70 +2,51 @@
 
 import React, { useMemo } from "react";
 import { useRouter } from "next/navigation";
+import dayjs from "dayjs";
 import { useFinancial } from "@/contexts/FinancialContext";
-import { IncomeSource, ExpenseRule, IncomeFrequency } from "@/lib/types";
 import { Card, Button, Icon } from "@/components/common";
 import { cn } from "@/lib/utils/cn";
 import { useCurrency } from "@/lib/hooks/useCurrency";
-
-const getMonthlyMultiplier = (frequency: IncomeFrequency): number => {
-  switch (frequency) {
-    case "daily":
-      return 30;
-    case "weekly":
-      return 52 / 12;
-    case "bi-weekly":
-      return 26 / 12;
-    case "semi-monthly":
-      return 2;
-    case "monthly":
-      return 1;
-    case "quarterly":
-      return 1 / 3;
-    case "yearly":
-      return 1 / 12;
-    default:
-      return 0;
-  }
-};
+import { getTodayKey, parseDate } from "@/lib/utils/dateUtils";
+import {
+  isExpenseRuleCurrent,
+  isIncomeSourceCurrent,
+  monthBounds,
+  recurringPeriodTotals,
+} from "@/lib/logic/forecasting";
 
 const RecurringSummaryWidget: React.FC = () => {
   const router = useRouter();
-  const { incomeSources, expenseRules } = useFinancial();
+  const { incomeSources, expenseRules, transactions } = useFinancial();
   const { formatCurrency, formatCurrencyWithSign } = useCurrency();
 
   const stats = useMemo(() => {
-    const activeIncome = incomeSources.filter((s) => s.isActive);
-    const activeExpenses = expenseRules.filter((r) => r.isActive);
+    const today = getTodayKey();
+    // "Active" means switched on AND still producing occurrences: an ended source, a repaid loan,
+    // a settled card or a fully paid installment plan is not active any more.
+    const activeIncome = incomeSources.filter((s) => isIncomeSourceCurrent(s, today));
+    const activeExpenses = expenseRules.filter((r) => isExpenseRuleCurrent(r, today));
 
-    const monthlyIncome = activeIncome.reduce((sum, source) => {
-      if (source.frequency === "one-time") return sum;
-      return sum + source.amount * getMonthlyMultiplier(source.frequency);
-    }, 0);
-
-    const monthlyExpenses = activeExpenses.reduce((sum, rule) => {
-      // Handle special expense types
-      if (rule.expenseType === "cash_loan" && rule.loanConfig) {
-        return sum + rule.loanConfig.monthlyPayment;
-      }
-      if (rule.expenseType === "installment" && rule.installmentConfig) {
-        // Assuming installments are monthly for now
-        return sum + rule.installmentConfig.installmentAmount;
-      }
-      if (rule.expenseType === "one-time") return sum;
-
-      // Standard recurring
-      return sum + rule.amount * getMonthlyMultiplier(rule.frequency as IncomeFrequency);
-    }, 0);
+    // The recurring occurrences of THIS calendar month: five Fridays are five payments.
+    const { start, end } = monthBounds(today);
+    const month = recurringPeriodTotals(
+      transactions,
+      incomeSources,
+      expenseRules,
+      start,
+      end,
+      today
+    );
 
     return {
+      monthLabel: dayjs(parseDate(today)).format("MMMM YYYY"),
       activeIncomeCount: activeIncome.length,
       activeExpenseCount: activeExpenses.length,
-      monthlyIncome,
-      monthlyExpenses,
-      net: monthlyIncome - monthlyExpenses,
+      monthlyIncome: month.income,
+      monthlyExpenses: month.expenses,
+      net: month.net,
     };
-  }, [incomeSources, expenseRules]);
+  }, [incomeSources, expenseRules, transactions]);
 
   return (
     <Card padding="md">
@@ -75,7 +56,7 @@ const RecurringSummaryWidget: React.FC = () => {
         </div>
         <div>
           <h3 className="font-bold text-white">Recurring Summary</h3>
-          <p className="text-xs text-gray-400">Estimated monthly totals</p>
+          <p className="text-xs text-gray-400">Scheduled for {stats.monthLabel}</p>
         </div>
       </div>
 
@@ -127,7 +108,7 @@ const RecurringSummaryWidget: React.FC = () => {
           <span className="text-sm text-gray-400">Net Recurring</span>
           <span className={cn("font-bold", stats.net >= 0 ? "text-success" : "text-danger")}>
             {formatCurrencyWithSign(stats.net, { maximumFractionDigits: 0 })}
-            <span className="text-xs font-normal text-gray-500 ml-1">/mo</span>
+            <span className="text-xs font-normal text-gray-500 ml-1">this month</span>
           </span>
         </div>
       </div>

@@ -190,9 +190,8 @@ describe("low-balance threshold drives the calendar status colours", () => {
     expect(statusOf()).toBe("warning"); // 800 < 1000
   }, 40_000);
 
-  knownDefect(
-    "UI-BAL-40",
-    "a user with a balance but no transactions or rules gets a calendar with NO balances (Opening/Closing '—', empty grid)",
+  it(
+    "UI-BAL-40 — a user with a balance but no transactions or rules gets a calendar with NO balances (Opening/Closing '—', empty grid)",
     async () => {
       // observed: useDailyBalances returns an empty Map when transactions.length === 0, so nothing is printed
       // for a balance the app knows exactly (800 on every day).

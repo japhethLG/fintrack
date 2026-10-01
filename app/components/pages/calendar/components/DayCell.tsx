@@ -11,6 +11,7 @@ import { ContextMenu } from "@/components/common";
 import { useModal } from "@/components/modals";
 import DraggableDayChip from "./DraggableDayChip";
 import { STATUS_COLORS } from "../constants";
+import { isOverdue } from "@/lib/logic/balanceCalculator/openItems";
 import type { CalendarDay } from "../types";
 
 interface IProps {
@@ -139,7 +140,13 @@ const DayCell: React.FC<IProps> = ({ day, isSelected, onClick, onTransactionClic
                 onClick={() => onTransactionClick?.(t)}
               >
                 <div
-                  className={cn("text-xs px-1.5 py-0.5 rounded truncate", getTransactionColor(t))}
+                  className={cn(
+                    "text-xs px-1.5 py-0.5 rounded truncate",
+                    getTransactionColor(t),
+                    isOverdue(t) && "ring-1 ring-danger/60"
+                  )}
+                  title={isOverdue(t) ? "Overdue" : undefined}
+                  data-overdue={isOverdue(t) ? "true" : undefined}
                 >
                   {t.name}
                 </div>

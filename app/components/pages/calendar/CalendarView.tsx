@@ -16,6 +16,7 @@ import { Transaction } from "@/lib/types";
 import { Button, Card, PageHeader, Icon, LoadingSpinner } from "@/components/common";
 import { formatDate, isSameDay, startOfDay } from "@/lib/utils/dateUtils";
 import { getBalanceStatus } from "@/lib/logic/balanceCalculator/utils";
+import { summarizePeriod } from "@/lib/logic/healthScore";
 import { useModal } from "@/components/modals";
 import { WEEKDAYS, WEEKDAYS_SHORT } from "./constants";
 import type { CalendarDay } from "./types";
@@ -188,16 +189,10 @@ const CalendarView: React.FC = () => {
       return date >= startKey && date <= endKey;
     });
 
-    rangeTransactions.forEach((t) => {
-      if (t.status === "skipped") return;
-      const amount =
-        t.status === "completed" ? (t.actualAmount ?? t.projectedAmount) : t.projectedAmount;
-      if (t.type === "income") {
-        income += amount;
-      } else {
-        expenses += amount;
-      }
-    });
+    // The one definition of a period's income and expenses (healthScore/periodStats.ts)
+    const period = summarizePeriod(transactions, startKey, endKey);
+    income = period.income;
+    expenses = period.expenses;
 
     return {
       start,
@@ -291,34 +286,20 @@ const CalendarView: React.FC = () => {
 
   // Month summary
   const monthSummary = useMemo(() => {
-    let income = 0;
-    let expenses = 0;
-    let projected = 0;
-    let completed = 0;
-
     const year = currentDate.getFullYear();
     const month = currentDate.getMonth();
     const startKey = formatDate(new Date(year, month, 1));
     const endKey = formatDate(new Date(year, month + 1, 0));
 
-    transactions.forEach((t) => {
-      const date = t.actualDate || t.scheduledDate;
-      if (date >= startKey && date <= endKey) {
-        // Skip skipped transactions from totals
-        if (t.status === "skipped") return;
-
-        const amount = t.actualAmount ?? t.projectedAmount;
-        if (t.type === "income") {
-          income += amount;
-        } else {
-          expenses += amount;
-        }
-        if (t.status === "projected") projected++;
-        if (t.status === "completed") completed++;
-      }
-    });
-
-    return { income, expenses, net: income - expenses, projected, completed };
+    // Skipped rows are in no total and in neither count (summarizePeriod keeps them apart)
+    const period = summarizePeriod(transactions, startKey, endKey);
+    return {
+      income: period.income,
+      expenses: period.expenses,
+      net: period.net,
+      projected: period.pendingIncomeCount + period.pendingExpenseCount,
+      completed: period.completedCount,
+    };
   }, [transactions, currentDate]);
 
   // Period balance summary (opening/closing for current view)

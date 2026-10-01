@@ -46,9 +46,8 @@ describe("calendar balance vs the stored balance", () => {
     ],
   };
 
-  knownDefect(
-    "UI-BAL-35",
-    "a completed transaction older than the 2-month window is subtracted from the opening balance but never re-applied, so today's closing balance is wrong",
+  it(
+    "UI-BAL-35 — a completed transaction older than the 2-month window is subtracted from the opening balance but never re-applied, so today's closing balance is wrong",
     async () => {
       // observed: today's Opening/Closing $10,000 while Settings/Dashboard/Forecast say $9,500
       const app = await renderApp({ ui: <Screens only={["settings", "calendar"]} />, today: TODAY, seed: preWindow });
@@ -62,9 +61,8 @@ describe("calendar balance vs the stored balance", () => {
     40_000
   );
 
-  knownDefect(
-    "UI-BAL-36",
-    "the calendar's balance for TODAY changes after browsing back to an older month (the view window only ever grows)",
+  it(
+    "UI-BAL-36 — the calendar's balance for TODAY changes after browsing back to an older month (the view window only ever grows)",
     async () => {
       // observed: 10,000 before browsing to Aug 2025 (the 500 expense is outside the window), 9,500 after.
       const app = await renderApp({ ui: <Screens only={["settings", "calendar"]} />, today: TODAY, seed: preWindow });

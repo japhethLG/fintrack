@@ -3,7 +3,7 @@
 import React, { useMemo } from "react";
 import { Card, Icon } from "@/components/common";
 import { Transaction } from "@/lib/types";
-import { getPeriodStats } from "@/lib/logic/healthScore";
+import { getPeriodStats, percentChange } from "@/lib/logic/healthScore";
 import { cn } from "@/lib/utils/cn";
 import { useCurrency } from "@/lib/hooks/useCurrency";
 import { dateFromDayNumber, dayNumberOfDate, formatDate, parseDate } from "@/lib/utils/dateUtils";
@@ -37,11 +37,9 @@ const PeriodComparison: React.FC<IProps> = ({ transactions, dateRange }) => {
     const currentStats = getPeriodStats(transactions, dateRange.start, dateRange.end);
     const prevStats = getPeriodStats(transactions, prevStartStr, prevEndStr);
 
-    // Calculate percentage changes
-    const calculateChange = (current: number, prev: number) => {
-      if (prev === 0) return current > 0 ? 100 : 0;
-      return ((current - prev) / prev) * 100;
-    };
+    // Percent changes are measured against |previous| (a worsening negative net flow is a drop, not
+    // a rise); with no baseline (previous 0) the change is "new" (null), not an invented number.
+    const calculateChange = (current: number, prev: number) => percentChange(current, prev);
 
     return {
       current: currentStats,
@@ -55,10 +53,16 @@ const PeriodComparison: React.FC<IProps> = ({ transactions, dateRange }) => {
     };
   }, [transactions, dateRange]);
 
-  const renderChange = (percent: number, type: "income" | "expense" | "net") => {
+  const renderChange = (
+    percent: number | null,
+    type: "income" | "expense" | "net",
+    current: number
+  ) => {
     if (percent === 0) return <span className="text-gray-500 text-xs">0%</span>;
 
-    const isPositive = percent > 0;
+    // No baseline (previous period was 0): the direction is the sign of the current value, the
+    // size is "new".
+    const isPositive = percent === null ? current > 0 : percent > 0;
 
     // For expenses, increase is bad (red), decrease is good (green)
     // For income/net, increase is good (green), decrease is bad (red)
@@ -78,7 +82,7 @@ const PeriodComparison: React.FC<IProps> = ({ transactions, dateRange }) => {
           size={12}
           className={isGood ? "text-success" : "text-danger"}
         />
-        {Math.abs(percent).toFixed(1)}%
+        {percent === null ? "new" : `${Math.abs(percent).toFixed(1)}%`}
       </span>
     );
   };
@@ -95,7 +99,7 @@ const PeriodComparison: React.FC<IProps> = ({ transactions, dateRange }) => {
         <div className="p-3 bg-gray-800/30 rounded-lg border border-gray-700">
           <div className="flex items-center justify-between mb-1">
             <span className="text-sm text-gray-400">Total Income</span>
-            {renderChange(comparisonData.changes.income, "income")}
+            {renderChange(comparisonData.changes.income, "income", comparisonData.current.income)}
           </div>
           <div className="flex items-baseline justify-between">
             <span className="text-xl font-bold text-success">
@@ -111,7 +115,7 @@ const PeriodComparison: React.FC<IProps> = ({ transactions, dateRange }) => {
         <div className="p-3 bg-gray-800/30 rounded-lg border border-gray-700">
           <div className="flex items-center justify-between mb-1">
             <span className="text-sm text-gray-400">Total Expenses</span>
-            {renderChange(comparisonData.changes.expenses, "expense")}
+            {renderChange(comparisonData.changes.expenses, "expense", comparisonData.current.expenses)}
           </div>
           <div className="flex items-baseline justify-between">
             <span className="text-xl font-bold text-danger">
@@ -127,7 +131,7 @@ const PeriodComparison: React.FC<IProps> = ({ transactions, dateRange }) => {
         <div className="p-3 bg-gray-800/30 rounded-lg border border-gray-700">
           <div className="flex items-center justify-between mb-1">
             <span className="text-sm text-gray-400">Net Flow</span>
-            {renderChange(comparisonData.changes.net, "net")}
+            {renderChange(comparisonData.changes.net, "net", comparisonData.current.net)}
           </div>
           <div className="flex items-baseline justify-between">
             <span

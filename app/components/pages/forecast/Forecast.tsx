@@ -22,7 +22,8 @@ import {
   calculateVarianceReport,
   getCategoryBreakdown,
 } from "@/lib/logic/balanceCalculator";
-import { getMonthlyMultiplier, prorateToDateRange } from "@/lib/utils/frequencyUtils";
+import { savingsRatePercent, summarizePeriod } from "@/lib/logic/healthScore";
+import { plannedTotals, totalDebt } from "@/lib/logic/forecasting";
 import { useCurrency } from "@/lib/hooks/useCurrency";
 import {
   LoadingSpinner,
@@ -168,108 +169,40 @@ const Forecast: React.FC = () => {
     return `${start.format("MMM D")} - ${end.format("MMM D, YYYY")}`;
   }, [dateRange]);
 
-  // Calculate ACTUAL metrics from transactions (same logic as dashboard)
+  // Calculate ACTUAL metrics from transactions: the same definition the Dashboard and the Calendar
+  // use (healthScore/periodStats.ts), so a period prints the same income, expenses and net.
   const actualMetrics = useMemo(() => {
-    const { start, end } = dateRangeStr;
-
-    let income = 0;
-    let expenses = 0;
-
-    transactions.forEach((t) => {
-      const date = t.actualDate || t.scheduledDate;
-      if (date >= start && date <= end) {
-        // Skip skipped transactions
-        if (t.status === "skipped") return;
-
-        const amount = t.actualAmount ?? t.projectedAmount;
-
-        if (t.type === "income") {
-          income += amount;
-        } else {
-          expenses += amount;
-        }
-      }
-    });
-
-    const surplus = income - expenses;
-    const savingsRate = income > 0 ? ((income - expenses) / income) * 100 : 0;
+    const period = summarizePeriod(transactions, dateRangeStr.start, dateRangeStr.end);
 
     return {
-      monthlyIncome: income,
-      monthlyExpenses: expenses,
-      monthlySurplus: surplus,
-      savingsRate,
+      monthlyIncome: period.income,
+      monthlyExpenses: period.expenses,
+      monthlySurplus: period.net,
+      savingsRate: savingsRatePercent(period.income, period.expenses),
     };
   }, [transactions, dateRangeStr]);
 
-  // Calculate BUDGETED metrics from income sources and expense rules
-  // Prorated to match the selected date range
-  // Only includes sources/rules that are active within the selected period
+  // BUDGETED metrics are the PLAN of the selected period: every non-skipped row scheduled in it at
+  // its projected amount (the same plan the Projected vs Actual widget shows). Counted from the
+  // occurrences, never estimated as amount x multiplier x days/30, so a 3,000 salary is a 3,000
+  // budget in a 31-day month and a plan that is met exactly shows no variance.
   const budgetedMetrics = useMemo(() => {
-    const { start, end } = dateRangeStr;
-
-    // Helper to check if a source/rule overlaps with the selected date range
-    const isWithinDateRange = (sourceStart: string, sourceEnd?: string): boolean => {
-      // Source starts after the selected range ends
-      if (sourceStart > end) return false;
-      // Source ends before the selected range starts
-      if (sourceEnd && sourceEnd < start) return false;
-      return true;
-    };
-
-    // Filter to active AND within date range
-    const activeIncome = incomeSources.filter(
-      (s) => s.isActive && isWithinDateRange(s.startDate, s.endDate)
-    );
-    const activeExpenses = expenseRules.filter(
-      (r) => r.isActive && isWithinDateRange(r.startDate, r.endDate)
-    );
-
-    // Calculate monthly equivalent first
-    let monthlyIncome = 0;
-    activeIncome.forEach((s) => {
-      if (s.frequency === "one-time") return; // Skip one-time for recurring projections
-      const multiplier = getMonthlyMultiplier(s.frequency);
-      monthlyIncome += s.amount * multiplier;
-    });
-
-    let monthlyExpenses = 0;
-    activeExpenses.forEach((r) => {
-      if (r.frequency === "one-time") return; // Skip one-time for recurring projections
-
-      // Handle credit card payment strategies
-      let amount = r.amount;
-      if (r.creditConfig) {
-        if (r.creditConfig.paymentStrategy === "fixed" && r.creditConfig.fixedPaymentAmount) {
-          amount = r.creditConfig.fixedPaymentAmount;
-        } else if (r.creditConfig.paymentStrategy === "full_balance") {
-          amount = r.creditConfig.currentBalance;
-        }
-      }
-
-      const multiplier = getMonthlyMultiplier(r.frequency);
-      monthlyExpenses += amount * multiplier;
-    });
-
-    // Prorate to selected date range
-    const proratedIncome = prorateToDateRange(monthlyIncome, start, end);
-    const proratedExpenses = prorateToDateRange(monthlyExpenses, start, end);
-    const surplus = proratedIncome - proratedExpenses;
-    const savingsRate = proratedIncome > 0 ? (surplus / proratedIncome) * 100 : 0;
+    const plan = plannedTotals(transactions, dateRangeStr.start, dateRangeStr.end);
 
     return {
-      monthlyIncome: proratedIncome,
-      monthlyExpenses: proratedExpenses,
-      monthlySurplus: surplus,
-      savingsRate,
+      monthlyIncome: plan.income,
+      monthlyExpenses: plan.expenses,
+      monthlySurplus: plan.net,
+      savingsRate: savingsRatePercent(plan.income, plan.expenses),
     };
-  }, [incomeSources, expenseRules, dateRangeStr]);
+  }, [transactions, dateRangeStr]);
 
   // Calculate financial metrics for MetricsGrid
   const metrics = useMemo(() => {
     if (!userProfile) return null;
 
     const balance = userProfile.currentBalance;
+    // One walk, one horizon: the same first negative day as the health score's runway
     const runway = getRunway(balance, transactions);
     const nextCrunch = getNextCrunch(balance, transactions);
 
@@ -293,11 +226,8 @@ const Forecast: React.FC = () => {
     const activeExpenses = expenseRules.filter(
       (r) => r.isActive && isWithinPeriod(r.startDate, r.endDate)
     );
-    let totalDebt = 0;
-    activeExpenses.forEach((r) => {
-      if (r.loanConfig) totalDebt += r.loanConfig.currentBalance;
-      if (r.creditConfig) totalDebt += r.creditConfig.currentBalance;
-    });
+    // Loans, cards AND installment plans (the Expenses page counts them all as debt)
+    const periodDebt = totalDebt(activeExpenses);
 
     return {
       balance,
@@ -310,7 +240,8 @@ const Forecast: React.FC = () => {
       monthlyExpenses: actualMetrics.monthlyExpenses,
       monthlySurplus: actualMetrics.monthlySurplus,
       savingsRate: actualMetrics.savingsRate,
-      totalDebt,
+      totalDebt: periodDebt,
+      hasData: transactions.length > 0,
       billsAtRisk: billCoverage?.upcomingBills.filter((b) => !b.canCover).length || 0,
     };
   }, [userProfile, transactions, expenseRules, billCoverage, dateRangeStr, actualMetrics]);

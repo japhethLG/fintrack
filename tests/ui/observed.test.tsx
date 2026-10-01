@@ -34,9 +34,8 @@ describe("Forecast page", () => {
     ],
   };
 
-  knownDefect(
-    "UI-OBS-01",
-    "Budgeted income for a 31-day month is prorated by days/30, so a $3,000 monthly salary budgets $3,100",
+  it(
+    "UI-OBS-01 — Budgeted income for a 31-day month is prorated by days/30, so a $3,000 monthly salary budgets $3,100",
     async () => {
       // observed: Budgeted income $3,100 and expenses $1,240 (amount x 31/30), shown as a
       // -3.2% variance on a plan that was met exactly. Feb (28 days) would budget $2,800.

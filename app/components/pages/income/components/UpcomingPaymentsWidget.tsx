@@ -4,7 +4,7 @@ import React, { useState, useMemo } from "react";
 import { useFinancial } from "@/contexts/FinancialContext";
 import { Transaction } from "@/lib/types";
 import { Card, Icon, Select, Badge } from "@/components/common";
-import { addDays, formatDate, parseDate } from "@/lib/utils/dateUtils";
+import { addDays, formatDate, getTodayKey, parseDate } from "@/lib/utils/dateUtils";
 import { useCurrency } from "@/lib/hooks/useCurrency";
 import { useModal } from "@/components/modals";
 
@@ -21,9 +21,10 @@ const UpcomingPaymentsWidget: React.FC = () => {
   const [selectedDays, setSelectedDays] = useState("30");
 
   const upcomingIncome = useMemo(() => {
-    const today = formatDate(new Date());
+    // "Next N days" is exactly N calendar days: today .. today + N - 1
+    const today = getTodayKey();
     const daysAhead = parseInt(selectedDays, 10);
-    const endDateStr = formatDate(addDays(new Date(), daysAhead));
+    const endDateStr = formatDate(addDays(parseDate(today), daysAhead - 1));
 
     return transactions
       .filter((t) => {

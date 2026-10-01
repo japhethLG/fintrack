@@ -17,13 +17,22 @@ import IncomeSourceForm from "./components/IncomeSourceForm";
 import { incomeSourceToFormValues } from "./components/IncomeSourceForm/formHelpers";
 import IncomeSourceCard from "./components/IncomeSourceCard";
 import IncomeSourceDetail from "./components/IncomeSourceDetail";
-import { getMonthlyMultiplier, INCOME_FILTER_OPTIONS } from "./constants";
+import { INCOME_FILTER_OPTIONS } from "./constants";
+import { getTodayKey, parseDate } from "@/lib/utils/dateUtils";
+import {
+  annualRecurringTotals,
+  isIncomeSourceCurrent,
+  monthBounds,
+  recurringPeriodTotals,
+} from "@/lib/logic/forecasting";
+import dayjs from "dayjs";
 import UpcomingPaymentsWidget from "./components/UpcomingPaymentsWidget";
 
 const IncomeManager: React.FC = () => {
   const { formatCurrency } = useCurrency();
   const {
     incomeSources,
+    transactions,
     isLoading,
     createIncomeSource,
     editIncomeSource,
@@ -87,15 +96,28 @@ const IncomeManager: React.FC = () => {
     }
   };
 
-  // Calculate totals
-  const activeSources = incomeSources.filter((s) => s.isActive);
+  // Calculate totals by counting OCCURRENCES (no amount x multiplier estimate):
+  // "Active" = switched on and still producing income (an ended source is not active).
+  const today = getTodayKey();
+  const activeSources = incomeSources.filter((s) => isIncomeSourceCurrent(s, today));
 
-  const recurringMonthly = activeSources.reduce((sum, source) => {
-    return sum + source.amount * getMonthlyMultiplier(source.frequency);
-  }, 0);
+  // The recurring income of THIS calendar month: five Fridays are five payments.
+  const month = monthBounds(today);
+  const recurringMonthly = recurringPeriodTotals(
+    transactions,
+    incomeSources,
+    [],
+    month.start,
+    month.end,
+    today
+  ).income;
+  const monthLabel = dayjs(parseDate(today)).format("MMMM YYYY");
 
-  const oneTimeTotal = activeSources
-    .filter((s) => s.frequency === "one-time")
+  // The occurrences of the next 12 months (a daily source is 365 payments, not 12 x 30).
+  const annualRecurring = annualRecurringTotals(incomeSources, [], today).income;
+
+  const oneTimeTotal = incomeSources
+    .filter((s) => s.isActive && s.frequency === "one-time")
     .reduce((sum, source) => sum + source.amount, 0);
 
   if (isLoading) {
@@ -140,12 +162,14 @@ const IncomeManager: React.FC = () => {
             <p className="text-xl lg:text-3xl font-bold text-success">
               {formatCurrency(recurringMonthly, { maximumFractionDigits: 0 })}
             </p>
+            <p className="text-[10px] lg:text-xs text-gray-500 mt-1">Scheduled for {monthLabel}</p>
           </Card>
           <Card padding="md">
             <p className="text-gray-400 text-xs lg:text-sm mb-1">Annual Projection</p>
             <p className="text-xl lg:text-3xl font-bold text-success">
-              {formatCurrency(recurringMonthly * 12, { maximumFractionDigits: 0 })}
+              {formatCurrency(annualRecurring, { maximumFractionDigits: 0 })}
             </p>
+            <p className="text-[10px] lg:text-xs text-gray-500 mt-1">Next 12 months</p>
           </Card>
           <Card padding="md">
             <p className="text-gray-400 text-xs lg:text-sm mb-1">One-time Income</p>

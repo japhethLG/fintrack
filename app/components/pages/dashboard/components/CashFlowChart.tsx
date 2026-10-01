@@ -13,11 +13,14 @@ import {
 import { Card, Icon } from "@/components/common";
 import { useCurrency } from "@/lib/hooks/useCurrency";
 import { cn } from "@/lib/utils/cn";
-import { formatDate } from "@/lib/utils/dateUtils";
+import { getTodayKey } from "@/lib/utils/dateUtils";
 
 interface ChartDataPoint {
   date: string;
   day: number;
+  /** Balance at the START of this day (before the day's own activity). */
+  opening: number;
+  /** Balance at the END of this day. */
   balance: number;
   label: string;
 }
@@ -67,7 +70,9 @@ const CashFlowChart: React.FC<IProps> = ({ data }) => {
       return { openingBalance: null, closingBalance: null, change: null, changePercent: null };
     }
 
-    const opening = data[0].balance;
+    // The period OPENS with the first day's opening balance (its own activity is part of the
+    // period's change) and CLOSES with the last day's closing balance.
+    const opening = data[0].opening;
     const closing = data[data.length - 1].balance;
     const diff = closing - opening;
     const percent = opening !== 0 ? ((diff / Math.abs(opening)) * 100).toFixed(1) : null;
@@ -108,7 +113,7 @@ const CashFlowChart: React.FC<IProps> = ({ data }) => {
 
   // Find today's label by matching the date
   const todayLabel = useMemo(() => {
-    const today = formatDate(new Date());
+    const today = getTodayKey();
     const todayData = data.find((d) => d.date === today);
     return todayData?.label || null;
   }, [data]);

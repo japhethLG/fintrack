@@ -17,13 +17,22 @@ import ExpenseRuleForm from "./components/ExpenseRuleForm";
 import { expenseRuleToFormValues } from "./components/ExpenseRuleForm/formHelpers";
 import ExpenseRuleCard from "./components/ExpenseRuleCard";
 import ExpenseRuleDetail from "./components/ExpenseRuleDetail";
-import { EXPENSE_FILTER_OPTIONS, getMonthlyExpenseMultiplier } from "./constants";
+import { EXPENSE_FILTER_OPTIONS } from "./constants";
+import { getTodayKey, parseDate } from "@/lib/utils/dateUtils";
+import {
+  isExpenseRuleCurrent,
+  monthBounds,
+  recurringPeriodTotals,
+  totalDebt,
+} from "@/lib/logic/forecasting";
+import dayjs from "dayjs";
 import UpcomingBillsWidget from "./components/UpcomingBillsWidget";
 
 const ExpenseManager: React.FC = () => {
   const { formatCurrency } = useCurrency();
   const {
     expenseRules,
+    transactions,
     isLoading,
     createExpenseRule,
     editExpenseRule,
@@ -96,36 +105,29 @@ const ExpenseManager: React.FC = () => {
     }
   };
 
-  // Calculate totals
-  const activeRules = expenseRules.filter((r) => r.isActive);
+  // Calculate totals by counting OCCURRENCES (no amount x multiplier estimate):
+  // "Active" = switched on and still producing bills (an ended rule, a repaid loan, a settled card
+  // and a fully paid installment plan are not active).
+  const today = getTodayKey();
+  const activeRules = expenseRules.filter((r) => isExpenseRuleCurrent(r, today));
 
-  const recurringMonthly = activeRules.reduce((sum, rule) => {
-    // For credit cards with fixed payment strategy, use the fixed payment amount
-    let amount = rule.amount;
-    if (rule.creditConfig) {
-      if (rule.creditConfig.paymentStrategy === "fixed" && rule.creditConfig.fixedPaymentAmount) {
-        amount = rule.creditConfig.fixedPaymentAmount;
-      } else if (rule.creditConfig.paymentStrategy === "full_balance") {
-        amount = rule.creditConfig.currentBalance;
-      }
-    }
-    return sum + amount * getMonthlyExpenseMultiplier(rule.frequency);
-  }, 0);
+  // The recurring bills of THIS calendar month (loan EMI, card payments, installments included).
+  const month = monthBounds(today);
+  const recurringMonthly = recurringPeriodTotals(
+    transactions,
+    [],
+    expenseRules,
+    month.start,
+    month.end,
+    today
+  ).expenses;
+  const monthLabel = dayjs(parseDate(today)).format("MMMM YYYY");
 
   const oneTimeTotal = activeRules
     .filter((r) => r.frequency === "one-time")
     .reduce((sum, rule) => sum + rule.amount, 0);
 
-  const totalDebt = activeRules.reduce((sum, rule) => {
-    if (rule.loanConfig) return sum + rule.loanConfig.currentBalance;
-    if (rule.creditConfig) return sum + rule.creditConfig.currentBalance;
-    if (rule.installmentConfig) {
-      const remaining =
-        rule.installmentConfig.installmentCount - rule.installmentConfig.installmentsPaid;
-      return sum + remaining * rule.installmentConfig.installmentAmount;
-    }
-    return sum;
-  }, 0);
+  const debtOwed = totalDebt(expenseRules);
 
   if (isLoading) {
     return (
@@ -169,6 +171,7 @@ const ExpenseManager: React.FC = () => {
             <p className="text-lg lg:text-3xl font-bold text-danger">
               {formatCurrency(recurringMonthly, { maximumFractionDigits: 0 })}
             </p>
+            <p className="text-[10px] lg:text-xs text-gray-500 mt-1">Scheduled for {monthLabel}</p>
           </Card>
           <Card padding="md">
             <p className="text-gray-400 text-xs lg:text-sm mb-1">One-time</p>
@@ -179,7 +182,7 @@ const ExpenseManager: React.FC = () => {
           <Card padding="md">
             <p className="text-gray-400 text-xs lg:text-sm mb-1">Total Debt</p>
             <p className="text-lg lg:text-3xl font-bold text-danger">
-              {formatCurrency(totalDebt, { maximumFractionDigits: 0 })}
+              {formatCurrency(debtOwed, { maximumFractionDigits: 0 })}
             </p>
           </Card>
           <Card padding="md">

@@ -44,8 +44,9 @@ describe("mutation: complete a projected bill with a different actual (Electrici
     expect(within(kpi(m)).getByText("4 completed, 6 projected")).toBeInTheDocument();
     // Projected vs Actual: actual 1,500.95 + 95 = 1,595.95 ; the plan is unchanged 2,929.8817
     expect(amounts(card(m.page("dashboard"), "Projected vs Actual"))).toEqual([3_120, 5_050, 1_595.95, 2_929.88]);
-    // Upcoming (14 days): the completed bill leaves the list: expenses 1,429.8817 - 90 = 1,339.8817; net 660.1183
-    expect(amounts(card(m.page("dashboard"), /Upcoming Activity/)).slice(0, 3)).toEqual([2_000, -1_339.88, 660]);
+    // Upcoming (14 days: Mar 16 .. Mar 29, so no Mar 30 payroll): the completed bill leaves the list:
+    // expenses 1,429.8817 - 90 = 1,339.8817; net -1,339.8817 prints as -$1,340
+    expect(amounts(card(m.page("dashboard"), /Upcoming Activity/)).slice(0, 3)).toEqual([0, -1_339.88, -1_340]);
     // Calendar tiles (whole dollars) and the completed counter 6 -> 7 of 14
     const cal = m.page("calendar");
     expect(money(cal, "Expenses", { occurrence: 0 })).toBe(-2_936);
@@ -56,12 +57,13 @@ describe("mutation: complete a projected bill with a different actual (Electrici
     const cmp = card(m.page("forecast"), /Budgeted vs Actual/);
     expect(money(cmp, "Actual", { occurrence: 1 })).toBe(2_935.83);
     expect(money(cmp, "Actual", { occurrence: 2 })).toBe(2_184.17);
-    // Expenses page: upcoming 30-day total loses the 90; the recurring estimate (rule-based) is unchanged
+    // Expenses page: upcoming 30-day total loses the 90; the month's recurring occurrences take the
+    // actual 95 instead of 90: 2,680.8317 - 90 + 95 = 2,685.8317 -> $2,686
     expect(money(card(m.page("expenses"), "Upcoming Bills"), "Total Due")).toBe(2_839.88);
-    expect(money(m.page("expenses"), "Monthly Recurring")).toBe(2_730);
+    expect(money(m.page("expenses"), "Monthly Recurring")).toBe(2_686);
   });
 
-  it("the Bills tab projected balance follows: 13,874.05 + 2,000 - 1,339.8817 = 14,534.17", async () => {
+  it("the Bills tab projected balance follows: 13,874.05 - 1,339.8817 = 12,534.17 (14-day window, no Mar 30 payroll)", async () => {
     const m = await mount();
     const power = findTx(m, "Electricity", "2026-03-18");
     await act(async () => {
@@ -70,7 +72,7 @@ describe("mutation: complete a projected bill with a different actual (Electrici
     await m.app.settle();
     await openTab(m.app, m.page("dashboard"), /Bills/);
     const upc = card(m.page("dashboard"), /Upcoming Activity/);
-    expect(money(upc, "Projected Balance")).toBe(14_534.17);
+    expect(money(upc, "Projected Balance")).toBe(12_534.17);
     expect(within(upc).queryByText("Electricity")).toBeNull();
   });
 });
@@ -102,17 +104,19 @@ describe("mutation: add and then deactivate a one-time income (Side gig 400 on M
     expect(money(kpi(m), "Total Income")).toBe(5_520);
     expect(money(kpi(m), "Net Flow")).toBe(2_589.17);
     expect(within(kpi(m)).getByText("3 completed, 2 projected")).toBeInTheDocument();
-    // Upcoming 14d income 2,000 + 400
-    expect(amounts(card(m.page("dashboard"), /Upcoming Activity/)).slice(0, 3)).toEqual([2_400, -1_429.88, 970]);
+    // Upcoming 14d (Mar 16 .. Mar 29): the 400 side gig on Mar 25 is in, the Mar 30 payroll is out:
+    // income 400, expenses 1,429.8817, net -1,029.8817 prints as -$1,030
+    expect(amounts(card(m.page("dashboard"), /Upcoming Activity/)).slice(0, 3)).toEqual([400, -1_429.88, -1_030]);
     // Recurring summary: one-time income adds a source but no monthly amount
     const rec = card(m.page("dashboard"), "Recurring Summary");
     expect(within(rec).getByText("3 sources")).toBeInTheDocument();
-    expect(money(rec, "Monthly Income")).toBe(4_750);
+    expect(money(rec, "Monthly Income")).toBe(4_820); // March recurring rows: 2,000 + 2,000 + 820
     // Income page
     expect(stat(m.page("income"), "Active Sources")).toBe("3");
     expect(money(m.page("income"), "One-time Income")).toBe(400);
-    expect(money(m.page("income"), "Monthly Recurring")).toBe(4_750);
-    expect(money(card(m.page("income"), "Upcoming Payments"), "Total Expected")).toBe(5_150);
+    expect(money(m.page("income"), "Monthly Recurring")).toBe(4_820);
+    // 30 days (Mar 16 .. Apr 14): Payroll Mar 30 2,000 + Freelance Apr 10 750 + side gig 400 = 3,150
+    expect(money(card(m.page("income"), "Upcoming Payments"), "Total Expected")).toBe(3_150);
     // Calendar + Forecast
     expect(money(m.page("calendar"), "Income", { occurrence: 0 })).toBe(5_520);
     expect(money(m.page("calendar"), "Net Change", { occurrence: 0 })).toBe(2_589);
@@ -127,7 +131,7 @@ describe("mutation: add and then deactivate a one-time income (Side gig 400 on M
     expect(money(kpi(m), "Net Flow")).toBe(2_189.17);
     expect(stat(m.page("income"), "Active Sources")).toBe("2");
     expect(money(m.page("income"), "One-time Income")).toBe(0);
-    expect(money(card(m.page("income"), "Upcoming Payments"), "Total Expected")).toBe(4_750);
+    expect(money(card(m.page("income"), "Upcoming Payments"), "Total Expected")).toBe(2_750);
     expect(within(card(m.page("dashboard"), "Recurring Summary")).getByText("2 sources")).toBeInTheDocument();
     expect(money(m.page("calendar"), "Income", { occurrence: 0 })).toBe(5_120);
     expect(money(card(m.page("forecast"), /Budgeted vs Actual/), "Actual", { occurrence: 0 })).toBe(5_120);
@@ -135,7 +139,7 @@ describe("mutation: add and then deactivate a one-time income (Side gig 400 on M
 });
 
 describe("mutation: add a weekly expense rule (Gym 40 every Saturday from Mar 21)", () => {
-  it("adds Mar 21 + Mar 28 to March and re-estimates the monthly recurring total", async () => {
+  it("adds Mar 21 + Mar 28 to March and re-counts the month's recurring total", async () => {
     const m = await mount();
     await act(async () => {
       await m.app.financial().createExpenseRule({
@@ -158,10 +162,10 @@ describe("mutation: add a weekly expense rule (Gym 40 every Saturday from Mar 21
     expect(money(kpi(m), "Net Flow")).toBe(2_109.17);
     expect(within(kpi(m)).getByText("3 completed, 9 projected")).toBeInTheDocument();
     expect(money(m.page("calendar"), "Expenses", { occurrence: 0 })).toBe(-3_011);
-    // recurring: 2,729.88 + 40 * 52/12 (173.33) = 2,903.21
-    expect(money(card(m.page("dashboard"), "Recurring Summary"), "Monthly Expenses")).toBe(2_903);
-    expect(money(card(m.page("dashboard"), "Recurring Summary"), "Net Recurring")).toBe(1_847); // 4,750 - 2,903.21
-    expect(money(m.page("expenses"), "Monthly Recurring")).toBe(2_903);
+    // recurring (occurrences): 2,680.8317 + 2 x 40 (Mar 21, Mar 28) = 2,760.8317 -> $2,761
+    expect(money(card(m.page("dashboard"), "Recurring Summary"), "Monthly Expenses")).toBe(2_761);
+    expect(money(card(m.page("dashboard"), "Recurring Summary"), "Net Recurring")).toBe(2_059); // 4,820 - 2,760.8317 = 2,059.1683
+    expect(money(m.page("expenses"), "Monthly Recurring")).toBe(2_761);
     expect(stat(m.page("expenses"), "Active Expenses")).toBe("8");
     // Upcoming 30 days: Mar 21, Mar 28, Apr 4, Apr 11 = 4 x 40 more: 2,929.8817 + 160 = 3,089.8817
     expect(money(card(m.page("expenses"), "Upcoming Bills"), "Total Due")).toBe(3_089.88);
@@ -185,7 +189,8 @@ describe("mutation: skip a projected bill (Dentist 250 on Mar 27)", () => {
     // the plan also drops the skipped bill: 2,929.8817 - 250 = 2,679.8817
     expect(amounts(card(m.page("dashboard"), "Projected vs Actual"))).toEqual([3_120, 5_050, 1_500.95, 2_679.88]);
     // Upcoming 14d: 1,429.8817 - 250 = 1,179.8817
-    expect(amounts(card(m.page("dashboard"), /Upcoming Activity/)).slice(0, 2)).toEqual([2_000, -1_179.88]);
+    // (14 days: no Mar 30 payroll, so income 0)
+    expect(amounts(card(m.page("dashboard"), /Upcoming Activity/)).slice(0, 2)).toEqual([0, -1_179.88]);
     // Calendar tiles: expenses 2,681 ; tile 6 completed of 13 (skipped is neither completed nor projected)
     const cal = m.page("calendar");
     expect(money(cal, "Expenses", { occurrence: 0 })).toBe(-2_681);

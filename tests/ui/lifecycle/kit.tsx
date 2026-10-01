@@ -386,7 +386,12 @@ const cellForDay = (cells: HTMLElement[], day: number, inMonth: boolean): HTMLEl
 export async function dragToDate(app: App, txId: string, toIso: string, displayedMonth = "2026-01") {
   const t = merged(app).find((x) => x.id === txId);
   expect(t, `merged tx ${txId}`).toBeTruthy();
-  const fromIso = t!.actualDate || t!.scheduledDate;
+  const ownIso = t!.actualDate || t!.scheduledDate;
+  // D5 (docs/audit/fixes/display-numbers.md): a COMPLETED row dated after today was paid ahead of its
+  // date; the calendar files it on the day it was paid, i.e. today.
+  const now = new Date();
+  const todayIso = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+  const fromIso = t!.status === "completed" && ownIso > todayIso ? todayIso : ownIso;
   const cells = calendarCells();
   expect(cells).toHaveLength(42);
   cells.forEach((c, i) => {

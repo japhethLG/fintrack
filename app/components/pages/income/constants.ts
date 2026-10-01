@@ -72,4 +72,3 @@ export const FREQUENCY_LABELS: Record<string, string> = {
   yearly: "Yearly",
 };
 
-export { getMonthlyMultiplier } from "@/lib/utils/frequencyUtils";

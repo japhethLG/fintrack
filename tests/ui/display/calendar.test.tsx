@@ -85,9 +85,8 @@ describe("Calendar: month view on H1", () => {
     expect(money(cal, "Expenses", { occurrence: 0 })).toBe(-600);
   });
 
-  knownDefect(
-    "UI-DISP-07",
-    "A month's opening balance changes after the user scrolls the calendar (window expansion), so it depends on navigation history",
+  it(
+    "UI-DISP-07 — A month's opening balance changes after the user scrolls the calendar (window expansion), so it depends on navigation history",
     async () => {
       // observed: March opens at $11,450 on first view; after scrolling back to Dec 2025 and forward
       // again it reads $12,350 (the window now contains the Dec history that was previously subtracted
@@ -127,9 +126,8 @@ describe("Calendar: week view on H1 (week of Sun Mar 15 - Sat Mar 21)", () => {
     expect(amounts(card(cal, /Weekly Balance Overview/))[0]).toBe(1_195);
   });
 
-  knownDefect(
-    "UI-DISP-08",
-    "Week view opening/closing balances are short by the pre-window history",
+  it(
+    "UI-DISP-08 — Week view opening/closing balances are short by the pre-window history",
     async () => {
       // observed: Opening $11,069 / Closing $12,264 (900 short).
       const { app, page } = await renderPages(["calendar"], { today: H1_TODAY, seed: h1Seed() });
@@ -168,9 +166,8 @@ describe("Calendar: selecting a day (Fri Mar 20: Car Loan 564.8817 due)", () => 
     expect(money(side, "Income")).toBe(0);
   });
 
-  knownDefect(
-    "UI-DISP-09",
-    "Day panel Opening/Closing carry the same pre-window shortfall",
+  it(
+    "UI-DISP-09 — Day panel Opening/Closing carry the same pre-window shortfall",
     async () => {
       // observed: Opening $12,979 / Closing $12,414.17. correct: 13,969.05 - 90 = 13,879.05 ; - 564.8817 = 13,314.17
       const { cal } = await pick();
@@ -305,9 +302,8 @@ describe("Calendar: negative and low balances", () => {
 });
 
 describe("Calendar: empty and one-time-only states", () => {
-  knownDefect(
-    "UI-DISP-14",
-    "With a starting balance and no transactions the calendar shows '—' for opening and closing instead of the balance",
+  it(
+    "UI-DISP-14 — With a starting balance and no transactions the calendar shows '—' for opening and closing instead of the balance",
     async () => {
       // observed: Opening "—", Closing "—" while Forecast shows Current Balance $5,000.
       const { page } = await renderPages(["calendar", "forecast"], {

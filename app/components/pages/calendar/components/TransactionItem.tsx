@@ -5,6 +5,7 @@ import { Transaction } from "@/lib/types";
 import { Icon, Badge } from "@/components/common";
 import { cn } from "@/lib/utils/cn";
 import { TRANSACTION_STATUS_BADGE_VARIANT } from "@/lib/constants";
+import { isOverdue } from "@/lib/logic/balanceCalculator/openItems";
 
 interface IProps {
   transaction: Transaction;
@@ -14,6 +15,8 @@ interface IProps {
 const TransactionItem: React.FC<IProps> = ({ transaction, onClick }) => {
   const isIncome = transaction.type === "income";
   const isSkipped = transaction.status === "skipped";
+  // Still projected and dated before today: owed (an expense) or late (an income), not yet realized
+  const overdue = isOverdue(transaction);
 
   // Determine colors based on type and skipped status
   const bgColor = isSkipped
@@ -70,10 +73,10 @@ const TransactionItem: React.FC<IProps> = ({ transaction, onClick }) => {
         <div className="flex items-center justify-between gap-2">
           <p className="text-xs text-gray-400 truncate">{transaction.category}</p>
           <Badge
-            variant={TRANSACTION_STATUS_BADGE_VARIANT[transaction.status]}
+            variant={overdue ? "danger" : TRANSACTION_STATUS_BADGE_VARIANT[transaction.status]}
             className="text-xs flex-shrink-0"
           >
-            {transaction.status}
+            {overdue ? "overdue" : transaction.status}
           </Badge>
         </div>
       </div>

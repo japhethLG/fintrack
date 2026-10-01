@@ -9,9 +9,9 @@ import { useModal } from "@/components/modals";
 import UpcomingActivityWidget from "./components/UpcomingActivityWidget";
 import RecurringSummaryWidget from "./components/RecurringSummaryWidget";
 import ProjectedVsActualWidget from "./components/ProjectedVsActualWidget";
-import { getCategoryBreakdown } from "@/lib/logic/balanceCalculator";
-import { formatDate } from "@/lib/utils/dateUtils";
-import { calculateHealthScore } from "@/lib/logic/healthScore";
+import { collectOpenItems, getCategoryBreakdown } from "@/lib/logic/balanceCalculator";
+import { getTodayKey } from "@/lib/utils/dateUtils";
+import { calculateHealthScore, sampleDayOffsets, summarizePeriod } from "@/lib/logic/healthScore";
 import dayjs from "dayjs";
 import { CHART_COLORS, DASHBOARD_PRESETS } from "./constants";
 import KPICards from "./components/KPICards";
@@ -36,8 +36,8 @@ const Dashboard: React.FC = () => {
   // Derived date strings for logic functions
   const dateRangeStr = useMemo(() => {
     return {
-      start: dateRange[0]?.format("YYYY-MM-DD") || formatDate(new Date()),
-      end: dateRange[1]?.format("YYYY-MM-DD") || formatDate(new Date()),
+      start: dateRange[0]?.format("YYYY-MM-DD") || getTodayKey(),
+      end: dateRange[1]?.format("YYYY-MM-DD") || getTodayKey(),
     };
   }, [dateRange]);
 
@@ -48,89 +48,52 @@ const Dashboard: React.FC = () => {
     }
   }, [dateRange, setViewDateRange]);
 
-  // Calculate stats for selected period
-  const periodStats = useMemo(() => {
-    const { start, end } = dateRangeStr;
-
-    let income = 0;
-    let expenses = 0;
-    let completedIncomeCount = 0;
-    let pendingIncomeCount = 0;
-    let skippedIncomeCount = 0;
-    let completedExpenseCount = 0;
-    let pendingExpenseCount = 0;
-    let skippedExpenseCount = 0;
-
-    transactions.forEach((t) => {
-      const date = t.actualDate || t.scheduledDate;
-      if (date >= start && date <= end) {
-        const isPending = t.status === "projected";
-        const isCompleted = t.status === "completed";
-        const isSkipped = t.status === "skipped";
-
-        if (t.type === "income") {
-          if (isCompleted) completedIncomeCount++;
-          if (isPending) pendingIncomeCount++;
-          if (isSkipped) skippedIncomeCount++;
-          // Only add to totals if not skipped
-          if (!isSkipped) {
-            income += t.actualAmount ?? t.projectedAmount;
-          }
-        } else {
-          if (isCompleted) completedExpenseCount++;
-          if (isPending) pendingExpenseCount++;
-          if (isSkipped) skippedExpenseCount++;
-          // Only add to totals if not skipped
-          if (!isSkipped) {
-            expenses += t.actualAmount ?? t.projectedAmount;
-          }
-        }
-      }
-    });
-
-    return {
-      income,
-      expenses,
-      net: income - expenses,
-      completedIncomeCount,
-      pendingIncomeCount,
-      skippedIncomeCount,
-      completedExpenseCount,
-      pendingExpenseCount,
-      skippedExpenseCount,
-    };
-  }, [transactions, dateRangeStr]);
+  // Calculate stats for selected period: the one definition shared with the Calendar, Forecast and
+  // the managers (healthScore/periodStats.ts), so the same month prints the same numbers everywhere.
+  const periodStats = useMemo(
+    () => summarizePeriod(transactions, dateRangeStr.start, dateRangeStr.end),
+    [transactions, dateRangeStr]
+  );
 
   // Cash flow chart data - filtered by date range
   const chartData = useMemo(() => {
-    const data: { date: string; day: number; balance: number; label: string }[] = [];
+    const data: {
+      date: string;
+      day: number;
+      opening: number;
+      balance: number;
+      label: string;
+    }[] = [];
 
     // Iterate through each day in the range
     if (dateRange[0] && dateRange[1]) {
-      let current = dateRange[0].clone();
-      const end = dateRange[1];
+      const start = dateRange[0].startOf("day");
+      const end = dateRange[1].startOf("day");
 
-      // Limit to 90 days to prevent performance issues with large ranges
-      const daysDiff = end.diff(current, "day");
-      const step = daysDiff > 90 ? Math.ceil(daysDiff / 90) : 1;
+      // Sample long ranges down to about 90 points to keep the chart light, but ALWAYS keep the
+      // last day: the closing balance is the end of the range, not the last sampled day.
+      const daysDiff = end.diff(start, "day");
 
-      while (current.isBefore(end) || current.isSame(end, "day")) {
+      sampleDayOffsets(daysDiff).forEach((offset) => {
+        const current = start.add(offset, "day");
         const dateKey = current.format("YYYY-MM-DD");
         const dayBalance = dailyBalances.get(dateKey);
+        // No balance for a day (outside the projected window): leave it out instead of drawing
+        // today's balance there, which would look like a plausible flat line.
+        if (!dayBalance) return;
 
         data.push({
           date: dateKey,
           day: current.date(),
-          balance: dayBalance?.closingBalance ?? (userProfile?.currentBalance || 0),
+          opening: dayBalance.openingBalance,
+          balance: dayBalance.closingBalance,
           label: current.format(daysDiff > 31 ? "MMM D" : "D"),
         });
-
-        current = current.add(step, "day");
-      }
+      });
     }
 
     return data;
-  }, [dailyBalances, userProfile, dateRange]);
+  }, [dailyBalances, dateRange]);
 
   // Category breakdown - filtered by date range (with "Other" aggregation)
   const { expenseCategoryData, incomeCategoryData } = useMemo(() => {
@@ -182,12 +145,12 @@ const Dashboard: React.FC = () => {
   }, [userProfile, transactions, dailyBalances, dateRangeStr]);
 
   // Overdue transactions
-  const overdueTransactions = useMemo(() => {
-    const today = formatDate(new Date());
-    return transactions.filter(
-      (t) => t.scheduledDate < today && t.status !== "completed" && t.status !== "skipped"
-    );
-  }, [transactions]);
+  const overdueTransactions = useMemo(
+    // Same definition as the risk views (balanceCalculator/openItems.ts): still projected, dated
+    // before today, tracked back to the start of the default window.
+    () => collectOpenItems(transactions, getTodayKey()).overdue,
+    [transactions]
+  );
 
   const openTransactionModal = useCallback(
     (transaction: Transaction) => {
