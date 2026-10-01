@@ -67,7 +67,7 @@ test.describe("day-cell context menu", () => {
     await expect(monthCell(page, "2026-03", "2026-03-20").getByText("Dentist")).toBeVisible();
     const [t] = await storedTxns(page);
     expect([t.name, t.scheduledDate, t.status, t.sourceType, t.projectedAmount, t.type]).toEqual(["Dentist", "2026-03-20", "projected", "manual", 80, "expense"]);
-    await expect(summaryTile(page, "Expenses")).toHaveText("-$280"); // rent 200 + 80
+    await expect(summaryTile(page, "Expenses")).toHaveText("-$280.00"); // rent 200 + 80
   });
 });
 
@@ -105,7 +105,7 @@ test.describe("transaction dialog", () => {
     const [t] = await storedTxns(page);
     expect([t.status, t.occurrenceId]).toEqual(["skipped", "payday_2026-03"]);
     expect(await userBalance(page)).toBe(1000);
-    await expect(summaryTile(page, "Income")).toHaveText("+$0");
+    await expect(summaryTile(page, "Income")).toHaveText("+$0.00");
     await expect(monthCell(page, "2026-03", "2026-03-13").getByText("Payday")).toBeVisible();
     await selectDay(monthCell(page, "2026-03", "2026-03-13"));
     await expect(sidebar(page)).toContainText("skipped");
@@ -117,7 +117,7 @@ test.describe("transaction dialog", () => {
     await selectDay(monthCell(page, "2026-03", "2026-03-13"));
     await sidebar(page).getByText("Payday", { exact: true }).click();
     await txnDialog(page).getByLabel("Actual Amount").fill("450");
-    await expect(txnDialog(page)).toContainText("-$50 variance");
+    await expect(txnDialog(page)).toContainText("-$50.00 variance");
     await txnDialog(page).getByRole("button", { name: "Mark Complete" }).click();
     await expect(txnDialog(page)).toBeHidden();
     const [t] = await storedTxns(page);

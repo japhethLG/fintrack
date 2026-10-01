@@ -93,7 +93,7 @@ test.describe("drag a projected occurrence to another day", () => {
     expect(await storedTxns(page)).toEqual([]);
     expect(await userBalance(page)).toBe(1000);
     // Totals for the month are unchanged by a move inside the month.
-    await expect(summaryTile(page, "Expenses")).toHaveText("-$200");
+    await expect(summaryTile(page, "Expenses")).toHaveText("-$200.00");
     await expect(periodFigure(page, "Closing")).toHaveText("$1,300");
     // No drag side effect: dialog not opened, nothing selected.
     await expect(txnDialog(page)).toBeHidden();
@@ -110,7 +110,7 @@ test.describe("drag a projected occurrence to another day", () => {
     await expect(monthCell(page, "2026-03", "2026-03-13")).toContainText("$1,000");
     await expect(monthCell(page, "2026-03", "2026-03-18")).toContainText("$800");
     await expect(monthCell(page, "2026-03", "2026-03-25")).toContainText("$1,300");
-    await expect(summaryTile(page, "Income")).toHaveText("+$500");
+    await expect(summaryTile(page, "Income")).toHaveText("+$500.00");
     expect(await overridesOf(page, "income_sources", "payday")).toEqual({
       ...OTHER_OVERRIDES,
       "payday_2026-03": { scheduledDate: "2026-03-25" },
@@ -177,7 +177,7 @@ test.describe("drag a projected occurrence to another day", () => {
     await boot(page);
     await dragTo(page, monthCell(page, "2026-03", "2026-03-13").getByText("Payday"), monthCell(page, "2026-03", "2026-04-01"));
     // Gone from March (March income is now 0; chips are not drawn on trailing cells).
-    await expect(summaryTile(page, "Income")).toHaveText("+$0");
+    await expect(summaryTile(page, "Income")).toHaveText("+$0.00");
     expect(await daysShowing(page, "2026-03", "Payday")).toEqual([]);
     // March closing = 1000 - 200.
     await expect(periodFigure(page, "Closing")).toHaveText("$800");
@@ -190,7 +190,7 @@ test.describe("drag a projected occurrence to another day", () => {
     await expect(periodFigure(page, "Opening")).toHaveText("$800");
     // 800 + 500 + 777 - 200
     await expect(periodFigure(page, "Closing")).toHaveText("$1,877");
-    await expect(summaryTile(page, "Income")).toHaveText("+$1,277");
+    await expect(summaryTile(page, "Income")).toHaveText("+$1,277.00");
     await page.reload();
     await navigateToMonth(page, "2026-03", "2026-04");
     expect(await daysShowing(page, "2026-04", "Payday")).toEqual(["2026-04-01", "2026-04-17"]);
@@ -201,12 +201,12 @@ test.describe("drag a projected occurrence to another day", () => {
     await navigateToMonth(page, "2026-03", "2026-04");
     // April grid starts Wed 4/1, so 3/29..3/31 are the leading (previous-month) cells. Drop Rent 4/18 on 3/31.
     await dragTo(page, monthCell(page, "2026-04", "2026-04-18").getByText("Rent"), monthCell(page, "2026-04", "2026-03-31"));
-    await expect(summaryTile(page, "Expenses")).toHaveText("-$0");
+    await expect(summaryTile(page, "Expenses")).toHaveText("$0.00");
     expect((await overridesOf(page, "expense_rules", "rent"))?.["rent_2026-04"]).toEqual({ scheduledDate: "2026-03-31" });
     await navigateToMonth(page, "2026-04", "2026-03");
     // March now has Rent on 3/18 (native) and 3/31 (April's rent).
     expect(await daysShowing(page, "2026-03", "Rent")).toEqual(["2026-03-18", "2026-03-31"]);
-    await expect(summaryTile(page, "Expenses")).toHaveText("-$400");
+    await expect(summaryTile(page, "Expenses")).toHaveText("-$400.00");
   });
 
   test("moving one occurrence never touches other occurrences' overrides (April/May stay exactly as seeded)", async ({ page }) => {
@@ -225,7 +225,7 @@ test.describe("drag a projected occurrence to another day", () => {
       incomeSources: [payday({ occurrenceOverrides: { ...OTHER_OVERRIDES, "payday_2026-03": { amount: 650, notes: "bonus" } } })],
     });
     // Precondition: the overridden amount is what the calendar shows before the drag (income tile = 650).
-    await expect(summaryTile(page, "Income")).toHaveText("+$650");
+    await expect(summaryTile(page, "Income")).toHaveText("+$650.00");
     await dragTo(page, monthCell(page, "2026-03", "2026-03-13").getByText("Payday"), monthCell(page, "2026-03", "2026-03-24"));
     await expect(monthCell(page, "2026-03", "2026-03-24").getByText("Payday")).toBeVisible();
     expect((await overridesOf(page, "income_sources", "payday"))?.["payday_2026-03"]).toEqual({
@@ -233,7 +233,7 @@ test.describe("drag a projected occurrence to another day", () => {
       amount: 650,
       notes: "bonus",
     });
-    await expect(summaryTile(page, "Income")).toHaveText("+$650");
+    await expect(summaryTile(page, "Income")).toHaveText("+$650.00");
   });
 });
 
@@ -377,7 +377,7 @@ test.describe("complete and revert a rescheduled occurrence", () => {
   test("an occurrence moved into the next month keeps its own identity when completed there", async ({ page }) => {
     await boot(page);
     await dragTo(page, monthCell(page, "2026-03", "2026-03-13").getByText("Payday"), monthCell(page, "2026-03", "2026-04-01"));
-    await expect(summaryTile(page, "Income")).toHaveText("+$0");
+    await expect(summaryTile(page, "Income")).toHaveText("+$0.00");
     await navigateToMonth(page, "2026-03", "2026-04");
     await openTxnFromCell(page, monthCell(page, "2026-04", "2026-04-01"), "Payday");
     await completeInDialog(page);

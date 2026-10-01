@@ -37,10 +37,10 @@ const cell = (page: import("@playwright/test").Page, day: number) =>
 
 test.describe("month-boundary paydays land on the right calendar day (all zones)", () => {
   const scenarios = [
-    { name: "Mar 31 23:30 local", ymd: "2026-03-31", hhmm: "23:30", today: 31, month: "March 2026", days: [1, 31], nextMonth: "April 2026", nextDays: [1, 30], income: "+$2,000" },
-    { name: "Apr 1 00:30 local", ymd: "2026-04-01", hhmm: "00:30", today: 1, month: "April 2026", days: [1, 30], nextMonth: "May 2026", nextDays: [1, 31], income: "+$2,000" },
-    { name: "Feb 28 23:30 local", ymd: "2026-02-28", hhmm: "23:30", today: 28, month: "February 2026", days: [1, 28], nextMonth: "March 2026", nextDays: [1, 31], income: "+$2,000" },
-    { name: "Mar 1 00:30 local", ymd: "2026-03-01", hhmm: "00:30", today: 1, month: "March 2026", days: [1, 31], nextMonth: "April 2026", nextDays: [1, 30], income: "+$2,000" },
+    { name: "Mar 31 23:30 local", ymd: "2026-03-31", hhmm: "23:30", today: 31, month: "March 2026", days: [1, 31], nextMonth: "April 2026", nextDays: [1, 30], income: "+$2,000.00" },
+    { name: "Apr 1 00:30 local", ymd: "2026-04-01", hhmm: "00:30", today: 1, month: "April 2026", days: [1, 30], nextMonth: "May 2026", nextDays: [1, 31], income: "+$2,000.00" },
+    { name: "Feb 28 23:30 local", ymd: "2026-02-28", hhmm: "23:30", today: 28, month: "February 2026", days: [1, 28], nextMonth: "March 2026", nextDays: [1, 31], income: "+$2,000.00" },
+    { name: "Mar 1 00:30 local", ymd: "2026-03-01", hhmm: "00:30", today: 1, month: "March 2026", days: [1, 31], nextMonth: "April 2026", nextDays: [1, 30], income: "+$2,000.00" },
   ];
   for (const s of scenarios) {
     test(`${s.name}: payday chips, month totals and today marker`, async ({ page }, testInfo) => {
@@ -59,7 +59,7 @@ test.describe("month-boundary paydays land on the right calendar day (all zones)
       await expect(cell(page, 15)).not.toContainText("Acme Payroll");
       // month totals: 2 paydays = +$2,000 ; 1 rent = -$500 (Mon summary card)
       await expect(page.getByText("Income", { exact: true }).first().locator("xpath=following-sibling::p")).toHaveText(s.income);
-      await expect(page.getByText("Expenses", { exact: true }).first().locator("xpath=following-sibling::p")).toHaveText("-$500");
+      await expect(page.getByText("Expenses", { exact: true }).first().locator("xpath=following-sibling::p")).toHaveText("-$500.00");
       // next month
       await S.calendarShowMonth(page, s.nextMonth);
       for (const d of s.nextDays) await expect(cell(page, d), `day ${d} of ${s.nextMonth}`).toContainText("Acme Payroll");
@@ -70,7 +70,7 @@ test.describe("month-boundary paydays land on the right calendar day (all zones)
     await at(page, tzOf(testInfo), "2026-03-31", "23:30");
     await seedAndLogin(page, household());
     await expect(page.getByText("Financial overview for Mar 1 - Mar 31, 2026")).toBeVisible();
-    await expect(page.getByText("+$2,000.00")).toBeVisible();
+    await expect(page.getByText("+$2,000.00").first()).toBeVisible();
     await expect(page.getByText("-$500.00").first()).toBeVisible();
   });
 });
@@ -140,8 +140,8 @@ test.describe("date labels and buckets (America/New_York shows the previous day)
     const card = page;
     // previous 31 days: payroll Jan 31 + Feb 1 + Feb 28 = 3,000 ; rent Feb 1 = 500
     await expect(card.getByText("vs Jan 29 - Feb 28")).toBeVisible();
-    await expect(card.getByText("was $3,000", { exact: true })).toBeVisible();
-    await expect(card.getByText("was $500", { exact: true }).first()).toBeVisible();
+    await expect(card.getByText("was $3,000.00", { exact: true })).toBeVisible();
+    await expect(card.getByText("was $500.00", { exact: true }).first()).toBeVisible();
   });
 
   test("Income rule detail shows Start Date 1/1/2026", async ({ page }, testInfo) => {

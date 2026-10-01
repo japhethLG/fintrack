@@ -53,9 +53,9 @@ test.describe("new user onboarding journey", () => {
     // --- every page, day 0 ------------------------------------------------
     await S.gotoPage(page, "Dashboard");
     const main = page.locator("main");
-    await expect(main.getByText("+₱4,000.00")).toBeVisible(); // Period Summary: Total Income (Mar 15 + Mar 30)
+    await expect(main.getByText("+₱4,000.00").first()).toBeVisible(); // Period Summary: Total Income (Mar 15 + Mar 30)
     await expect(main.getByText("-₱3,016.19").first()).toBeVisible(); // Total Expenses (see header)
-    await expect(main.getByText("+₱983.81")).toBeVisible(); // Net Flow 4,000 - 3,016.19
+    await expect(main.getByText("+₱983.81").first()).toBeVisible(); // Net Flow 4,000 - 3,016.19
     await S.gotoPage(page, "Financial Calendar");
     await expect(main.getByText("Transactions").locator("xpath=following-sibling::p")).toContainText("0"); // 0 completed / 9
     await expect(main.getByText("/ 9")).toBeVisible(); // 2 payroll + rent + 3 groceries + loan + visa + phone

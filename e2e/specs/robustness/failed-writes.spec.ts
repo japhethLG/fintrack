@@ -16,7 +16,6 @@ import {
   transaction,
   completedTransaction,
   readCollection,
-  knownDefect,
   setFault,
   COLLECTIONS,
 } from "../../index";
@@ -147,7 +146,6 @@ test.describe("rules, balance and reset", () => {
   });
 
   test("delete a rule: a rejected write must be reported (and the rule must remain)", async ({ page }) => {
-    knownDefect("E2E-ROB-04", "rejected delete only produces an unhandled promise rejection; no message, confirm buttons stay");
     await seedAndLogin(page, { user: userProfile(), expenseRules: [fixedExpense({ id: "r1", name: "Gym" })] }, { path: "/expenses" });
     await page.getByRole("heading", { name: "Gym" }).first().click();
     await setFault(page, { code: "permission-denied", collections: [COLLECTIONS.expenseRules] });
@@ -158,7 +156,6 @@ test.describe("rules, balance and reset", () => {
   });
 
   test("deactivate a rule: a rejected write must be reported", async ({ page }) => {
-    knownDefect("E2E-ROB-04", "rejected deactivate is an unhandled rejection; no message shown");
     await seedAndLogin(page, { user: userProfile(), expenseRules: [fixedExpense({ id: "r1", name: "Gym" })] }, { path: "/expenses" });
     await page.getByRole("heading", { name: "Gym" }).first().click();
     await setFault(page, { code: "unavailable", collections: [COLLECTIONS.expenseRules], times: 1 });

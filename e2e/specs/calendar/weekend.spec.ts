@@ -56,7 +56,7 @@ test.describe("semi-monthly [15,30], weekend 'after' (Sun 3/15 -> Mon 3/16, Mon 
   test("both paydays are drawn once, on the adjusted dates, and counted once each", async ({ page }) => {
     await boot(page, semi());
     expect(await daysShowing(page, "2026-03", "Semi")).toEqual(["2026-03-16", "2026-03-30"]);
-    await expect(summaryTile(page, "Income")).toHaveText("+$200");
+    await expect(summaryTile(page, "Income")).toHaveText("+$200.00");
     await expect(periodFigure(page, "Opening")).toHaveText("$1,000");
     await expect(periodFigure(page, "Closing")).toHaveText("$1,200");
     await expect(summaryTile(page, "Transactions")).toHaveText("0 / 2");
@@ -144,7 +144,7 @@ test.describe("daily, weekend 'after' (daily rules ignore the weekend setting: e
   test("every day carries exactly one payment, weekend included, and totals add up", async ({ page }) => {
     await boot(page, dailyAfter());
     // 3/11 .. 3/31 = 21 days = 21 payments of 10, one per day (weekend days included)
-    await expect(summaryTile(page, "Income")).toHaveText("+$210");
+    await expect(summaryTile(page, "Income")).toHaveText("+$210.00");
     await expect(summaryTile(page, "Transactions")).toHaveText("0 / 21");
     for (const day of ["2026-03-14", "2026-03-15", "2026-03-16"]) {
       expect(await monthChipNames(monthCell(page, "2026-03", day)), day).toEqual(["Daily"]);
