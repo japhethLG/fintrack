@@ -5,6 +5,7 @@ import React, {
   useContext,
   useState,
   useEffect,
+  useCallback,
   useMemo,
   useRef,
   ReactNode,
@@ -18,6 +19,7 @@ import { useViewDateRange } from "./hooks/useViewDateRange";
 import { useFinancialSubscriptions } from "./hooks/useFinancialSubscriptions";
 import { useFinancialActions } from "./hooks/useFinancialActions";
 import { sumLedger } from "@/lib/logic/balanceCalculator/ledgerMath";
+import type { DataIssue, DataIssueKind } from "@/lib/utils/sanitizeData";
 
 // ============================================================================
 // CONTEXT CREATION
@@ -52,6 +54,25 @@ export const FinancialProvider: React.FC<FinancialProviderProps> = ({ children }
   const [expenseRules, setExpenseRules] = useState<ExpenseRule[]>([]);
   const [storedTransactions, setStoredTransactions] = useState<Transaction[]>([]);
   const [alerts, setAlerts] = useState<Alert[]>([]);
+  const [issuesByKind, setIssuesByKind] = useState<Record<DataIssueKind, DataIssue[]>>({
+    income_source: [],
+    expense_rule: [],
+    transaction: [],
+  });
+  const setDataIssues = useCallback((kind: DataIssueKind, issues: DataIssue[]) => {
+    // keep the previous array when nothing changed (no re-render for a clean snapshot)
+    setIssuesByKind((prev) =>
+      prev[kind].length === 0 && issues.length === 0 ? prev : { ...prev, [kind]: issues }
+    );
+  }, []);
+  const dataIssues = useMemo(
+    () => [
+      ...issuesByKind.income_source,
+      ...issuesByKind.expense_rule,
+      ...issuesByKind.transaction,
+    ],
+    [issuesByKind]
+  );
 
   // Refs for use in callbacks (avoids recreating callbacks when these change)
   const incomeSourcesRef = useRef<IncomeSource[]>([]);
@@ -78,6 +99,7 @@ export const FinancialProvider: React.FC<FinancialProviderProps> = ({ children }
     setExpenseRules,
     setStoredTransactions,
     setAlerts,
+    setDataIssues,
     setIsLoading,
     setIsInitialized,
   });
@@ -141,6 +163,7 @@ export const FinancialProvider: React.FC<FinancialProviderProps> = ({ children }
     billCoverage,
     upcomingBills,
     alerts,
+    dataIssues,
     ...actions,
   };
 

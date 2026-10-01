@@ -286,9 +286,8 @@ describe("the same balance must read the same on every screen, in every currency
     expect(settingsCurrentRaw()).toBe(dashboardCurrentRaw());
   }, 30_000);
 
-  knownDefect(
-    "UI-BAL-28",
-    "EUR: Settings prints €1,234,567.50, Dashboard prints €1.234.567,50",
+  it(
+    "UI-BAL-28 — EUR: Settings prints €1,234,567.50, Dashboard prints €1.234.567,50",
     async () => {
       await rendered("EUR");
       expect(settingsCurrentRaw()).toContain("€");
@@ -298,9 +297,8 @@ describe("the same balance must read the same on every screen, in every currency
     30_000
   );
 
-  knownDefect(
-    "UI-BAL-29",
-    "CAD: Settings prints CA$1,234,567.50, Dashboard prints C$1,234,567.50",
+  it(
+    "UI-BAL-29 — CAD: Settings prints CA$1,234,567.50, Dashboard prints C$1,234,567.50",
     async () => {
       await rendered("CAD");
       expect(settingsCurrentRaw()).toContain("$");
@@ -310,9 +308,8 @@ describe("the same balance must read the same on every screen, in every currency
     30_000
   );
 
-  knownDefect(
-    "UI-BAL-30",
-    "INR: Settings groups digits 1,234,567.50, Dashboard groups 12,34,567.50",
+  it(
+    "UI-BAL-30 — INR: Settings groups digits 1,234,567.50, Dashboard groups 12,34,567.50",
     async () => {
       await rendered("INR");
       expect(settingsCurrentRaw()).toContain("₹");
@@ -322,9 +319,8 @@ describe("the same balance must read the same on every screen, in every currency
     30_000
   );
 
-  knownDefect(
-    "UI-BAL-31",
-    "Forecast prints a balance with ONE decimal ($1,234,567.5) where Settings and Dashboard print cents",
+  it(
+    "UI-BAL-31 — Forecast prints a balance with ONE decimal ($1,234,567.5) where Settings and Dashboard print cents",
     async () => {
       // observed: "$1,234,567.5" (minimumFractionDigits 0)
       await rendered("USD");
@@ -350,9 +346,8 @@ describe("the same balance must read the same on every screen, in every currency
 });
 
 describe("hard-coded currency symbols in Settings inputs", () => {
-  knownDefect(
-    "UI-BAL-32",
-    "the Override Current Balance and Set Initial Balance inputs are prefixed with ₱ for a USD user",
+  it(
+    "UI-BAL-32 — the Override Current Balance and Set Initial Balance inputs are prefixed with ₱ for a USD user",
     async () => {
       // observed: prefix "₱" on both (UI-OBS-02 found it on the threshold input only)
       const app = await renderApp({ route: "/settings", today: TODAY, seed: { profile: { preferences: { currency: "USD" } } } });
@@ -364,9 +359,8 @@ describe("hard-coded currency symbols in Settings inputs", () => {
     }
   );
 
-  knownDefect(
-    "UI-BAL-33",
-    "the Set Initial Balance input is prefixed ₱ for a EUR user",
+  it(
+    "UI-BAL-33 — the Set Initial Balance input is prefixed ₱ for a EUR user",
     async () => {
       const app = await renderApp({ route: "/settings", today: TODAY, seed: { profile: { preferences: { currency: "EUR" } } } });
       await app.user.click(screen.getByRole("button", { name: /Update Initial Balance$/ }));
@@ -427,9 +421,8 @@ describe("cents, negative zero and large values on the balance screens", () => {
     60_000
   );
 
-  knownDefect(
-    "UI-BAL-39",
-    "the completion modal's variance line drops the cents: +$0.49 is printed '+$0'",
+  it(
+    "UI-BAL-39 — the completion modal's variance line drops the cents: +$0.49 is printed '+$0'",
     async () => {
       // observed: "+$0 variance from expected" for an actual of 120.49 against 120
       const app = await renderApp({

@@ -6,6 +6,7 @@ import { Icon, Badge } from "@/components/common";
 import { cn } from "@/lib/utils/cn";
 import { TRANSACTION_STATUS_BADGE_VARIANT } from "@/lib/constants";
 import { isOverdue } from "@/lib/logic/balanceCalculator/openItems";
+import { useCurrency } from "@/lib/hooks/useCurrency";
 
 interface IProps {
   transaction: Transaction;
@@ -13,6 +14,7 @@ interface IProps {
 }
 
 const TransactionItem: React.FC<IProps> = ({ transaction, onClick }) => {
+  const { formatCurrencyWithSign } = useCurrency();
   const isIncome = transaction.type === "income";
   const isSkipped = transaction.status === "skipped";
   // Still projected and dated before today: owed (an expense) or late (an income), not yet realized
@@ -64,8 +66,9 @@ const TransactionItem: React.FC<IProps> = ({ transaction, onClick }) => {
             {transaction.name}
           </p>
           <p className={cn("font-bold text-sm whitespace-nowrap flex-shrink-0", amountColor)}>
-            {isIncome ? "+" : "-"}$
-            {(transaction.actualAmount ?? transaction.projectedAmount).toLocaleString()}
+            {formatCurrencyWithSign(
+              (isIncome ? 1 : -1) * (transaction.actualAmount ?? transaction.projectedAmount)
+            )}
           </p>
         </div>
 

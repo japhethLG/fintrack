@@ -13,6 +13,7 @@ import {
   DrawerContent,
   DrawerHeader,
   DrawerTitle,
+  DrawerDescription,
   DrawerClose,
 } from "@/components/common/Drawer";
 import { cn } from "@/lib/utils/cn";
@@ -86,6 +87,7 @@ const MobileNav: React.FC = () => {
                   />
                 </DrawerClose>
               </div>
+              <DrawerDescription className="sr-only">Main navigation</DrawerDescription>
             </DrawerHeader>
 
             {/* Navigation Items */}

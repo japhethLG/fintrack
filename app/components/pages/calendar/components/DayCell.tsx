@@ -22,7 +22,7 @@ interface IProps {
 }
 
 const DayCell: React.FC<IProps> = ({ day, isSelected, onClick, onTransactionClick }) => {
-  const { currencySymbol } = useCurrency();
+  const { formatCurrency } = useCurrency();
   const router = useRouter();
   const { openModal } = useModal();
   const { date, isCurrentMonth, isToday, isPast, dayBalance } = day;
@@ -121,10 +121,7 @@ const DayCell: React.FC<IProps> = ({ day, isSelected, onClick, onTransactionClic
           {/* Balance indicator */}
           {dayBalance && isCurrentMonth && (
             <span className={cn("text-xs font-medium", STATUS_COLORS[dayBalance.status])}>
-              {currencySymbol}
-              {Math.abs(dayBalance.closingBalance).toLocaleString(undefined, {
-                maximumFractionDigits: 0,
-              })}
+              {formatCurrency(dayBalance.closingBalance, { maximumFractionDigits: 0 })}
             </span>
           )}
         </div>

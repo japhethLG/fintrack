@@ -74,7 +74,7 @@ const IncomeSourceForm: React.FC<IProps> = ({
   onCancel,
   isEditing = false,
 }) => {
-  const { currencySymbol } = useCurrency();
+  const { currencySymbol, formatCurrency } = useCurrency();
   const [step, setStep] = useState(1);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -443,8 +443,7 @@ const IncomeSourceForm: React.FC<IProps> = ({
                 <div>
                   <p className="text-xs text-gray-400">Amount</p>
                   <p className="text-success font-bold text-xl">
-                    {currencySymbol}
-                    {parseFloat(amount || "0").toLocaleString()}
+                    {formatCurrency(parseFloat(amount || "0"))}
                     {isVariableAmount && (
                       <span className="text-xs text-gray-400 ml-1">(estimate)</span>
                     )}

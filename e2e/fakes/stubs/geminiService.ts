@@ -6,9 +6,12 @@
  *   geminiResponse  string  -> text analyzeBudget() resolves with
  *   geminiError     string  -> analyzeBudget() resolves with "Error: <string>"
  *                              (the real one swallows errors into a string too)
- *   geminiCalls     array   -> every call, { model, context } (context is the
- *                              AnalysisContext the page passed in)
+ *   geminiCalls     array   -> every call, { model, context, prompt } (context is the
+ *                              AnalysisContext the page passed in; prompt is the text the
+ *                              real buildAnalysisPrompt makes from it)
  */
+import { buildAnalysisPrompt } from "@/lib/services/analysisPrompt";
+import { getCurrencySymbol } from "@/lib/utils/currency";
 import type {
   Transaction,
   IncomeSource,
@@ -86,7 +89,13 @@ export const analyzeBudget = async (
   model: string = DEFAULT_MODEL
 ): Promise<string> => {
   const b = bridge();
-  b?.geminiCalls?.push({ model, context: JSON.parse(JSON.stringify(context)) });
+  // `prompt` is the text the REAL prompt builder would send (pure module, no SDK): specs assert on what the AI
+  // would actually be told, not on a re-implementation of the selection.
+  b?.geminiCalls?.push({
+    model,
+    context: JSON.parse(JSON.stringify(context)),
+    prompt: buildAnalysisPrompt(context),
+  });
   if (b?.geminiError) return `Error: ${b.geminiError}`;
   return b?.geminiResponse ?? FAKE_ANALYSIS_TEXT;
 };
@@ -100,9 +109,9 @@ export const getSmartInsights = async (context: AnalysisContext): Promise<Analys
 });
 
 // Formatters are pure string builders; keep them trivial but stable.
-export const formatTransactionsForAI = (transactions: Transaction[], symbol = "$"): string =>
+export const formatTransactionsForAI = (transactions: Transaction[], symbol = getCurrencySymbol()): string =>
   transactions.map((t) => `- ${t.name}: ${symbol}${t.actualAmount ?? t.projectedAmount}`).join("\n");
-export const formatIncomeSourcesForAI = (sources: IncomeSource[], symbol = "$"): string =>
+export const formatIncomeSourcesForAI = (sources: IncomeSource[], symbol = getCurrencySymbol()): string =>
   sources.map((s) => `- ${s.name}: ${symbol}${s.amount}`).join("\n");
-export const formatExpenseRulesForAI = (rules: ExpenseRule[], symbol = "$"): string =>
+export const formatExpenseRulesForAI = (rules: ExpenseRule[], symbol = getCurrencySymbol()): string =>
   rules.map((r) => `- ${r.name}: ${symbol}${r.amount}`).join("\n");

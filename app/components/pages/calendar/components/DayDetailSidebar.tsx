@@ -66,7 +66,7 @@ const DetailPanel: React.FC<DetailPanelProps> = ({
         </div>
         <div className="bg-danger/10 rounded-lg p-2 text-center">
           <p className="text-xs text-gray-400">Expenses</p>
-          <p className="text-danger font-bold">-{formatCurrency(expenses)}</p>
+          <p className="text-danger font-bold">{formatCurrency(-expenses)}</p>
         </div>
       </div>
     );

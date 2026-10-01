@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button, Input, Alert, Divider, LoadingSpinner, Icon } from "@/components/common";
 import { getAssetPath } from "@/lib/utils/assetPath";
+import { takeFlashNotice } from "@/lib/utils/flashNotice";
 import Link from "next/link";
 
 const getAuthErrorMessage = (error: unknown): string => {
@@ -38,7 +39,13 @@ export default function LoginPage() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
+  // a message that had to survive a redirect (e.g. an incomplete account deletion)
+  const [notice, setNotice] = useState<string | null>(null);
   const { user, loading: authLoading, login, loginWithGoogle } = useAuth();
+
+  useEffect(() => {
+    setNotice(takeFlashNotice());
+  }, []);
   const router = useRouter();
 
   useEffect(() => {
@@ -106,6 +113,12 @@ export default function LoginPage() {
         </h1>
         <p className="text-sm sm:text-base text-gray-400">Sign in to manage your finances</p>
       </div>
+
+      {notice && (
+        <div className="mb-6">
+          <Alert variant="warning">{notice}</Alert>
+        </div>
+      )}
 
       {error && (
         <div className="mb-6">

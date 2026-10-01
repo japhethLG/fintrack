@@ -12,7 +12,6 @@ import {
   incomeSource,
   creditCard,
   ts,
-  knownDefect,
 } from "../../index";
 import { APP_PAGES, badTokens, isResponsive } from "./support";
 import type { Page } from "@playwright/test";
@@ -140,7 +139,6 @@ test.describe("known defects in hostile data", () => {
   });
 
   test("a rule with a null amount must not crash the calendar", async ({ page, diagnostics }) => {
-    knownDefect("E2E-ROB-09", "amount null: Calendar throws 'Cannot read properties of null (reading toLocaleString)' and the whole page tree unmounts");
     await seedAndLogin(page, { user: BASE, expenseRules: [fixedExpense({ id: "e1", name: "NullAmt", amount: null as never, startDate: "2026-03-12", scheduleConfig: { dayOfMonth: 12 } })] });
     await visit(page, "/dashboard", "Dashboard"); // precondition: the dashboard survives
     await page.goto("/calendar");
@@ -150,7 +148,6 @@ test.describe("known defects in hostile data", () => {
   });
 
   test("a rule whose amount is a non-numeric string must not print NaN", async ({ page }) => {
-    knownDefect("E2E-ROB-10", "amount 'abc' renders NaN on Dashboard, Calendar, Expenses, Transactions and Forecast");
     await seedAndLogin(page, { user: BASE, expenseRules: [fixedExpense({ id: "e1", name: "StrAmt", amount: "abc" as never, startDate: "2026-03-12", scheduleConfig: { dayOfMonth: 12 } })] });
     await visit(page, "/dashboard", "Dashboard");
     expect(await badTokens(page)).toEqual([]);

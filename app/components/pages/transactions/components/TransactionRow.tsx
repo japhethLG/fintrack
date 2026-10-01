@@ -14,7 +14,7 @@ interface IProps {
 }
 
 const TransactionRow: React.FC<IProps> = ({ transaction, onAction }) => {
-  const { formatCurrency, currencySymbol } = useCurrency();
+  const { formatCurrencyWithSign } = useCurrency();
   const isIncome = transaction.type === "income";
   const amount = transaction.actualAmount ?? transaction.projectedAmount;
   const hasVariance = transaction.variance && transaction.variance !== 0;
@@ -79,8 +79,7 @@ const TransactionRow: React.FC<IProps> = ({ transaction, onAction }) => {
           {/* Amount */}
           <div className="text-right min-w-[100px]">
             <p className={cn("font-bold", isIncome ? "text-success" : "text-danger")}>
-              {isIncome ? "+" : "-"}
-              {formatCurrency(amount, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+              {formatCurrencyWithSign((isIncome ? 1 : -1) * (amount))}
             </p>
             {hasVariance && (
               <p
@@ -95,9 +94,7 @@ const TransactionRow: React.FC<IProps> = ({ transaction, onAction }) => {
                       : "text-success"
                 )}
               >
-                {transaction.variance! > 0 ? "+" : ""}
-                {currencySymbol}
-                {transaction.variance?.toFixed(2)}
+                {formatCurrencyWithSign(transaction.variance!)}
               </p>
             )}
           </div>

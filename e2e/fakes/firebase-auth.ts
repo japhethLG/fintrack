@@ -126,7 +126,7 @@ export const signInWithPopup = async (_auth: Auth, _provider: unknown): Promise<
     email: "google.user@example.com",
     displayName: "Google User",
   };
-  setCurrentUser(g);
+  setCurrentUser({ ...g, providerId: "google.com" });
   return credentialFor();
 };
 
@@ -158,6 +158,20 @@ export const updateEmail = async (user: FakeUser, newEmail: string): Promise<voi
 export const updatePassword = async (user: FakeUser, newPassword: string): Promise<void> => {
   maybeReject(authConfig().rejectUpdatePassword);
   if (user.email) setAccountPassword(user.email, newPassword);
+};
+
+/**
+ * Real Firebase: a popup reauthentication succeeds only for the account that is signed in
+ * (`auth/user-mismatch` otherwise) and can be cancelled (`auth/popup-closed-by-user`, via rejectReauth).
+ */
+export const reauthenticateWithPopup = async (
+  user: FakeUser,
+  _provider: unknown
+): Promise<UserCredential> => {
+  maybeReject(authConfig().rejectReauth);
+  const g = authConfig().googleUser;
+  if (g && g.uid !== user.uid) throw authError("auth/user-mismatch");
+  return { user, providerId: "google.com", operationType: "signIn" };
 };
 
 export const reauthenticateWithCredential = async (

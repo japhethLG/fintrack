@@ -22,7 +22,7 @@ interface IProps {
 }
 
 const WeekDayCell: React.FC<IProps> = ({ day, isSelected, onClick, onTransactionClick }) => {
-  const { formatCurrency } = useCurrency();
+  const { formatCurrency, formatCurrencyWithSign } = useCurrency();
   const router = useRouter();
   const { openModal } = useModal();
   const { date, isToday, dayBalance } = day;
@@ -160,8 +160,7 @@ const WeekDayCell: React.FC<IProps> = ({ day, isSelected, onClick, onTransaction
                           isSkipped ? "text-gray-500" : isIncome ? "text-success" : "text-danger"
                         )}
                       >
-                        {isIncome ? "+" : "-"}
-                        {formatCurrency(t.actualAmount ?? t.projectedAmount)}
+                        {formatCurrencyWithSign((isIncome ? 1 : -1) * (t.actualAmount ?? t.projectedAmount))}
                       </span>
                     </div>
                     <span

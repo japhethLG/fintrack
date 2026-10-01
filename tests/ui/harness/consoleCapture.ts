@@ -27,8 +27,8 @@ export const ENV_NOISE: RegExp[] = [
  * strict-mode spec on them would make strict mode unusable. Still printed.
  */
 export const KNOWN_APP_WARNINGS: RegExp[] = [
-  // Every Radix <Dialog.Content> in app/components/modals/BaseModal.tsx lacks a Description.
-  /Missing `Description` or `aria-describedby=\{undefined\}`/,
+  // (empty: the Radix "Missing Description" warning, UI-OBS-06, was fixed; BaseModal and the mobile
+  // drawer now render a Description, so any new one fails strict mode)
 ];
 
 export interface ConsoleCall {

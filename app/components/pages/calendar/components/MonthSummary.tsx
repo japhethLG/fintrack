@@ -20,19 +20,19 @@ const MonthSummary: React.FC<IProps> = ({ income, expenses, net, projected, comp
       <Card padding="sm">
         <p className="text-xs text-gray-400">Income</p>
         <p className="text-xl font-bold text-success">
-          {formatCurrencyWithSign(income, { maximumFractionDigits: 0 })}
+          {formatCurrencyWithSign(income)}
         </p>
       </Card>
       <Card padding="sm">
         <p className="text-xs text-gray-400">Expenses</p>
         <p className="text-xl font-bold text-danger">
-          -{formatCurrency(expenses, { maximumFractionDigits: 0 })}
+          {formatCurrency(-expenses)}
         </p>
       </Card>
       <Card padding="sm">
         <p className="text-xs text-gray-400">Net Change</p>
         <p className={cn("text-xl font-bold", net >= 0 ? "text-success" : "text-danger")}>
-          {formatCurrencyWithSign(net, { maximumFractionDigits: 0 })}
+          {formatCurrencyWithSign(net)}
         </p>
       </Card>
       <Card padding="sm">

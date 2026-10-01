@@ -122,8 +122,8 @@ describe("Calendar: week view on H1 (week of Sun Mar 15 - Sat Mar 21)", () => {
     const side = card(cal, "Weekly range");
     expect(money(side, "Income")).toBe(2_000);
     expect(money(side, "Expenses")).toBe(-804.88); // 804.8817
-    // change badge = closing - opening on the whole-dollar chips: +2,000 - 804.8817 = +1,195.1183 -> +$1,195
-    expect(amounts(card(cal, /Weekly Balance Overview/))[0]).toBe(1_195);
+    // change badge is a signed amount, so it keeps its cents: +2,000 - 804.8817 = +1,195.1183 -> +1,195.12
+    expect(amounts(card(cal, /Weekly Balance Overview/))[0]).toBe(1_195.12);
   });
 
   it(
@@ -178,9 +178,8 @@ describe("Calendar: selecting a day (Fri Mar 20: Car Loan 564.8817 due)", () => 
     }
   );
 
-  knownDefect(
-    "UI-DISP-10",
-    "Transaction rows in the day/range panel print amounts with 3 decimals ($564.882) unlike every other screen ($564.88)",
+  it(
+    "UI-DISP-10 — Transaction rows in the day/range panel print amounts with 3 decimals ($564.882) unlike every other screen ($564.88)",
     async () => {
       // observed: "-$564.882" (Number.toLocaleString default allows 3 fraction digits)
       const { cal } = await pick();
@@ -192,9 +191,8 @@ describe("Calendar: selecting a day (Fri Mar 20: Car Loan 564.8817 due)", () => 
 });
 
 describe("Calendar: transaction-row money formatting in the range panel", () => {
-  knownDefect(
-    "UI-DISP-11",
-    "A completed 138.40 grocery prints as '$138.4' (ragged decimals)",
+  it(
+    "UI-DISP-11 — A completed 138.40 grocery prints as '$138.4' (ragged decimals)",
     async () => {
       // observed: "-$138.4"
       const { page } = await renderPages(["calendar"], { today: H1_TODAY, seed: h1Seed() });
@@ -205,9 +203,8 @@ describe("Calendar: transaction-row money formatting in the range panel", () => 
     }
   );
 
-  knownDefect(
-    "UI-DISP-12",
-    "Transaction rows hard-code '$' for a PHP user while every other figure on the page uses the peso sign",
+  it(
+    "UI-DISP-12 — Transaction rows hard-code '$' for a PHP user while every other figure on the page uses the peso sign",
     async () => {
       // observed: "-$90" on the Electricity row, "-₱2,931" in the summary tile above it.
       const seed = h1Seed({
@@ -238,9 +235,8 @@ describe("Calendar: negative and low balances", () => {
     ],
   });
 
-  knownDefect(
-    "UI-DISP-13",
-    "A day cell whose balance is negative prints it without the minus sign (-$500 and +$500 look identical)",
+  it(
+    "UI-DISP-13 — A day cell whose balance is negative prints it without the minus sign (-$500 and +$500 look identical)",
     async () => {
       // observed: Mar 18 (balance -500) prints "$ 500", Mar 20 (balance +500) prints "$ 500".
       const { page } = await renderPages(["dashboard", "calendar"], {

@@ -5,6 +5,7 @@ import { useSearchParams } from "next/navigation";
 import { useFinancial } from "@/contexts/FinancialContext";
 import { IncomeSource, IncomeSourceFormData } from "@/lib/types";
 import {
+  Alert,
   Button,
   Card,
   PageHeader,
@@ -78,15 +79,32 @@ const IncomeManager: React.FC = () => {
     setShowForm(false);
   };
 
+  // A rejected delete / deactivate is shown to the user (E2E-ROB-04); it used to be an unhandled rejection
+  const [actionError, setActionError] = useState<string | null>(null);
+
   const handleDeleteSource = async () => {
     if (!selectedSourceId) return;
-    await removeIncomeSource(selectedSourceId);
-    setSelectedSourceId(null);
+    setActionError(null);
+    try {
+      await removeIncomeSource(selectedSourceId);
+      setSelectedSourceId(null);
+    } catch (err) {
+      setActionError(err instanceof Error ? err.message : "Failed to delete income source");
+    }
   };
 
   const handleToggleActive = async (isActive: boolean) => {
     if (!selectedSourceId) return;
-    await toggleIncomeSourceActive(selectedSourceId, isActive);
+    setActionError(null);
+    try {
+      await toggleIncomeSourceActive(selectedSourceId, isActive);
+    } catch (err) {
+      setActionError(
+        err instanceof Error
+          ? err.message
+          : `Failed to ${isActive ? "activate" : "deactivate"} income source`
+      );
+    }
   };
 
   const startEdit = () => {
@@ -149,6 +167,12 @@ const IncomeManager: React.FC = () => {
           )
         }
       />
+
+      {actionError && (
+        <Alert variant="error" className="mb-6">
+          {actionError}
+        </Alert>
+      )}
 
       {/* Summary Cards */}
       {!showForm && (

@@ -25,7 +25,7 @@ const PeriodBalanceSummary: React.FC<IProps> = ({
   startDateLabel,
   endDateLabel,
 }) => {
-  const { formatCurrency } = useCurrency();
+  const { formatCurrency, formatCurrencyWithSign } = useCurrency();
 
   const periodLabel = viewMode === "month" ? "Monthly" : "Weekly";
   const change = openingBalance !== null && closingBalance !== null
@@ -64,7 +64,7 @@ const PeriodBalanceSummary: React.FC<IProps> = ({
               size={16}
             />
             <span>
-              {change >= 0 ? "+" : ""}{formatCurrency(change, { maximumFractionDigits: 0 })}
+              {formatCurrencyWithSign(change)}
             </span>
             {changePercent && (
               <span className="text-xs opacity-70">

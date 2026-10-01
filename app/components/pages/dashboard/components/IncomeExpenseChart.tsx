@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useMemo, useCallback } from "react";
+import React, { useState, useMemo } from "react";
 import {
   ResponsiveContainer,
   BarChart,
@@ -35,29 +35,11 @@ const CHART_RANGE_OPTIONS = [
 ];
 
 const IncomeExpenseChart: React.FC<IProps> = ({ transactions, dateRange }) => {
-  const { currencySymbol, formatCurrency } = useCurrency();
+  const { formatCurrency, formatCompactCurrency } = useCurrency();
   const [selectedRange, setSelectedRange] = useState("global");
 
-  /**
-   * Formats a value for Y-axis display, choosing the appropriate scale
-   */
-  const formatYAxisValue = useCallback(
-    (value: number): string => {
-      const absValue = Math.abs(value);
-
-      // For values >= 10k, show in "k" format
-      if (absValue >= 10000) {
-        return `${currencySymbol}${(value / 1000).toFixed(0)}k`;
-      }
-      // For values >= 1k, show in "k" format with one decimal
-      if (absValue >= 1000) {
-        return `${currencySymbol}${(value / 1000).toFixed(1)}k`;
-      }
-      // For smaller values, show the full number
-      return formatCurrency(value);
-    },
-    [currencySymbol, formatCurrency]
-  );
+  // Y-axis ticks: compact (k / M / B), sign before the symbol
+  const formatYAxisValue = formatCompactCurrency;
 
   // Determine the actual range to use
   const activeRange = useMemo(() => {

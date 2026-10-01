@@ -44,11 +44,11 @@ describe("H1 March 2026: totals every screen prints", () => {
     expect(money(kpi, "Total Expenses")).toBe(-2_930.83); // 2,930.8317
     expect(money(kpi, "Net Flow")).toBe(2_189.17); // 2,189.1683
 
-    // Calendar summary tiles print whole dollars.
+    // Calendar summary tiles print cents like the Dashboard (signed amounts keep their cents).
     const cal = page("calendar");
     expect(money(cal, "Income", { occurrence: 0 })).toBe(5_120);
-    expect(money(cal, "Expenses", { occurrence: 0 })).toBe(-2_931);
-    expect(money(cal, "Net Change", { occurrence: 0 })).toBe(2_189);
+    expect(money(cal, "Expenses", { occurrence: 0 })).toBe(-2_930.83);
+    expect(money(cal, "Net Change", { occurrence: 0 })).toBe(2_189.17);
 
     // Calendar sidebar "Monthly range" (0-2 decimals).
     const side = card(cal, "Monthly range");
@@ -99,7 +99,7 @@ describe("H1 March 2026: totals every screen prints", () => {
     // Mar16..Mar29: Payroll Mar30 is day 15 and is OUT, so income 0.
     // expenses Mar18 90 + Mar20 564.8817 + Mar21 150 + Mar22 25 + Mar25 200 + Mar27 250 + Mar28 150 = 1,429.8817
     const upc = card(page("dashboard"), /Upcoming Activity/);
-    expect(amounts(upc).slice(0, 3)).toEqual([0, -1_429.88, -1_430]); // net -1,429.8817 prints as -$1,430
+    expect(amounts(upc).slice(0, 3)).toEqual([0, -1_429.88, -1_429.88]); // net -1,429.8817 prints as -$1,429.88 (signed amounts keep cents)
     // Expenses page, 30 days (Mar16..Apr14): 1,429.8817 + Rent Apr1 1,200 + Groc Apr4 150 + Apr11 150 = 2,929.8817
     expect(money(card(page("expenses"), "Upcoming Bills"), "Total Due")).toBe(2_929.88);
     // Income page, 30 days (Mar16..Apr14): Payroll Mar30 2,000 + Freelance Apr10 750 = 2,750

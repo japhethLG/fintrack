@@ -9,6 +9,9 @@ import {
   signOut,
   onAuthStateChanged,
   deleteCurrentUser,
+  reauthenticateUser,
+  reauthenticateWithGoogle,
+  isGoogleOnlyUser,
 } from "@/lib/firebase/auth";
 import { DeletableDataType, UserProfile } from "@/lib/types";
 import {
@@ -22,6 +25,38 @@ import {
   migrateLoanInstallmentDayOfMonth,
 } from "@/lib/firebase/firestore";
 
+export interface DeleteAccountCredentials {
+  /** The account password (email users). Google users reauthenticate with the Google popup instead. */
+  password?: string;
+}
+
+/** Thrown when the data is gone but the login could not be deleted; the user has been signed out. */
+export class AccountDeletionIncompleteError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "AccountDeletionIncompleteError";
+  }
+}
+
+const reasonOf = (error: unknown): string => (error instanceof Error ? error.message : String(error));
+
+const describeReauthFailure = (error: unknown): string => {
+  const reason = reasonOf(error);
+  if (/auth\/(wrong-password|invalid-credential)/.test(reason)) {
+    return "Incorrect password. Nothing was deleted.";
+  }
+  if (/auth\/(popup-closed-by-user|cancelled-popup-request|popup-blocked)/.test(reason)) {
+    return "Google sign-in was cancelled or blocked. Nothing was deleted.";
+  }
+  if (/auth\/user-mismatch/.test(reason)) {
+    return "That Google account is not the one you are signed in with. Nothing was deleted.";
+  }
+  if (/auth\/too-many-requests/.test(reason)) {
+    return "Too many attempts. Please try again later. Nothing was deleted.";
+  }
+  return `We could not confirm your identity (${reason}). Nothing was deleted.`;
+};
+
 interface AuthContextType {
   user: User | null;
   userProfile: UserProfile | null;
@@ -30,7 +65,8 @@ interface AuthContextType {
   loginWithGoogle: () => Promise<void>;
   signup: (email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
-  deleteAccount: () => Promise<void>;
+  /** Reauthenticates, deletes the data, then the login. Email users must pass their password. */
+  deleteAccount: (credentials?: DeleteAccountCredentials) => Promise<void>;
   resetFinancialData: () => Promise<void>;
   resetSelectiveFinancialData: (dataTypes: DeletableDataType[]) => Promise<void>;
 }
@@ -121,25 +157,55 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
     setUserProfile(null);
   };
 
-  const deleteAccount = async () => {
+  const deleteAccount = async (credentials?: DeleteAccountCredentials) => {
     if (!user) throw new Error("No user logged in");
 
     const uid = user.uid;
 
-    // ORDER (UI-BAL-23). The login goes FIRST: it is the step Firebase refuses when the
-    // session is not recent ("requires-recent-login") or the network fails, and while it has
-    // not succeeded nothing has been touched, so the user keeps a whole account and can
-    // retry. Deleting the data first left a signed-in, empty account behind whenever this
-    // step failed. The data then goes in one atomic batch (profile document included).
-    await deleteCurrentUser();
+    // ORDER (UI-BAL-23, safety-critical). With real security rules every data write needs an
+    // AUTHENTICATED caller, so the login must outlive the data deletion; and the login is the step
+    // Firebase refuses with "requires-recent-login". Hence:
+    //   (a) reauthenticate first (password for email users, Google popup for Google users): a stale
+    //       session or a wrong password stops here with nothing touched;
+    //   (b) delete the data and the profile (one atomic batch): a failure leaves the account whole;
+    //   (c) delete the auth user. If only this fails, the data is already gone: tell the user plainly and
+    //       sign them out (they can retry; an empty signed-in account is never left behind).
+    // The first await is the reauthentication itself, so a Google popup still counts as user-initiated.
+    try {
+      if (isGoogleOnlyUser(user)) {
+        await reauthenticateWithGoogle();
+      } else {
+        if (!credentials?.password) {
+          throw new Error("Enter your password to confirm. Nothing was deleted.");
+        }
+        await reauthenticateUser(credentials.password);
+      }
+    } catch (error) {
+      throw new Error(describeReauthFailure(error));
+    }
 
     try {
       await deleteAccountData(uid);
     } catch (error) {
-      const reason = error instanceof Error ? error.message : String(error);
       throw new Error(
-        `Your sign-in was deleted, but your stored data could not be removed (${reason}). ` +
-          "Contact support to have it erased."
+        `Your account was not deleted: your data could not be removed (${reasonOf(error)}). ` +
+          "Nothing was changed. Please try again."
+      );
+    }
+
+    try {
+      await deleteCurrentUser();
+    } catch (error) {
+      try {
+        await signOut();
+      } catch {
+        // already failing; the message below is what matters
+      }
+      setUserProfile(null);
+      setUser(null);
+      throw new AccountDeletionIncompleteError(
+        `Your data was deleted, but we could not remove your sign-in (${reasonOf(error)}). ` +
+          "You have been signed out. Sign in again and use Delete Account to finish, or contact support."
       );
     }
 

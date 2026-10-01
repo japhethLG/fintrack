@@ -23,12 +23,12 @@ interface IProps {
 }
 
 const KPICards: React.FC<IProps> = ({ currentBalance, stats }) => {
-  const { formatCurrency } = useCurrency();
+  const { formatCurrency, formatCurrencyWithSign } = useCurrency();
 
   const kpiItems = [
     {
       label: "Current Balance",
-      value: formatCurrency(currentBalance, { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
+      value: formatCurrency(currentBalance),
       color: currentBalance >= 0 ? "text-white" : "text-danger",
       icon: "account_balance_wallet",
       iconColor: "text-primary",
@@ -37,7 +37,7 @@ const KPICards: React.FC<IProps> = ({ currentBalance, stats }) => {
     },
     {
       label: "Total Income",
-      value: `+${formatCurrency(stats.income, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
+      value: formatCurrencyWithSign(stats.income),
       color: "text-success",
       icon: "trending_up",
       iconColor: "text-success",
@@ -45,7 +45,7 @@ const KPICards: React.FC<IProps> = ({ currentBalance, stats }) => {
     },
     {
       label: "Total Expenses",
-      value: `-${formatCurrency(stats.expenses, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
+      value: formatCurrency(-stats.expenses),
       color: "text-danger",
       icon: "trending_down",
       iconColor: "text-danger",
@@ -53,7 +53,7 @@ const KPICards: React.FC<IProps> = ({ currentBalance, stats }) => {
     },
     {
       label: "Net Flow",
-      value: `${stats.net >= 0 ? "+" : ""}${formatCurrency(stats.net, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`,
+      value: formatCurrencyWithSign(stats.net),
       color: stats.net >= 0 ? "text-success" : "text-danger",
       icon: stats.net >= 0 ? "savings" : "money_off",
       iconColor: stats.net >= 0 ? "text-success" : "text-danger",

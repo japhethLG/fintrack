@@ -154,9 +154,8 @@ describe("Dashboard cash-flow chart card", () => {
     }
   );
 
-  knownDefect(
-    "UI-DISP-17",
-    "negative Y-axis ticks are rendered '$-2.7k' (sign after the currency symbol)",
+  it(
+    "UI-DISP-17 — negative Y-axis ticks are rendered '$-2.7k' (sign after the currency symbol)",
     async () => {
       // observed labels: "$-2.7k", "$-2.3k", "$-1.8k", "$-1.4k", "$-0.9k"
       const { d } = await dash({
@@ -174,9 +173,8 @@ describe("Dashboard cash-flow chart card", () => {
     }
   );
 
-  knownDefect(
-    "UI-DISP-18",
-    "Y-axis ticks for very large balances are printed in thousands with 8 digits ('$10000000k') instead of M/B",
+  it(
+    "UI-DISP-18 — Y-axis ticks for very large balances are printed in thousands with 8 digits ('$10000000k') instead of M/B",
     async () => {
       // observed: "$0k", "$2500000k", "$5000000k", "$7500000k", "$10000000k"
       const { d } = await dash({
@@ -268,9 +266,8 @@ describe("Dashboard period comparison", () => {
     }
   );
 
-  knownDefect(
-    "UI-DISP-21",
-    "signed amounts drop the cents on the same screen that shows them elsewhere: income $1,234.56 prints '+$1,235'",
+  it(
+    "UI-DISP-21 — signed amounts drop the cents on the same screen that shows them elsewhere: income $1,234.56 prints '+$1,235'",
     async () => {
       // Period Summary prints +$1,234.56; Period Comparison prints +$1,235 for the same figure.
       const { d } = await dash({
@@ -285,9 +282,8 @@ describe("Dashboard period comparison", () => {
     }
   );
 
-  knownDefect(
-    "UI-DISP-22",
-    "a tiny negative net flow (-$0.40) prints as '-$0' (sign taken from the unrounded value)",
+  it(
+    "UI-DISP-22 — a tiny negative net flow (-$0.40) prints as '-$0' (sign taken from the unrounded value)",
     async () => {
       // observed: "-$0" in Period Comparison and Upcoming Activity; Period Summary prints -$0.40
       const { d } = await dash({

@@ -12,8 +12,9 @@ import { describeSchedule } from "@/lib/logic/ruleSchedule";
 interface IProps {
   source: IncomeSource;
   onEdit: () => void;
-  onDelete: () => void;
-  onToggleActive: (isActive: boolean) => void;
+  /** Handlers may reject; the parent reports the error. The confirmation resolves either way. */
+  onDelete: () => void | Promise<void>;
+  onToggleActive: (isActive: boolean) => void | Promise<void>;
 }
 
 const IncomeSourceDetail: React.FC<IProps> = ({ source, onEdit, onDelete, onToggleActive }) => {
@@ -117,7 +118,17 @@ const IncomeSourceDetail: React.FC<IProps> = ({ source, onEdit, onDelete, onTogg
         {showDeleteConfirm ? (
           <div className="flex items-center gap-2">
             <span className="text-sm text-gray-400">Are you sure?</span>
-            <Button variant="danger" size="sm" onClick={onDelete}>
+            <Button
+              variant="danger"
+              size="sm"
+              onClick={async () => {
+                try {
+                  await onDelete();
+                } finally {
+                  setShowDeleteConfirm(false);
+                }
+              }}
+            >
               Yes, Delete
             </Button>
             <Button variant="ghost" size="sm" onClick={() => setShowDeleteConfirm(false)}>

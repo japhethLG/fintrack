@@ -10,7 +10,9 @@ export interface IModalData {
   confirmButtonText?: string;
   variant?: "danger" | "warning" | "default";
   isLoading?: boolean;
-  onConfirm: () => void;
+  /** Ask for the account password too (reauthentication); it is handed to onConfirm. */
+  requirePassword?: boolean;
+  onConfirm: (password?: string) => void;
   onCancel?: () => void;
   onCloseModal?: () => void;
 }
@@ -27,14 +29,17 @@ const ConfirmModal: React.FC<IProps> = ({ closeModal, modalData }) => {
     confirmButtonText = "Confirm",
     variant = "default",
     isLoading = false,
+    requirePassword = false,
     onConfirm,
     onCancel,
   } = modalData;
 
   const [inputValue, setInputValue] = useState("");
+  const [password, setPassword] = useState("");
 
   const needsConfirmText = !!confirmText;
-  const isConfirmEnabled = !needsConfirmText || inputValue === confirmText;
+  const isConfirmEnabled =
+    (!needsConfirmText || inputValue === confirmText) && (!requirePassword || password.length > 0);
 
   const handleCancel = () => {
     onCancel?.();
@@ -42,7 +47,7 @@ const ConfirmModal: React.FC<IProps> = ({ closeModal, modalData }) => {
   };
 
   const handleConfirm = () => {
-    onConfirm();
+    onConfirm(requirePassword ? password : undefined);
     closeModal();
   };
 
@@ -98,6 +103,22 @@ const ConfirmModal: React.FC<IProps> = ({ closeModal, modalData }) => {
             placeholder={`Type "${confirmText}" to confirm`}
             className="font-mono"
             autoFocus
+          />
+        </div>
+      )}
+
+      {requirePassword && (
+        <div className="mb-4">
+          <label htmlFor="confirm-password" className="text-sm text-gray-400 mb-2 block">
+            Current password
+          </label>
+          <Input
+            id="confirm-password"
+            type="password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+            placeholder="Enter your password to confirm it's you"
+            autoComplete="current-password"
           />
         </div>
       )}

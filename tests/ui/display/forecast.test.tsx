@@ -81,7 +81,7 @@ describe("Forecast: runway and next crunch", () => {
     // 500 - 300 = 200 left; Bill B 400 leaves -200 -> needs 200
     expect(billRow(upc, "Bill B")).toMatchObject({ covered: false, need: 200 });
     expect(money(upc, "Projected Balance")).toBe(-200); // Refund (Apr 1) is beyond the window
-    expect(colorToken(within(upc).getByText("-$200"))).toBe("danger");
+    expect(colorToken(within(upc).getByText("-$200.00"))).toBe("danger");
   });
 
   it(
@@ -234,9 +234,9 @@ describe("Forecast: Actual metrics and overview", () => {
     const overview = card(f, "Monthly Overview");
     await app.user.click(within(overview).getByRole("button", { name: "Actual" }));
     expect(within(overview).getByText("Income")).toBeInTheDocument();
-    expect(within(overview).getByText("+$5,120")).toBeInTheDocument();
+    expect(within(overview).getByText("+$5,120.00")).toBeInTheDocument();
     expect(within(overview).getByText("-$2,930.83")).toBeInTheDocument();
-    expect(within(overview).getByText("+$2,189")).toBeInTheDocument(); // net 2,189.1683 (whole-dollar signed format)
+    expect(within(overview).getByText("+$2,189.17")).toBeInTheDocument(); // net 2,189.1683: signed amounts keep cents
   });
 
   it(

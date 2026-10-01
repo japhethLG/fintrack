@@ -52,9 +52,8 @@ describe("Forecast page", () => {
 });
 
 describe("Settings page", () => {
-  knownDefect(
-    "UI-OBS-02",
-    "Low Balance Warning Threshold input is prefixed with a hard-coded peso sign for a USD user",
+  it(
+    "UI-OBS-02 — Low Balance Warning Threshold input is prefixed with a hard-coded peso sign for a USD user",
     async () => {
       // observed: prefix "₱" while every other amount on the page renders "$"
       await renderApp({
@@ -135,9 +134,8 @@ describe("Settings page", () => {
 });
 
 describe("Modals", () => {
-  knownDefect(
-    "UI-OBS-06",
-    "Every modal Dialog.Content is missing a Description (Radix accessibility warning)",
+  it(
+    "UI-OBS-06 — Every modal Dialog.Content is missing a Description (Radix accessibility warning)",
     async () => {
       // observed: console.warn "Missing `Description` or `aria-describedby={undefined}` for {DialogContent}."
       const app = await renderApp({ route: "/transactions" });

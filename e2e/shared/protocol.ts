@@ -26,6 +26,8 @@ export interface E2EUser {
   email: string;
   displayName?: string | null;
   photoURL?: string | null;
+  /** How the user signed in; becomes `providerData` like the real SDK. Default: "password". */
+  providerId?: "password" | "google.com";
 }
 
 export interface AuthAccount {

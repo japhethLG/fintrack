@@ -151,7 +151,6 @@ test.describe("money formatting on screen", () => {
   });
 
   test("Calendar day sidebar uses the user's currency symbol (PHP) and 2 decimals", async ({ page }) => {
-    knownDefect("E2E-JRN-19", "sidebar row reads '-$100.5' (hard-coded $, one decimal) for a PHP user");
     await seedAndLogin(page, rentOnly(1000), { path: "/calendar" });
     await expect(page.getByRole("heading", { name: "Financial Calendar", level: 1 })).toBeVisible();
     await S.calendarSelectDay(page, 20);
@@ -161,14 +160,12 @@ test.describe("money formatting on screen", () => {
   });
 
   test("Calendar cell of a negative balance keeps its minus sign", async ({ page }) => {
-    knownDefect("E2E-JRN-20", "balance -500 is printed as '₱500' in every day cell (Math.abs), only the colour hints at the sign");
     await seedAndLogin(page, rentOnly(-500), { path: "/calendar" });
     await expect(page.getByRole("heading", { name: "Financial Calendar", level: 1 })).toBeVisible();
     await expect(page.locator("div.min-h-\\[100px\\]:not(.opacity-50)").filter({ hasText: /^5(?!\d)/ }).first()).toContainText("-₱500");
   });
 
   test("Forecast Current Balance prints 2 decimals like the Dashboard (₱8,662.50)", async ({ page }) => {
-    knownDefect("E2E-JRN-21", "Forecast card prints '₱8,662.5'");
     await seedAndLogin(page, rentOnly(8662.5), { path: "/forecast" });
     await expect(page.getByRole("heading", { name: "AI Financial Forecaster", level: 1 })).toBeVisible();
     expect(await S.forecastBalanceText(page)).toBe("₱8,662.50");

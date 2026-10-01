@@ -74,7 +74,7 @@ test("walking back from March to January and forward to May: paydays on the 1st 
     expect(await daysShowing(page, m, "First"), `First in ${m}`).toEqual([`${m}-01`]);
     await expect(periodFigure(page, "Opening"), `${m} opening`).toHaveText(FIGURES[m][0]);
     await expect(periodFigure(page, "Closing"), `${m} closing`).toHaveText(FIGURES[m][1]);
-    await expect(summaryTile(page, "Income"), `${m} income`).toHaveText("+$110");
+    await expect(summaryTile(page, "Income"), `${m} income`).toHaveText("+$110.00");
   }
 });
 

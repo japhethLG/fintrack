@@ -8,6 +8,10 @@ import { useFinancial } from "@/contexts/FinancialContext";
 import { DeletableDataType } from "@/lib/types";
 import { countBalanceHistory } from "@/lib/firebase/firestore";
 import { useModal } from "@/components/modals";
+import { useCurrency } from "@/lib/hooks/useCurrency";
+import { isGoogleOnlyUser } from "@/lib/firebase/auth";
+import { AccountDeletionIncompleteError } from "@/contexts/AuthContext";
+import { setFlashNotice } from "@/lib/utils/flashNotice";
 
 const DATA_LABELS: Record<DeletableDataType, string> = {
   income_sources: "Income Sources",
@@ -21,6 +25,7 @@ const DangerZone: React.FC = () => {
   const router = useRouter();
   const { openModal, closeModal } = useModal();
   const { user, resetSelectiveFinancialData, deleteAccount } = useAuth();
+  const { formatCurrency } = useCurrency();
   const { incomeSources, expenseRules, storedTransactions, alerts } = useFinancial();
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -69,16 +74,24 @@ const DangerZone: React.FC = () => {
     setTimeout(() => setSuccess(null), 5000);
   };
 
-  const handleDeleteAccount = async () => {
+  const handleDeleteAccount = async (password?: string) => {
     setIsLoading(true);
     setError(null);
 
     try {
-      await deleteAccount();
+      await deleteAccount({ password });
       router.push("/login");
     } catch (err) {
       setIsLoading(false);
-      setError(err instanceof Error ? err.message : "Failed to delete account");
+      const message = err instanceof Error ? err.message : "Failed to delete account";
+      if (err instanceof AccountDeletionIncompleteError) {
+        // the data is gone and the user has been signed out: this page is about to go away, so the
+        // message travels to the login page
+        setFlashNotice(message);
+        router.push("/login");
+        return;
+      }
+      setError(message);
       closeModal("ConfirmModal");
     }
   };
@@ -115,7 +128,7 @@ const DangerZone: React.FC = () => {
 
                 if (deletedTransactions) {
                   resetSuccess(
-                    "Selected data reset successfully. Your balance has been reset to ₱0. Update your initial balance in Settings → Balance Management."
+                    `Selected data reset successfully. Your balance has been reset to ${formatCurrency(0)}. Update your initial balance in Settings → Balance Management.`
                   );
                 } else if (deletedRules) {
                   resetSuccess(
@@ -149,6 +162,8 @@ const DangerZone: React.FC = () => {
         confirmButtonText: "Delete My Account",
         variant: "danger" as const,
         isLoading,
+        // email users prove it is them with their password (Google users get the Google popup)
+        requirePassword: !isGoogleOnlyUser(user),
         onConfirm: handleDeleteAccount,
       },
       "Delete Your Account"
@@ -187,7 +202,7 @@ const DangerZone: React.FC = () => {
               <h4 className="font-medium text-white">Reset Financial Data</h4>
               <p className="text-sm text-gray-400 mt-1">
                 Choose exactly what to delete or pick "All Financial Data" to wipe everything.
-                Balance resets to $0 when transactions are removed.
+                Balance resets to {formatCurrency(0)} when transactions are removed.
               </p>
             </div>
             <Button
