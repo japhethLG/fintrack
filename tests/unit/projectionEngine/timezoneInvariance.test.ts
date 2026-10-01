@@ -322,6 +322,8 @@ describe("time-zone invariance (fixed string inputs)", () => {
       daily: getIncomeExpenseChartData(txns, "2026-03-01", "2026-04-30", "daily").map((p) => [
         p.date,
         p.label,
+        p.income,
+        p.expenses,
       ]),
       bucket: [
         getBestBucketType("2026-03-01", "2026-03-15"),
@@ -334,12 +336,21 @@ describe("time-zone invariance (fixed string inputs)", () => {
       ["2026-03", "Mar 2026", 100, 40],
       ["2026-04", "Apr 2026", 0, 10],
     ]);
-    expect(out.daily.map((p: string[]) => p[0])).toEqual([
+    // Zero-filled: every day of 2026-03-01 .. 2026-04-30 (31 + 30 = 61 buckets), in every zone.
+    expect(out.daily).toHaveLength(61);
+    expect(out.daily[0][0]).toBe("2026-03-01");
+    expect(out.daily[60][0]).toBe("2026-04-30");
+    const withActivity = out.daily.filter((p: (string | number)[]) => p[2] !== 0 || p[3] !== 0);
+    expect(withActivity.map((p: (string | number)[]) => p[0])).toEqual([
       "2026-03-01",
       "2026-03-31",
       "2026-04-15",
     ]);
-    expect(out.daily.map((p: string[]) => p[1])).toEqual(["Mar 1", "Mar 31", "Apr 15"]);
+    expect(withActivity.map((p: (string | number)[]) => p[1])).toEqual([
+      "Mar 1",
+      "Mar 31",
+      "Apr 15",
+    ]);
     // 14 days apart -> daily; 15 days -> weekly; 92 days -> monthly.
     expect(out.bucket).toEqual(["daily", "weekly", "monthly"]);
   });

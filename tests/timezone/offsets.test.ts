@@ -947,42 +947,46 @@ describe("getBillCoverageReport", () => {
   it("includes a bill on the last day of the default 14-day window", () => {
     freezeAt("2026-03-15", 22);
 
-    // today + 14 days == 2026-03-29.
-    const report = getBillCoverageReport(1_000, [bill("2026-03-29")]);
+    // REWRITTEN (user decision: exactly 14 days): the window is today .. today + 13 = 2026-03-28.
+    const report = getBillCoverageReport(1_000, [bill("2026-03-28")]);
 
     expect(report.upcomingBills).toHaveLength(1);
-    expect(report.upcomingBills[0].daysUntilDue).toBe(14);
+    expect(report.upcomingBills[0].daysUntilDue).toBe(13);
   });
 
-  it("excludes a bill one day past the 14-day window", () => {
+  it("excludes a bill on today + 14 and one day past it", () => {
     freezeAt("2026-03-15", 22);
 
-    const report = getBillCoverageReport(1_000, [bill("2026-03-30")]);
-
-    expect(report.upcomingBills).toEqual([]);
+    // 2026-03-29 (today + 14) used to be the 15th day of the "14-day" window.
+    expect(getBillCoverageReport(1_000, [bill("2026-03-29")]).upcomingBills).toEqual([]);
+    expect(getBillCoverageReport(1_000, [bill("2026-03-30")]).upcomingBills).toEqual([]);
   });
 
-  it("excludes a bill dated yesterday even at 05:00 local", () => {
+  it("lists a bill dated yesterday as OVERDUE (daysUntilDue -1) even at 05:00 local", () => {
+    // REWRITTEN (D5): an unpaid bill dated before the LOCAL day is owed now, so it is walked first
+    // instead of being dropped. 05:00 local is 21:00 UTC the previous day; the local day decides.
     freezeAt("2026-03-15", 5);
 
     const report = getBillCoverageReport(1_000, [bill("2026-03-14")]);
 
-    expect(report.upcomingBills).toEqual([]);
+    expect(report.upcomingBills).toHaveLength(1);
+    expect(report.upcomingBills[0].daysUntilDue).toBe(-1);
   });
 
   it("spans the whole window inclusively at 22:00 local", () => {
     freezeAt("2026-03-15", 22);
 
+    // REWRITTEN (14-day window): the last day is 03-28, not 03-29.
     const report = getBillCoverageReport(1_000, [
       bill("2026-03-15", 100),
       bill("2026-03-22", 100),
-      bill("2026-03-29", 100),
+      bill("2026-03-28", 100),
     ]);
 
     expect(report.upcomingBills.map((entry) => entry.transaction.scheduledDate)).toEqual([
       "2026-03-15",
       "2026-03-22",
-      "2026-03-29",
+      "2026-03-28",
     ]);
     expect(report.totalUpcoming).toBe(300);
   });
@@ -1042,7 +1046,10 @@ describe("getRunway", () => {
     expect(getRunway(1_000, [expense])).toEqual({ days: 5, runOutDate: "2026-03-20" });
   });
 
-  it("ignores an expense dated before today", () => {
+  it("owes an overdue expense from the local today (D5)", () => {
+    // REWRITTEN: an expense dated before today and still unpaid is OVERDUE: it is owed now, so
+    // 1,000 - 1,500 runs out TODAY (03-15 local, although it is still 03-14 in UTC at 05:00 local
+    // east of UTC). It used to be ignored, which made the runway "30 days".
     freezeAt("2026-03-15", 5);
 
     const expense = makeProjectedTransaction({
@@ -1052,6 +1059,6 @@ describe("getRunway", () => {
       projectedAmount: 1_500,
     });
 
-    expect(getRunway(1_000, [expense], 30)).toEqual({ days: 30, runOutDate: null });
+    expect(getRunway(1_000, [expense], 30)).toEqual({ days: 0, runOutDate: "2026-03-15" });
   });
 });

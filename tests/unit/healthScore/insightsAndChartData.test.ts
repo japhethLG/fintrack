@@ -214,10 +214,11 @@ describe("generateInsights: truncation to three", () => {
     expect(insights).toHaveLength(3);
   });
 
-  it("keeps insights in source push order: runway, savings, bills, trend", () => {
-    // The order is determined solely by the order of the push calls in
-    // insights.ts:26-59, NOT by severity. With all four bands firing, the trend
-    // insight is the one dropped.
+  it("keeps equal-severity insights in source order: runway, savings, bills, trend", () => {
+    // Insights are ranked by severity (danger, warning, note, praise) and equal severities keep
+    // the order runway, savings, bills, trend. Here runway (5 days) and savings (-20%) are
+    // DANGER, bills (40%) and trend (declining) are WARNING; the top three are
+    // [runway, savings, bills] and the trend insight, last of the four, is the one dropped.
     const insights = insightsFor({
       runwayDays: 5,
       savingsRate: -20,
@@ -263,7 +264,7 @@ describe("generateInsights: truncation to three", () => {
      * CORRECT: a warning must never be dropped in favour of a compliment. The
      * declining-balance insight should survive truncation.
      */
-    it.fails("KNOWN DEFECT: drops the only warning in favour of three compliments", () => {
+    it("keeps the only warning instead of dropping it for three compliments (fixed: ranked by severity)", () => {
       const insights = insightsFor({
         runwayDays: 120,
         savingsRate: 30,
@@ -282,7 +283,7 @@ describe("generateInsights: truncation to three", () => {
      *
      * CORRECT: both warnings should be visible before any praise.
      */
-    it.fails("KNOWN DEFECT: shows praise ahead of a second warning", () => {
+    it("shows both warnings before any praise (fixed: ranked by severity)", () => {
       const insights = insightsFor({
         runwayDays: 120,
         savingsRate: 30,
@@ -376,12 +377,20 @@ describe("getBestBucketType", () => {
 // getIncomeExpenseChartData
 // ============================================================================
 
+/**
+ * Every bucket of the requested range is present (zero-filled), so most expectations below read the
+ * buckets that carry activity. Each test also states how many buckets the range must produce
+ * (hand-counted: 31 days in March, 5 Sundays-to-Saturdays for 2026-03-01..03-31, ...).
+ */
+const withActivity = <T extends { income: number; expenses: number }>(points: T[]): T[] =>
+  points.filter((point) => point.income !== 0 || point.expenses !== 0);
+
 describe("getIncomeExpenseChartData", () => {
   it("returns an empty array for no transactions", () => {
     expect(getIncomeExpenseChartData([], "2026-03-01", "2026-03-31")).toEqual([]);
   });
 
-  it("buckets one transaction per day by default", () => {
+  it("buckets one transaction per day by default (March has 31 daily buckets, two with activity)", () => {
     const data = getIncomeExpenseChartData(
       [
         makeTransaction({
@@ -401,7 +410,8 @@ describe("getIncomeExpenseChartData", () => {
       "2026-03-31"
     );
 
-    expect(data).toEqual([
+    expect(data).toHaveLength(31); // 2026-03-01 .. 2026-03-31, one bucket per day
+    expect(withActivity(data)).toEqual([
       { label: "Mar 2", date: "2026-03-02", income: 500, expenses: 0, net: 500 },
       { label: "Mar 3", date: "2026-03-03", income: 0, expenses: 120, net: -120 },
     ]);
@@ -433,8 +443,10 @@ describe("getIncomeExpenseChartData", () => {
       "2026-03-31"
     );
 
-    expect(data).toHaveLength(1);
-    expect(data[0]).toMatchObject({ date: "2026-03-02", income: 750, expenses: 100, net: 650 });
+    expect(data).toHaveLength(31);
+    const active = withActivity(data);
+    expect(active).toHaveLength(1);
+    expect(active[0]).toMatchObject({ date: "2026-03-02", income: 750, expenses: 100, net: 650 });
   });
 
   it("excludes transactions outside the range, inclusive of both bounds", () => {
@@ -449,8 +461,9 @@ describe("getIncomeExpenseChartData", () => {
       "2026-03-31"
     );
 
-    expect(data.map((point) => point.date)).toEqual(["2026-03-01", "2026-03-31"]);
-    expect(data.map((point) => point.expenses)).toEqual([2, 3]);
+    expect(data).toHaveLength(31); // the range is 31 days; the out-of-range rows add no buckets
+    expect(withActivity(data).map((point) => point.date)).toEqual(["2026-03-01", "2026-03-31"]);
+    expect(withActivity(data).map((point) => point.expenses)).toEqual([2, 3]);
   });
 
   it("excludes skipped transactions", () => {
@@ -463,8 +476,9 @@ describe("getIncomeExpenseChartData", () => {
       "2026-03-31"
     );
 
-    expect(data).toHaveLength(1);
-    expect(data[0].expenses).toBe(10);
+    expect(data).toHaveLength(31);
+    expect(withActivity(data)).toHaveLength(1);
+    expect(withActivity(data)[0].expenses).toBe(10);
   });
 
   // The projected-vs-actual contract, asserted here too because this module
@@ -484,7 +498,8 @@ describe("getIncomeExpenseChartData", () => {
       "2026-03-31"
     );
 
-    expect(data.map((point) => point.expenses)).toEqual([175, 60]);
+    expect(data).toHaveLength(31);
+    expect(withActivity(data).map((point) => point.expenses)).toEqual([175, 60]);
   });
 
   it("falls back to projectedAmount when a completed transaction has no actualAmount", () => {
@@ -502,7 +517,8 @@ describe("getIncomeExpenseChartData", () => {
       "2026-03-31"
     );
 
-    expect(data[0].expenses).toBe(90);
+    expect(withActivity(data)[0].expenses).toBe(90);
+    expect(withActivity(data)).toHaveLength(1);
   });
 
   it("buckets a completed transaction on its actualDate, not its scheduledDate", () => {
@@ -520,7 +536,8 @@ describe("getIncomeExpenseChartData", () => {
       "2026-03-31"
     );
 
-    expect(data.map((point) => point.date)).toEqual(["2026-03-09"]);
+    expect(data).toHaveLength(31);
+    expect(withActivity(data).map((point) => point.date)).toEqual(["2026-03-09"]);
   });
 
   it("groups weekly buckets onto the preceding Sunday", () => {
@@ -552,7 +569,16 @@ describe("getIncomeExpenseChartData", () => {
       "weekly"
     );
 
-    expect(data).toEqual([
+    // 2026-03-01 is a Sunday, so the weeks of 03-01, 03-08, 03-15, 03-22 and 03-29 all intersect
+    // March: five weekly buckets, the middle two with activity.
+    expect(data.map((point) => point.date)).toEqual([
+      "2026-03-01",
+      "2026-03-08",
+      "2026-03-15",
+      "2026-03-22",
+      "2026-03-29",
+    ]);
+    expect(withActivity(data)).toEqual([
       { label: "Week of Mar 15", date: "2026-03-15", income: 150, expenses: 0, net: 150 },
       { label: "Week of Mar 22", date: "2026-03-22", income: 25, expenses: 0, net: 25 },
     ]);
@@ -566,7 +592,7 @@ describe("getIncomeExpenseChartData", () => {
       "weekly"
     );
 
-    expect(data[0].date).toBe("2026-03-15");
+    expect(withActivity(data).map((point) => point.date)).toEqual(["2026-03-15"]);
   });
 
   it("carries a weekly bucket back across a month boundary", () => {
@@ -579,7 +605,15 @@ describe("getIncomeExpenseChartData", () => {
       "weekly"
     );
 
-    expect(data[0].date).toBe("2026-03-29");
+    // 2026-04-01 (Wed) .. 04-30 (Thu): the weeks of 03-29, 04-05, 04-12, 04-19 and 04-26.
+    expect(data.map((point) => point.date)).toEqual([
+      "2026-03-29",
+      "2026-04-05",
+      "2026-04-12",
+      "2026-04-19",
+      "2026-04-26",
+    ]);
+    expect(withActivity(data).map((point) => point.date)).toEqual(["2026-03-29"]);
   });
 
   it("groups monthly buckets by year and month", () => {
@@ -626,7 +660,16 @@ describe("getIncomeExpenseChartData", () => {
       "2026-03-31"
     );
 
-    expect(data.map((point) => point.date)).toEqual(["2026-03-02", "2026-03-11", "2026-03-20"]);
+    expect(data).toHaveLength(31);
+    expect(withActivity(data).map((point) => point.date)).toEqual([
+      "2026-03-02",
+      "2026-03-11",
+      "2026-03-20",
+    ]);
+    // zero-filled and still strictly chronological end to end
+    expect(data.map((point) => point.date)).toEqual(
+      [...data.map((point) => point.date)].sort()
+    );
   });
 
   it("sorts monthly buckets correctly across a year boundary", () => {
@@ -663,7 +706,7 @@ describe("getIncomeExpenseChartData", () => {
       "2026-03-31"
     );
 
-    expect(data[0].net).toBe(-150);
+    expect(withActivity(data)[0].net).toBe(-150);
   });
 
   it("produces no NaN for a single transaction", () => {
@@ -693,7 +736,7 @@ describe("getIncomeExpenseChartData", () => {
      * CORRECT: every bucket in the requested range should be present, with
      * zeros where nothing happened.
      */
-    it.fails("KNOWN DEFECT: emits empty buckets as zeros instead of omitting them", () => {
+    it("emits empty buckets as zeros instead of omitting them (fixed: HS-10)", () => {
       const data = getIncomeExpenseChartData(
         [
           makeTransaction({ id: "a", projectedAmount: 10, scheduledDate: "2026-03-02" }),

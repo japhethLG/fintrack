@@ -1,5 +1,6 @@
 import { useState, useCallback } from "react";
 import { formatDate, getTodayKey, parseDate } from "@/lib/utils/dateUtils";
+import { defaultWindowStart } from "@/lib/logic/balanceCalculator/openItems";
 
 interface DateRange {
   start: string;
@@ -16,8 +17,9 @@ export function useViewDateRange() {
     // "Today" is the local calendar day; bounds are local calendar days, serialised with formatDate.
     // (toISOString() would stamp the UTC day, a day early at any UTC+ offset.)
     const today = parseDate(getTodayKey());
-    // Default: 2 months back (1st of that month) to 4 months forward (day 0 = last day of month+3)
-    const startDate = new Date(today.getFullYear(), today.getMonth() - 2, 1);
+    // Default: 2 months back (1st of that month: `defaultWindowStart`, the oldest day the risk views
+    // track overdue rows back to) to 4 months forward (day 0 = last day of month+3)
+    const startDate = parseDate(defaultWindowStart(getTodayKey()));
     const endDate = new Date(today.getFullYear(), today.getMonth() + 4, 0);
     return {
       start: formatDate(startDate),

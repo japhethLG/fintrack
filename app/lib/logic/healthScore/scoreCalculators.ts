@@ -4,7 +4,10 @@
 
 import { TrendDirection } from "./types";
 import { Transaction, DayBalance } from "@/lib/types";
-import { formatDate, addDays } from "@/lib/utils/dateUtils";
+import { getTodayKey } from "@/lib/utils/dateUtils";
+import { getRunway, RISK_HORIZON_DAYS } from "@/lib/logic/balanceCalculator/runway";
+import { amountOf, rowDate } from "@/lib/logic/balanceCalculator/openItems";
+import { savingsRatePercent } from "./periodStats";
 
 /**
  * Calculate the cash runway score (0-100)
@@ -15,42 +18,17 @@ import { formatDate, addDays } from "@/lib/utils/dateUtils";
  * - 14-29 days = 40
  * - 7-13 days = 20
  * - < 7 days = 0
+ *
+ * This is the SAME walk as the Forecast's Cash Runway (`getRunway`): realized balance, overdue
+ * expenses folded into day 0, completed rows excluded, one horizon. The first negative date can
+ * therefore never differ between the two.
  */
 export const calculateRunwayScore = (
   currentBalance: number,
-  transactions: Transaction[]
+  transactions: Transaction[],
+  today: string = getTodayKey()
 ): { score: number; daysRemaining: number } => {
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-
-  let balance = currentBalance;
-  let daysRemaining = 0;
-
-  // Look ahead 90 days
-  for (let i = 0; i < 90; i++) {
-    const currentDate = addDays(today, i);
-    const dateKey = formatDate(currentDate);
-
-    const dayTransactions = transactions.filter((t) => {
-      const txDate = t.actualDate || t.scheduledDate;
-      return txDate === dateKey && t.status !== "skipped" && t.status !== "completed";
-    });
-
-    dayTransactions.forEach((t) => {
-      const amount = t.projectedAmount;
-      if (t.type === "income") {
-        balance += amount;
-      } else {
-        balance -= amount;
-      }
-    });
-
-    if (balance < 0) {
-      daysRemaining = i;
-      break;
-    }
-    daysRemaining = i + 1;
-  }
+  const { days: daysRemaining } = getRunway(currentBalance, transactions, RISK_HORIZON_DAYS, today);
 
   // Score based on days remaining
   let score: number;
@@ -73,6 +51,8 @@ export const calculateRunwayScore = (
  * - 5-9% = 40
  * - 0-4% = 20
  * - Negative = 0
+ *
+ * Spending with NO income at all is the worst case, not "breaking even": rate -100, score 0.
  */
 export const calculateSavingsRateScore = (
   transactions: Transaction[],
@@ -83,12 +63,11 @@ export const calculateSavingsRateScore = (
   let totalExpenses = 0;
 
   transactions.forEach((t) => {
-    const date = t.actualDate || t.scheduledDate;
+    const date = rowDate(t);
     if (date < startDate || date > endDate) return;
     if (t.status === "skipped") return;
 
-    const amount =
-      t.status === "completed" ? (t.actualAmount ?? t.projectedAmount) : t.projectedAmount;
+    const amount = amountOf(t);
 
     if (t.type === "income") {
       totalIncome += amount;
@@ -102,8 +81,7 @@ export const calculateSavingsRateScore = (
     return { score: 100, rate: 0 };
   }
 
-  const savings = totalIncome - totalExpenses;
-  const rate = totalIncome > 0 ? (savings / totalIncome) * 100 : 0;
+  const rate = savingsRatePercent(totalIncome, totalExpenses);
 
   let score: number;
   if (rate >= 30) score = 100;
@@ -118,25 +96,24 @@ export const calculateSavingsRateScore = (
 
 /**
  * Calculate bill payment rate score (0-100)
- * Based on % of past transactions completed on or before scheduled date
+ * Based on % of past bills (due on or before today, in the period) that were paid on or before
+ * their due date. A bill that came due and was never paid or skipped (still "projected") is
+ * OVERDUE and counts in the denominator, so an untouched overdue bill can no longer earn a perfect
+ * record.
  */
 export const calculateBillPaymentScore = (
   transactions: Transaction[],
   startDate: string,
-  endDate: string
+  endDate: string,
+  today: string = getTodayKey()
 ): { score: number; rate: number } => {
-  const today = formatDate(new Date());
-
-  // Get past expense transactions in range
+  // Get past expense transactions in range (paid, skipped or still owed)
   const pastExpenses = transactions.filter((t) => {
     const date = t.scheduledDate;
-    return (
-      date >= startDate &&
-      date <= endDate &&
-      date <= today &&
-      t.type === "expense" &&
-      t.status !== "projected"
-    );
+    if (date < startDate || date > endDate || t.type !== "expense") return false;
+    // Paid or skipped rows count once due (today included); an UNTOUCHED row is overdue only after
+    // its due day has passed (a bill due today is not late yet).
+    return t.status === "projected" ? date < today : date <= today;
   });
 
   if (pastExpenses.length === 0) {
@@ -161,21 +138,28 @@ export const calculateBillPaymentScore = (
 
 /**
  * Calculate balance trend score (0-100)
- * Based on whether balance is improving, stable, or declining using linear regression
+ * Based on whether balance is improving, stable, or declining using linear regression.
+ *
+ * The slope is normalised by the MEAN ABSOLUTE balance (not the signed average), so the verdict
+ * follows the sign of the slope for an overdrawn account too: -1,000 falling to -2,500 is
+ * declining, -2,000 recovering to -500 is improving, and a balance climbing through zero is
+ * improving rather than "stable" (the signed average of such a series is 0). The days are put in
+ * date order first, whatever order the map was built in.
  */
 export const calculateBalanceTrendScore = (
   dailyBalances: Map<string, DayBalance>,
   startDate: string,
   endDate: string
 ): { score: number; trend: TrendDirection } => {
-  const balances: number[] = [];
-
-  // Collect closing balances in the date range
+  // Collect closing balances in the date range, in date order
+  const days: { date: string; balance: number }[] = [];
   dailyBalances.forEach((dayBalance, dateKey) => {
     if (dateKey >= startDate && dateKey <= endDate) {
-      balances.push(dayBalance.closingBalance);
+      days.push({ date: dateKey, balance: dayBalance.closingBalance });
     }
   });
+  days.sort((a, b) => a.date.localeCompare(b.date));
+  const balances = days.map((d) => d.balance);
 
   if (balances.length < 2) {
     return { score: 65, trend: "stable" }; // Insufficient data = assume stable
@@ -187,19 +171,21 @@ export const calculateBalanceTrendScore = (
   let sumY = 0;
   let sumXY = 0;
   let sumX2 = 0;
+  let sumAbs = 0;
 
   balances.forEach((balance, i) => {
     sumX += i;
     sumY += balance;
     sumXY += i * balance;
     sumX2 += i * i;
+    sumAbs += Math.abs(balance);
   });
 
   const slope = (n * sumXY - sumX * sumY) / (n * sumX2 - sumX * sumX);
 
-  // Normalize slope relative to average balance
-  const avgBalance = sumY / n;
-  const normalizedSlope = avgBalance !== 0 ? (slope / avgBalance) * 100 : 0;
+  // Normalize slope relative to the typical size of the balance (always positive)
+  const scale = sumAbs / n;
+  const normalizedSlope = scale > 0 ? (slope / scale) * 100 : 0;
 
   let trend: TrendDirection;
   let score: number;

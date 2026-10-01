@@ -325,6 +325,11 @@ export interface DayBalance {
   projectedExpenses: number;
   transactions: Transaction[];
   status: BalanceStatus;
+  /**
+   * Set on TODAY only: the sum of overdue, still-projected expenses that were deducted from this
+   * day's closing balance (they do not move the realized balance, see balanceCalculator/openItems.ts).
+   */
+  overdueOwed?: number;
 }
 
 export interface UpcomingBill {

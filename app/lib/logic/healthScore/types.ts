@@ -20,6 +20,11 @@ export interface HealthScoreBreakdown {
     /** Balance trend over time (0-100) */
     balanceTrend: number;
   };
+  /**
+   * True when there is no data at all (no rows of any kind): the numbers are placeholders and the
+   * UI shows a neutral "not enough data yet" state instead of a grade.
+   */
+  insufficientData: boolean;
   /** Human-readable insights */
   insights: string[];
 }

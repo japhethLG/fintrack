@@ -6,3 +6,4 @@
 
 export * from "./forecastCalculator";
 
+export * from "./recurringTotals";

@@ -4,6 +4,7 @@
 
 import { HealthScoreBreakdown } from "./types";
 import { Transaction, DayBalance } from "@/lib/types";
+import { getTodayKey } from "@/lib/utils/dateUtils";
 import {
   calculateRunwayScore,
   calculateSavingsRateScore,
@@ -19,6 +20,7 @@ import { generateInsights, getGrade, getScoreColor } from "./insights";
  * @param dailyBalances - Calculated daily balances
  * @param startDate - Period start date (YYYY-MM-DD)
  * @param endDate - Period end date (YYYY-MM-DD)
+ * @param today - Local day key (default: today)
  * @returns Complete health score breakdown with grade and insights
  */
 export const calculateHealthScore = (
@@ -26,10 +28,15 @@ export const calculateHealthScore = (
   transactions: Transaction[],
   dailyBalances: Map<string, DayBalance>,
   startDate: string,
-  endDate: string
+  endDate: string,
+  today: string = getTodayKey()
 ): HealthScoreBreakdown => {
   // Calculate individual component scores
-  const { score: runwayScore, daysRemaining } = calculateRunwayScore(currentBalance, transactions);
+  const { score: runwayScore, daysRemaining } = calculateRunwayScore(
+    currentBalance,
+    transactions,
+    today
+  );
 
   const { score: savingsScore, rate: savingsRate } = calculateSavingsRateScore(
     transactions,
@@ -40,7 +47,8 @@ export const calculateHealthScore = (
   const { score: billPaymentScore, rate: billPaymentRate } = calculateBillPaymentScore(
     transactions,
     startDate,
-    endDate
+    endDate,
+    today
   );
 
   const { score: trendScore, trend } = calculateBalanceTrendScore(
@@ -69,6 +77,9 @@ export const calculateHealthScore = (
     grade: getGrade(overallScore),
     color: getScoreColor(overallScore),
     components,
+    // Nothing recorded at all (no rows, no sources, no rules): the figures above are neutral
+    // placeholders, not a verdict. The UI shows "not enough data yet" instead of a grade.
+    insufficientData: transactions.length === 0,
     insights,
   };
 };

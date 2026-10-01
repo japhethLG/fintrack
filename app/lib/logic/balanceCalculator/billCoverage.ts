@@ -1,85 +1,84 @@
 /**
  * Bill coverage and shortfall analysis
+ *
+ * The window is EXACTLY `daysAhead` calendar days: today .. today + daysAhead - 1 ("Next 14 days of
+ * bills", SPECIFICATION.md). Bills are walked in the order of openItems.ts (D5):
+ *
+ *   1. overdue expenses first: they are owed now (income that is overdue is NOT credited);
+ *   2. then the window, day by day, income before expenses within a day.
+ *
+ * Each bill reports its OWN shortfall: the part of that bill the money on hand cannot pay. An
+ * earlier uncovered bill does not inflate a later one ("Need $100" after a 200 shortfall stays
+ * $100); the running balance still goes on down, so `projectedBalance` is the true end balance.
  */
 
 import { Transaction, BillCoverageReport, UpcomingBill } from "@/lib/types";
-import { formatDate, parseDate, addDays } from "@/lib/utils/dateUtils";
+import { dayNumberOfDate, getTodayKey, parseDate } from "@/lib/utils/dateUtils";
+import { cleanMoney } from "./ledgerMath";
+import { amountOf, collectOpenItems, rowDate } from "./openItems";
+
+/** The spec's window: "Next 14 days of bills". */
+export const BILL_COVERAGE_DAYS = 14;
 
 /**
  * Analyze if current balance can cover upcoming bills
- * @param currentBalance - Current account balance
+ * @param currentBalance - Realized account balance
  * @param transactions - All transactions
- * @param daysAhead - Number of days to look ahead (default: 14)
+ * @param daysAhead - Window length in days, today inclusive (default: 14)
+ * @param today - Local day key (default: today)
  * @returns Report showing bill coverage and potential shortfalls
  */
 export const getBillCoverageReport = (
   currentBalance: number,
-  transactions: Transaction[],
-  daysAhead: number = 14
+  transactions: readonly Transaction[],
+  daysAhead: number = BILL_COVERAGE_DAYS,
+  today: string = getTodayKey()
 ): BillCoverageReport => {
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const endDate = addDays(today, daysAhead);
-  const todayStr = formatDate(today);
-  const endDateStr = formatDate(endDate);
+  const open = collectOpenItems(transactions, today);
+  const todayNumber = dayNumberOfDate(parseDate(today));
+  const lastDay = todayNumber + daysAhead - 1;
 
-  // Filter transactions in the date range (exclude completed and skipped)
-  const upcomingTransactions = transactions.filter((t) => {
-    const date = t.actualDate || t.scheduledDate;
-    return (
-      date >= todayStr && date <= endDateStr && t.status !== "skipped" && t.status !== "completed"
-    );
-  });
+  const inWindow = open.upcoming.filter(
+    (t) => dayNumberOfDate(parseDate(rowDate(t))) <= lastDay
+  );
+  // Overdue expenses are owed now; overdue income has not arrived and is not credited.
+  const overdueBills = open.overdue.filter((t) => t.type !== "income");
+  const walk = [...overdueBills, ...inWindow];
 
-  // Sort by date
-  upcomingTransactions.sort((a, b) => {
-    const dateA = a.actualDate || a.scheduledDate;
-    const dateB = b.actualDate || b.scheduledDate;
-    return dateA.localeCompare(dateB);
-  });
-
-  // Calculate coverage for each bill
   const upcomingBills: UpcomingBill[] = [];
   const billsAtRisk: UpcomingBill[] = [];
   let runningBalance = currentBalance;
   let totalBillsAmount = 0;
 
-  upcomingTransactions.forEach((t) => {
-    const amount =
-      t.status === "completed" ? (t.actualAmount ?? t.projectedAmount) : t.projectedAmount;
+  walk.forEach((t) => {
+    const amount = amountOf(t);
 
     if (t.type === "income") {
       runningBalance += amount;
-    } else {
-      totalBillsAmount += amount;
-      const balanceAfterBill = runningBalance - amount;
-      const canCover = balanceAfterBill >= 0;
-      const shortfall = canCover ? undefined : Math.abs(balanceAfterBill);
-
-      const txDate = parseDate(t.scheduledDate);
-      const daysUntilDue = Math.ceil((txDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
-
-      const billInfo: UpcomingBill = {
-        transaction: t,
-        daysUntilDue,
-        canCover,
-        shortfall,
-      };
-
-      upcomingBills.push(billInfo);
-
-      if (!canCover) {
-        billsAtRisk.push(billInfo);
-      }
-
-      runningBalance = balanceAfterBill;
+      return;
     }
+
+    totalBillsAmount += amount;
+    const available = Math.max(runningBalance, 0);
+    const shortfallAmount = Math.max(cleanMoney(amount - available), 0);
+    const canCover = shortfallAmount === 0;
+
+    const bill: UpcomingBill = {
+      transaction: t,
+      daysUntilDue: dayNumberOfDate(parseDate(rowDate(t))) - todayNumber,
+      canCover,
+      shortfall: canCover ? undefined : shortfallAmount,
+    };
+    upcomingBills.push(bill);
+    if (!canCover) billsAtRisk.push(bill);
+
+    runningBalance -= amount;
   });
 
   const firstAtRisk = billsAtRisk[0];
   const firstShortfall = firstAtRisk
     ? {
-        date: firstAtRisk.transaction.scheduledDate,
+        date: rowDate(firstAtRisk.transaction),
         amount: firstAtRisk.shortfall || 0,
         billName: firstAtRisk.transaction.name,
       }

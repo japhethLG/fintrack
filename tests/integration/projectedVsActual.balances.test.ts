@@ -78,6 +78,13 @@ const summarise = (balances: Map<string, DayBalance>) =>
 // ============================================================================
 
 describe("calculateDailyBalances", () => {
+  // D5 (docs/audit/fixes/display-numbers.md): the series is anchored on the realized balance AT
+  // TODAY, so what is "history", "overdue" and "upcoming" depends on today. These fixtures were
+  // written time-independently (projected rows early in January 2026); pinning today to the first
+  // day of the window keeps them what they always meant: upcoming rows. Tests that need another
+  // "today" pass it explicitly (sixth argument).
+  beforeEach(() => freezeToday("2026-01-01"));
+
   describe("amount selection", () => {
     it("uses actualAmount for a completed transaction, not projectedAmount", () => {
       // Completed expense projected 100 but actually cost 150.
@@ -93,7 +100,9 @@ describe("calculateDailyBalances", () => {
           }),
         ],
         d("2026-01-01"),
-        d("2026-01-03")
+        d("2026-01-03"),
+        500,
+        "2026-01-03" // the expense was paid on 01-02: history by then
       );
 
       expect(summarise(balances)).toEqual([
@@ -114,7 +123,9 @@ describe("calculateDailyBalances", () => {
           }),
         ],
         d("2026-01-01"),
-        d("2026-01-03")
+        d("2026-01-03"),
+        500,
+        "2026-01-03"
       );
 
       // Fallback amount 100 is both reversed out of the opening balance and
@@ -166,7 +177,9 @@ describe("calculateDailyBalances", () => {
           }),
         ],
         d("2026-01-01"),
-        d("2026-01-05")
+        d("2026-01-05"),
+        500,
+        "2026-01-05" // paid on 01-04: history by 01-05
       );
 
       // The scheduled day (01-02) must be untouched...
@@ -185,7 +198,14 @@ describe("calculateDailyBalances", () => {
         actualDate: "2026-01-04",
       });
 
-      const balances = calculateDailyBalances(10_000, [late], d("2026-01-01"), d("2026-01-05"));
+      const balances = calculateDailyBalances(
+        10_000,
+        [late],
+        d("2026-01-01"),
+        d("2026-01-05"),
+        500,
+        "2026-01-05" // paid on 01-04: history by 01-05
+      );
 
       expect(day(balances, "2026-01-02").transactions).toEqual([]);
       expect(day(balances, "2026-01-04").transactions.map((t) => t.id)).toEqual(["txn-late"]);
@@ -204,7 +224,9 @@ describe("calculateDailyBalances", () => {
           }),
         ],
         d("2026-01-01"),
-        d("2026-01-05")
+        d("2026-01-05"),
+        500,
+        "2026-01-05" // paid on 01-02: history by 01-05
       );
 
       expect(day(balances, "2026-01-02").totalIncome).toBe(500);
@@ -393,7 +415,9 @@ describe("calculateDailyBalances", () => {
           }),
         ],
         d("2026-01-01"),
-        d("2026-01-04")
+        d("2026-01-04"),
+        500,
+        "2026-01-04" // both rows were completed on 01-02 and 01-03
       );
 
       expect(day(balances, "2026-01-01").openingBalance).toBe(8_500);
@@ -622,8 +646,8 @@ describe("calculateDailyBalances", () => {
      * window should be reversed, so the first opening balance here is 10000.
      * OBSERVED: 10500 (the 500 expense is added back and never re-spent).
      */
-    it.fails(
-      "KNOWN DEFECT: excludes pre-window completed transactions from the opening balance",
+    it(
+      "keeps pre-window completed transactions in the opening balance (fixed: BAL-1)",
       () => {
         const balances = calculateDailyBalances(
           10_000,
@@ -649,7 +673,7 @@ describe("calculateDailyBalances", () => {
      * whole window is shifted, not just day one — the final closing balance no
      * longer reconciles with the caller's `currentBalance`.
      */
-    it.fails("KNOWN DEFECT: keeps the window reconciled with currentBalance", () => {
+    it("keeps the window reconciled with currentBalance (fixed: BAL-1)", () => {
       const balances = calculateDailyBalances(
         10_000,
         [
@@ -689,7 +713,7 @@ describe("calculateDailyBalances", () => {
      * every non-skipped row). No sibling test pins the hardcoded 0s, because
      * doing so would turn a correct fix into a test failure.
      */
-    it.fails("KNOWN DEFECT: populates projectedIncome and projectedExpenses per day", () => {
+    it("populates projectedIncome and projectedExpenses per day (fixed: BAL-9)", () => {
       const balances = calculateDailyBalances(
         10_000,
         [
@@ -943,7 +967,7 @@ describe("syncComputedBalance", () => {
 
 describe("calculateVarianceReport", () => {
   describe("transaction selection", () => {
-    it("counts only completed transactions", () => {
+    it("plans every non-skipped row but reports actuals only for completed ones (HS-11)", () => {
       const report = calculateVarianceReport(
         [
           makeCompletedTransaction({
@@ -971,12 +995,14 @@ describe("calculateVarianceReport", () => {
         "2026-01-31"
       );
 
-      expect(report.expenses).toEqual({
-        projected: 100,
-        actual: 120,
-        variance: 20,
-        variancePercent: 20,
-      });
+      // REWRITTEN (HS-11: the baseline was computed from completed rows only, so the report could
+      // never show under-delivery). The plan is every non-skipped row in range: 100 (paid) + 999
+      // (still projected) = 1,099; the skipped 888 left the plan. Actual so far is the paid 120.
+      // Variance 120 - 1,099 = -979, i.e. -979 / 1,099 = -89.0809...%.
+      expect(report.expenses.projected).toBe(1_099);
+      expect(report.expenses.actual).toBe(120);
+      expect(report.expenses.variance).toBe(-979);
+      expect(report.expenses.variancePercent).toBeCloseTo(-89.0809, 3);
     });
 
     it("includes transactions scheduled on both boundary dates", () => {
@@ -1387,7 +1413,7 @@ describe("calculateVarianceReport", () => {
      * also leaves the row ORDER of a fixed implementation free — only the
      * presence of the income row is required.
      */
-    it.fails("KNOWN DEFECT: tracks income variance by category as well as expenses", () => {
+    it("tracks income variance by category as well as expenses (fixed: HS-12)", () => {
       const report = calculateVarianceReport(
         [
           makeCompletedTransaction({

@@ -285,6 +285,8 @@ Both the reversal and the re-application read `existing.type`, so changing incom
 
 ## 16. Pre-window completed transactions corrupt every balance in the window
 
+**STATUS: FIXED** by the display-numbers stream (`docs/audit/fixes/display-numbers.md`). Its tests are now plain `it` tests and stay as regression guards. The daily balance is anchored on the realized balance (D5): history is "balance minus what was completed after that day", so no window and no navigation can change a number.
+
 **Source:** `app/lib/logic/balanceCalculator/dailyBalance.ts:27-53`
 
 The opening balance reverses **all** completed transactions in the list — and
@@ -302,6 +304,8 @@ that skews every displayed balance.
 
 ## 17. `DayBalance.projectedIncome` / `projectedExpenses` are always 0
 
+**STATUS: FIXED** by the display-numbers stream (`docs/audit/fixes/display-numbers.md`). Its tests are now plain `it` tests and stay as regression guards. Both are filled from the projected-status rows of each day (overdue rows excluded).
+
 **Source:** `app/lib/logic/balanceCalculator/dailyBalance.ts:87-88`
 
 The type advertises a projected-vs-actual split per day that the calculator never
@@ -312,6 +316,8 @@ populates, so the calendar cannot show one.
 ---
 
 ## 18. `getRunway` re-applies completed transactions
+
+**STATUS: FIXED** by the display-numbers stream (`docs/audit/fixes/display-numbers.md`). Its tests are now plain `it` tests and stay as regression guards. Runway, next crunch and the health runway are one walk (`walkRisk`) that never touches a completed row, folds overdue expenses into day 0 and uses one 90-day horizon.
 
 **Source:** `app/lib/logic/balanceCalculator/runway.ts:37-46`
 
@@ -327,6 +333,8 @@ to `status === "projected"`. `getRunway` is the odd one out.
 ---
 
 ## 19. Income variance by category is discarded
+
+**STATUS: FIXED** by the display-numbers stream (`docs/audit/fixes/display-numbers.md`). Its tests are now plain `it` tests and stay as regression guards. The variance report also lists income categories, and its baseline is every non-skipped planned row (not completed rows only).
 
 **Source:** `app/lib/logic/balanceCalculator/variance.ts:42-47`
 
@@ -350,6 +358,8 @@ Without a `type` filter, income and expense amounts are summed into one
 
 ## 21. Health-score insights truncate by push order, not severity
 
+**STATUS: FIXED** by the display-numbers stream (`docs/audit/fixes/display-numbers.md`). Its tests are now plain `it` tests and stay as regression guards. Insights are ranked danger, warning, note, praise before the top 3 are kept.
+
 **Source:** `app/lib/logic/healthScore/insights.ts:61`
 
 `.slice(0, 3)` keeps whichever insights were pushed first. A user with a great
@@ -361,6 +371,8 @@ shown three compliments and no warning.
 ---
 
 ## 22. Chart buckets omit empty periods
+
+**STATUS: FIXED** by the display-numbers stream (`docs/audit/fixes/display-numbers.md`). Its tests are now plain `it` tests and stay as regression guards. Every bucket of the requested range is emitted (zeros where nothing happened); a range with no activity at all is an empty chart.
 
 **Source:** `app/lib/logic/healthScore/chartData.ts:71-92`
 

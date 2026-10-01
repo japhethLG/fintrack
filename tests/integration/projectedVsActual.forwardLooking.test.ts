@@ -64,14 +64,15 @@ import { freezeToday } from "../helpers/time";
  * `getRunway(userProfile.currentBalance, transactions)` and
  * `getNextCrunch(userProfile.currentBalance, transactions)`.
  *
- * COMPLIANT — a passing test in each block below says so:
- *   - `calculateRunwayScore` excludes completed (scoreCalculators.ts:34-37)
+ * COMPLIANT — every projection now honours it (display-numbers stream, BAL-2 fixed):
+ *   - `calculateRunwayScore`, `getRunway` and `getNextCrunch` all read ONE walk (runway.ts
+ *     `walkRisk`), which never touches a completed row
  *   - `calculateForecast` keeps only `status === "projected"`
- *     (forecastCalculator.ts:27-29)
- *   - `getBillCoverageReport` excludes completed (billCoverage.ts:26-31)
- * VIOLATING — filed as an `it.fails` defect in each block below:
- *   - `getRunway` walks completed rows (runway.ts:32-39)
- *   - `getNextCrunch` walks completed rows (runway.ts:82-92)
+ *   - `getBillCoverageReport` excludes completed rows
+ *
+ * D5 (docs/audit/fixes/display-numbers.md): a still-projected row dated before today is OVERDUE.
+ * It does not move the realized balance, but the risk views (runway, crunch, coverage) owe it from
+ * day 0; overdue INCOME is not credited. Within a day income is credited before expenses.
  */
 
 // ============================================================================
@@ -132,33 +133,41 @@ describe("getBillCoverageReport", () => {
   beforeEach(() => freezeToday(TODAY));
 
   describe("window", () => {
-    it("includes both boundary days of [today, today + daysAhead] and nothing outside", () => {
-      // daysAhead 14 from 2026-03-10 => window 2026-03-10 .. 2026-03-24.
+    it("covers EXACTLY daysAhead days: today .. today + daysAhead - 1 (SPECIFICATION: next 14 days)", () => {
+      // REWRITTEN (user decision: the window is exactly 14 days; it was today..today+14 = 15 days).
+      // daysAhead 14 from 2026-03-10 => window 2026-03-10 .. 2026-03-23 (14 calendar days).
+      // 03-24 (today + 14) is outside. 03-09 is OVERDUE (D5): it is still owed, so it is walked
+      // first and listed ahead of the window (daysUntilDue -1) instead of being invisible.
       const report = getBillCoverageReport(
         100_000,
         [
           makeProjectedTransaction({ id: "before", scheduledDate: "2026-03-09" }),
           makeProjectedTransaction({ id: "first-day", scheduledDate: TODAY }),
-          makeProjectedTransaction({ id: "last-day", scheduledDate: "2026-03-24" }),
-          makeProjectedTransaction({ id: "after", scheduledDate: "2026-03-25" }),
+          makeProjectedTransaction({ id: "last-day", scheduledDate: "2026-03-23" }),
+          makeProjectedTransaction({ id: "after", scheduledDate: "2026-03-24" }),
         ],
         14
       );
 
-      expect(report.upcomingBills.map((b) => b.transaction.id)).toEqual(["first-day", "last-day"]);
+      expect(report.upcomingBills.map((b) => [b.transaction.id, b.daysUntilDue])).toEqual([
+        ["before", -1],
+        ["first-day", 0],
+        ["last-day", 13],
+      ]);
     });
 
-    it("honours a custom daysAhead window", () => {
+    it("honours a custom daysAhead window (7 days = today .. today + 6)", () => {
+      // REWRITTEN with the 14-day decision: a 7-day window ends on day 6, so day 6 is in, day 7 out.
       const report = getBillCoverageReport(
         100_000,
         [
+          makeProjectedTransaction({ id: "day-6", scheduledDate: plusDays(TODAY, 6) }),
           makeProjectedTransaction({ id: "day-7", scheduledDate: plusDays(TODAY, 7) }),
-          makeProjectedTransaction({ id: "day-8", scheduledDate: plusDays(TODAY, 8) }),
         ],
         7
       );
 
-      expect(report.upcomingBills.map((b) => b.transaction.id)).toEqual(["day-7"]);
+      expect(report.upcomingBills.map((b) => b.transaction.id)).toEqual(["day-6"]);
     });
 
     it("excludes completed and skipped transactions — only unrealized bills need covering", () => {
@@ -310,9 +319,11 @@ describe("getBillCoverageReport", () => {
       expect(report.upcomingBills[0].shortfall).toBe(500);
     });
 
-    it("attributes canCoverAll and firstShortfall to the FIRST uncoverable bill", () => {
-      // Balance 100: "Water" overdraws to -100 (shortfall 100), then
-      // "Electric" compounds it to -400 (shortfall 400).
+    it("attributes canCoverAll and firstShortfall to the FIRST uncoverable bill; each shortfall is the bill's own", () => {
+      // REWRITTEN (per-bill shortfall, not a cumulative carry). Balance 100: "Water" 200 overdraws
+      // to -100: only 100 of it is covered, so it needs 100. "Electric" 300 then finds nothing
+      // left (the balance is already below zero): its own uncovered part is its full 300 (the old
+      // cumulative figure, 400, double-counted Water's 100). The end balance is still -400.
       const report = getBillCoverageReport(100, [
         makeProjectedTransaction({
           id: "water",
@@ -329,7 +340,7 @@ describe("getBillCoverageReport", () => {
       ]);
 
       expect(report.canCoverAll).toBe(false);
-      expect(report.upcomingBills.map((b) => b.shortfall)).toEqual([100, 400]);
+      expect(report.upcomingBills.map((b) => b.shortfall)).toEqual([100, 300]);
       expect(report.firstShortfall).toEqual({
         date: "2026-03-12",
         amount: 100,
@@ -344,10 +355,12 @@ describe("getBillCoverageReport", () => {
       const report = getBillCoverageReport(100_000, [
         makeProjectedTransaction({ id: "today", scheduledDate: TODAY }),
         makeProjectedTransaction({ id: "week", scheduledDate: plusDays(TODAY, 7) }),
-        makeProjectedTransaction({ id: "edge", scheduledDate: plusDays(TODAY, 14) }),
+        makeProjectedTransaction({ id: "edge", scheduledDate: plusDays(TODAY, 13) }),
+        makeProjectedTransaction({ id: "outside", scheduledDate: plusDays(TODAY, 14) }),
       ]);
 
-      expect(report.upcomingBills.map((b) => b.daysUntilDue)).toEqual([0, 7, 14]);
+      // REWRITTEN with the 14-day decision: the last day of the default window is today + 13.
+      expect(report.upcomingBills.map((b) => b.daysUntilDue)).toEqual([0, 7, 13]);
     });
   });
 
@@ -370,7 +383,7 @@ describe("getBillCoverageReport", () => {
      * (filter on scheduledDate, or compute daysUntilDue from the effective
      * date) and to fail on today's code.
      */
-    it.fails("KNOWN DEFECT: keeps daysUntilDue inside the reported window", () => {
+    it("keeps daysUntilDue inside the reported window (fixed: one date drives membership and due days)", () => {
       const report = getBillCoverageReport(
         10_000,
         [
@@ -384,7 +397,8 @@ describe("getBillCoverageReport", () => {
         14
       );
 
-      expect(report.upcomingBills.every((b) => b.daysUntilDue >= 0 && b.daysUntilDue <= 14)).toBe(
+      // window is 14 days => daysUntilDue in 0..13 (tightened from <= 14 with the window decision)
+      expect(report.upcomingBills.every((b) => b.daysUntilDue >= 0 && b.daysUntilDue <= 13)).toBe(
         true
       );
     });
@@ -467,10 +481,9 @@ describe("getRunway", () => {
   // The next three tests characterize HOW getRunway spends completed rows. Per
   // the contract it should not spend them at all; these exist so that the
   // arithmetic (which amount, which date) is pinned rather than accidental.
-  it("characterizes the defect: spends a completed row at actualAmount, projected rows at projectedAmount", () => {
-    // The completed bill's projectedAmount (5,000) would overdraw on the 11th;
-    // its actualAmount (200) does not, so the run-out is driven by the
-    // projected 900 on the 12th: 1,000 - 200 - 900 = -100.
+  it("never walks a completed row: only the projected 900 is spent, 1,000 - 900 = 100 stays solvent", () => {
+    // REWRITTEN (the old test pinned the double-count: it spent the completed row's actual 200 as
+    // well and ran out on the 12th). A completed row is already inside the 1,000 balance.
     const result = getRunway(1_000, [
       makeCompletedTransaction({
         id: "settled",
@@ -485,19 +498,21 @@ describe("getRunway", () => {
       }),
     ]);
 
-    expect(result).toEqual({ days: 2, runOutDate: "2026-03-12" });
+    expect(result).toEqual({ days: 90, runOutDate: null });
   });
 
-  it("characterizes the defect: falls back to projectedAmount for a completed row with no actualAmount", () => {
-    // Branch coverage for runway.ts:39 (`t.actualAmount ?? t.projectedAmount`).
+  it("never walks a completed row that has no actualAmount either", () => {
+    // REWRITTEN: a completed 1,200 (projected amount, no actual) is in the balance already, so
+    // there is no run-out tomorrow.
     const result = getRunway(1_000, [
       completedWithoutActual({ scheduledDate: "2026-03-11", projectedAmount: 1_200 }),
     ]);
 
-    expect(result).toEqual({ days: 1, runOutDate: "2026-03-11" });
+    expect(result).toEqual({ days: 90, runOutDate: null });
   });
 
-  it("characterizes the defect: buckets a completed row on its actualDate, not its scheduledDate", () => {
+  it("never walks a completed row, whatever day it was actually paid on", () => {
+    // REWRITTEN: paid on the 15th instead of the scheduled 11th changes nothing for the runway.
     const result = getRunway(1_000, [
       makeCompletedTransaction({
         scheduledDate: "2026-03-11",
@@ -507,7 +522,7 @@ describe("getRunway", () => {
       }),
     ]);
 
-    expect(result).toEqual({ days: 5, runOutDate: "2026-03-15" });
+    expect(result).toEqual({ days: 90, runOutDate: null });
   });
 
   it("counts income on the same day before deciding the balance went negative", () => {
@@ -533,21 +548,60 @@ describe("getRunway", () => {
     ).toEqual({ days: 30, runOutDate: null });
   });
 
-  it("is contradicted by calculateRunwayScore, which applies the contract correctly", () => {
-    // Identical input, and only one of these two answers can be right. The
-    // 1,000 balance handed in ALREADY paid the completed 1,200 bill, so
-    // calculateRunwayScore is correct to leave the 90-day horizon untouched;
-    // the getRunway half of this assertion is the double-count filed as a
-    // defect immediately below, kept side by side so the divergence is visible
-    // in one place instead of being inferred from two separate blocks.
+  it("agrees with calculateRunwayScore on identical input", () => {
+    // REWRITTEN (it asserted the DISAGREEMENT between the two). The 1,000 balance already paid the
+    // completed 1,200 bill, so neither runs out: the runway is the full horizon, 90 days.
     const completed = makeCompletedTransaction({
       scheduledDate: "2026-03-11",
       projectedAmount: 1_200,
       actualAmount: 1_200,
     });
 
-    expect(getRunway(1_000, [completed], 30)).toEqual({ days: 1, runOutDate: "2026-03-11" });
+    expect(getRunway(1_000, [completed], 30)).toEqual({ days: 30, runOutDate: null });
+    expect(getRunway(1_000, [completed]).days).toBe(90);
     expect(calculateRunwayScore(1_000, [completed]).daysRemaining).toBe(90);
+  });
+
+  it("reports the same first negative day as calculateRunwayScore when one exists", () => {
+    // 1,000 - 400 (11th) - 400 (12th) - 400 (13th) => -200 on the 13th: day 3 in both.
+    const bills = [
+      makeProjectedTransaction({ id: "a", scheduledDate: "2026-03-11", projectedAmount: 400 }),
+      makeProjectedTransaction({ id: "b", scheduledDate: "2026-03-12", projectedAmount: 400 }),
+      makeProjectedTransaction({ id: "c", scheduledDate: "2026-03-13", projectedAmount: 400 }),
+    ];
+
+    expect(getRunway(1_000, bills)).toEqual({ days: 3, runOutDate: "2026-03-13" });
+    expect(calculateRunwayScore(1_000, bills).daysRemaining).toBe(3);
+    expect(getNextCrunch(1_000, bills)).toEqual({ date: "2026-03-13", shortfall: 200 });
+  });
+
+  it("folds an OVERDUE unpaid bill into day 0 (D5): it is owed now", () => {
+    // 300 in the account, a 400 bill due 03-08 and never paid. The realized balance stays 300 but
+    // the bill is owed, so the account is -100 at the end of today: runway 0, crunch today.
+    const overdue = makeProjectedTransaction({
+      id: "overdue",
+      scheduledDate: "2026-03-08",
+      projectedAmount: 400,
+    });
+
+    expect(getRunway(300, [overdue])).toEqual({ days: 0, runOutDate: TODAY });
+    expect(getNextCrunch(300, [overdue])).toEqual({ date: TODAY, shortfall: 100 });
+  });
+
+  it("does not credit an OVERDUE income that has not arrived", () => {
+    // 100 in the account, a 500 payday due 03-08 that never came, a 150 bill tomorrow:
+    // 100 - 150 = -50 on the 11th. The late payday is not money you can spend.
+    const result = getRunway(100, [
+      makeProjectedTransaction({
+        id: "late-pay",
+        type: "income",
+        scheduledDate: "2026-03-08",
+        projectedAmount: 500,
+      }),
+      makeProjectedTransaction({ id: "bill", scheduledDate: "2026-03-11", projectedAmount: 150 }),
+    ]);
+
+    expect(result).toEqual({ days: 1, runOutDate: "2026-03-11" });
   });
 
   describe("known defects", () => {
@@ -572,7 +626,7 @@ describe("getRunway", () => {
      * (app/lib/logic/healthScore/scoreCalculators.ts:34-37). With a 1,000
      * balance that already includes the 1,200 payment, there is no run-out.
      */
-    it.fails("KNOWN DEFECT: does not re-spend a completed transaction dated in the future", () => {
+    it("does not re-spend a completed transaction dated in the future (fixed: BAL-2)", () => {
       const result = getRunway(
         1_000,
         [
@@ -653,8 +707,9 @@ describe("getNextCrunch", () => {
     ).toBeNull();
   });
 
-  it("characterizes the defect: uses actualAmount for the completed rows it should not be spending", () => {
-    // actualAmount 5,000 overdraws where projectedAmount 10 would not.
+  it("never walks a completed row, whatever its actualAmount", () => {
+    // REWRITTEN (it pinned the double-count: a completed 5,000 actual "overdrew" tomorrow). It is
+    // already inside the 1,000 balance, so there is no crunch.
     expect(
       getNextCrunch(1_000, [
         makeCompletedTransaction({
@@ -663,13 +718,11 @@ describe("getNextCrunch", () => {
           actualAmount: 5_000,
         }),
       ])
-    ).toEqual({ date: "2026-03-11", shortfall: 4_000 });
+    ).toBeNull();
   });
 
-  it("characterizes the defect: falls back to projectedAmount for a completed row with no actualAmount", () => {
-    // Branch coverage for runway.ts:92 (`t.actualAmount ?? t.projectedAmount`).
-    // No actualAmount, so the projected 5,000 is what gets spent:
-    // 1,000 - 5,000 = -4,000 on the 11th.
+  it("never walks a completed row that has no actualAmount either", () => {
+    // REWRITTEN: the completed 5,000 (projected amount) is in the balance already.
     expect(
       getNextCrunch(1_000, [
         completedWithoutActual({
@@ -678,26 +731,19 @@ describe("getNextCrunch", () => {
           projectedAmount: 5_000,
         }),
       ])
-    ).toEqual({ date: "2026-03-11", shortfall: 4_000 });
+    ).toBeNull();
   });
 
-  describe("the dayExpenses > 0 guard", () => {
+  describe("an account that is already overdrawn (the old dayExpenses > 0 gate is gone)", () => {
     /**
-     * JUDGEMENT: the guard (runway.ts:103) means a day is only ever reported
-     * when an expense lands on it. Because the balance can only fall on days
-     * that have expenses, the only way to be negative on a quiet day is to
-     * have started negative — i.e. `currentBalance` is already overdrawn. In
-     * that situation the function reports nothing at all, which contradicts
-     * its own docstring ("Find the next date when balance will go negative").
-     * That is a reporting gap rather than a miscalculation: the account is
-     * already overdrawn, so nothing "goes" negative, and the widgets that
-     * consume this have a separate negative-balance signal. Pinned as
-     * behaviour, not filed as a defect.
+     * REWRITTEN (BAL-11 / UI-DISP-33). The old gate only reported a day on which an expense landed,
+     * so an account that STARTED negative was reported late (on its first expense) or never. The
+     * function's own contract is "the next date the balance is negative": for an overdrawn account
+     * that is today. The gate is dropped and the answer matches getRunway.
      */
-    it("skips a negative day that carries an earlier deficit but has no expenses of its own", () => {
-      // Already overdrawn at -500. The 11th only receives income (-400, still
-      // negative, no expenses => skipped). The crunch is not reported until the
-      // 12th, where a 50 expense lands, and the shortfall is the cumulative 450.
+    it("reports today for an account that starts overdrawn, even when a payday lands first", () => {
+      // -500 now; +100 on the 11th and a 50 bill on the 12th never matter: it is negative TODAY.
+      // Shortfall = how far below zero the account is today: 500.
       expect(
         getNextCrunch(-500, [
           makeProjectedTransaction({
@@ -712,11 +758,37 @@ describe("getNextCrunch", () => {
             projectedAmount: 50,
           }),
         ])
-      ).toEqual({ date: "2026-03-12", shortfall: 450 });
+      ).toEqual({ date: TODAY, shortfall: 500 });
     });
 
-    it("reports no crunch at all for an already-overdrawn account with no upcoming expenses", () => {
-      expect(getNextCrunch(-500, [])).toBeNull();
+    it("reports today for an already-overdrawn account with no upcoming rows at all", () => {
+      expect(getNextCrunch(-500, [])).toEqual({ date: TODAY, shortfall: 500 });
+      expect(getRunway(-500, [])).toEqual({ days: 0, runOutDate: TODAY });
+    });
+
+    it("reports an overdrawn account's deeper end-of-today balance as the shortfall", () => {
+      // -500 now and a 200 bill today: -700 at the end of today.
+      expect(
+        getNextCrunch(-500, [
+          makeProjectedTransaction({ id: "bill", scheduledDate: TODAY, projectedAmount: 200 }),
+        ])
+      ).toEqual({ date: TODAY, shortfall: 700 });
+    });
+
+    it("reports the first negative day even when a later day carries only the earlier deficit", () => {
+      // 100, a 600 bill on the 11th (-500). The 12th has only a 100 payday (-400): still negative
+      // but no expense of its own; the FIRST negative day (the 11th) is the crunch.
+      expect(
+        getNextCrunch(100, [
+          makeProjectedTransaction({ id: "bill", scheduledDate: "2026-03-11", projectedAmount: 600 }),
+          makeProjectedTransaction({
+            id: "pay",
+            type: "income",
+            scheduledDate: "2026-03-12",
+            projectedAmount: 100,
+          }),
+        ])
+      ).toEqual({ date: "2026-03-11", shortfall: 500 });
     });
   });
 
@@ -738,7 +810,7 @@ describe("getNextCrunch", () => {
      * CORRECT: no crunch, matching calculateRunwayScore's treatment of the same
      * input (app/lib/logic/healthScore/scoreCalculators.ts:34-37).
      */
-    it.fails("KNOWN DEFECT: does not re-spend a completed transaction dated in the future", () => {
+    it("does not re-spend a completed transaction dated in the future (fixed: BAL-2)", () => {
       const result = getNextCrunch(
         1_000,
         [
@@ -851,10 +923,8 @@ describe("calculateForecast", () => {
     // balance TODAY", forecastCalculator.ts:24-25). The completed 1,200 is
     // already inside the 1,000 balance, so the forecast is correctly flat.
     //
-    // The second assertion is the same input through getRunway, which breaks
-    // the contract and reports a run-out tomorrow — the defect filed in the
-    // getRunway block. It is asserted here to keep the two treatments of one
-    // input adjacent; the forecast's answer is the correct one.
+    // The second assertion is the same input through getRunway, which now honours the contract
+    // too (BAL-2 fixed): no run-out tomorrow either.
     const transactions = [
       makeCompletedTransaction({
         id: "paid",
@@ -868,7 +938,7 @@ describe("calculateForecast", () => {
     expect(calculateForecast(1_000, transactions, d(TODAY), 4).map((p) => p.balance)).toEqual([
       1_000, 1_000, 1_000, 1_000,
     ]);
-    expect(getRunway(1_000, transactions, 10)).toEqual({ days: 1, runOutDate: "2026-03-11" });
+    expect(getRunway(1_000, transactions, 10)).toEqual({ days: 10, runOutDate: null });
   });
 
   it("buckets projected transactions by scheduledDate, ignoring any actualDate", () => {
@@ -1270,7 +1340,7 @@ describe("calculateSavingsRateScore", () => {
      * month; the passing test "returns a neutral 100 with a 0 rate when there
      * are no transactions at all" above guards that.
      */
-    it.fails("KNOWN DEFECT: scores 0 for spending in a month with no income", () => {
+    it("scores 0 for spending in a month with no income (fixed: HS-2)", () => {
       const result = calculateSavingsRateScore(
         [makeProjectedTransaction({ scheduledDate: "2026-03-06", projectedAmount: 1_000 })],
         PERIOD.start,
@@ -1439,12 +1509,38 @@ describe("calculateBillPaymentScore", () => {
     expect(result).toEqual({ score: 100, rate: 100 });
   });
 
-  it("ignores still-projected bills, so an unpaid overdue bill does not lower the score", () => {
-    // Only `status !== "projected"` expenses are considered
-    // (scoreCalculators.ts:131-140): a bill that came due on the 10th and was
-    // never touched is invisible here, and the record stays perfect.
+  it("counts an unpaid overdue bill against the record (HS-4, D5)", () => {
+    // REWRITTEN (it pinned "the record stays perfect" for a bill that came due on the 10th and was
+    // never touched). Today is the 31st, so the untouched bill is overdue: 0 of 1 on time.
     const result = calculateBillPaymentScore(
       [makeProjectedTransaction({ id: "overdue", scheduledDate: "2026-03-10" })],
+      PERIOD.start,
+      PERIOD.end
+    );
+
+    expect(result).toEqual({ score: 0, rate: 0 });
+  });
+
+  it("puts an overdue bill in the denominator beside paid ones: 3 paid + 1 overdue = 75%", () => {
+    const paid = (id: string, day: string) =>
+      makeCompletedTransaction({ id, scheduledDate: day, actualDate: day });
+    const result = calculateBillPaymentScore(
+      [
+        paid("a", "2026-03-05"),
+        paid("b", "2026-03-06"),
+        paid("c", "2026-03-07"),
+        makeProjectedTransaction({ id: "overdue", scheduledDate: "2026-03-10" }),
+      ],
+      PERIOD.start,
+      PERIOD.end
+    );
+
+    expect(result).toEqual({ score: 75, rate: 75 });
+  });
+
+  it("does not count a bill due TODAY that is still unpaid: it is not late yet", () => {
+    const result = calculateBillPaymentScore(
+      [makeProjectedTransaction({ id: "due-today", scheduledDate: "2026-03-31" })],
       PERIOD.start,
       PERIOD.end
     );
@@ -1662,7 +1758,7 @@ describe("calculateBalanceTrendScore", () => {
      * CORRECT: the trend must follow the sign of the slope; recovering from
      * overdraft is "improving".
      */
-    it.fails("KNOWN DEFECT: reports a balance rising through zero as improving", () => {
+    it("reports a balance rising through zero as improving (fixed: HS-1/HS-6)", () => {
       const result = calculateBalanceTrendScore(
         dayBalances([
           ["2026-03-01", -1_000],
@@ -1688,7 +1784,7 @@ describe("calculateBalanceTrendScore", () => {
      *
      * CORRECT: sort the collected days by date before regressing.
      */
-    it.fails("KNOWN DEFECT: orders the series by date, not by map insertion order", () => {
+    it("orders the series by date, not by map insertion order (fixed)", () => {
       const result = calculateBalanceTrendScore(
         dayBalances([
           ["2026-03-03", 3_000],
@@ -2019,7 +2115,9 @@ describe("getMonthlyMultiplier", () => {
   beforeEach(() => freezeToday(TODAY));
 
   it("maps every frequency to its monthly equivalent", () => {
-    expect(getMonthlyMultiplier("daily")).toBe(30);
+    // REWRITTEN (UI-15): a daily source is 365 payments a year, so a typical month is 365 / 12, not 30
+    // (a 360-day year). The multiplier is a typical-month helper; no displayed total uses it.
+    expect(getMonthlyMultiplier("daily")).toBe(365 / 12);
     expect(getMonthlyMultiplier("weekly")).toBe(52 / 12);
     expect(getMonthlyMultiplier("bi-weekly")).toBe(26 / 12);
     expect(getMonthlyMultiplier("semi-monthly")).toBe(2);
@@ -2046,39 +2144,37 @@ describe("prorateToDateRange", () => {
   beforeEach(() => freezeToday(TODAY));
 
   /**
-   * NOTE: this helper parses its bounds with `new Date(str)`
-   * (frequencyUtils.ts:49-50), which reads "YYYY-MM-DD" as UTC midnight. Under
-   * this suite's pinned TZ=UTC that is indistinguishable from local midnight;
-   * the offset behaviour belongs to the timezone suite.
+   * REWRITTEN (UI-OBS-01 / UI-2). The helper used a fixed 30-day divisor ("Use 30-day month for
+   * consistency"), so a whole 31-day month prorated to 3,100 and February to 2,800. Each day is now
+   * worth monthlyAmount / (days in THAT calendar month), so a whole month is exactly the monthly
+   * amount. (No displayed total uses this: they count occurrences.)
    */
 
-  it("returns the full monthly amount for an inclusive 30-day range", () => {
-    // 2026-03-01 .. 2026-03-30 is 30 days inclusive.
-    expect(prorateToDateRange(3_000, "2026-03-01", "2026-03-30")).toBe(3_000);
+  it("returns the full monthly amount for a whole 30-day month", () => {
+    expect(prorateToDateRange(3_000, "2026-04-01", "2026-04-30")).toBeCloseTo(3_000, 9);
   });
 
-  it("returns half the monthly amount for a 15-day range", () => {
-    expect(prorateToDateRange(3_000, "2026-03-01", "2026-03-15")).toBe(1_500);
+  it("prorates a part-month by that month's own length: 15 of 31 days", () => {
+    // 2026-03-01 .. 03-15 is 15 days of 31: 3,000 x 15 / 31 = 1,451.6129...
+    expect(prorateToDateRange(3_000, "2026-03-01", "2026-03-15")).toBeCloseTo(1_451.6129032, 6);
   });
 
-  it("returns a single day as one thirtieth", () => {
-    expect(prorateToDateRange(3_000, "2026-03-01", "2026-03-01")).toBe(100);
+  it("returns a single day as one day's share of its month: 1/31", () => {
+    expect(prorateToDateRange(3_000, "2026-03-01", "2026-03-01")).toBeCloseTo(96.7741935, 6);
   });
 
-  it("assumes a fixed 30-day month, so a 31-day month prorates above the monthly amount", () => {
-    // 31 inclusive days / 30 => 3,100. The fixed divisor is deliberate
-    // ("Use 30-day month for consistency") but it does mean the sum of a
-    // year's prorated months does not equal 12 monthly amounts.
-    expect(prorateToDateRange(3_000, "2026-03-01", "2026-03-31")).toBe(3_100);
+  it("a whole 31-day month is the monthly amount, not 3,100", () => {
+    expect(prorateToDateRange(3_000, "2026-03-01", "2026-03-31")).toBeCloseTo(3_000, 9);
   });
 
-  it("prorates a 28-day February below the monthly amount", () => {
-    expect(prorateToDateRange(3_000, "2026-02-01", "2026-02-28")).toBe(2_800);
+  it("a whole 28-day February is the monthly amount, not 2,800", () => {
+    expect(prorateToDateRange(3_000, "2026-02-01", "2026-02-28")).toBeCloseTo(3_000, 9);
   });
 
-  it("scales linearly across a month boundary", () => {
-    // 2026-03-20 .. 2026-04-08 is 20 inclusive days => 3,000 / 30 * 20.
-    expect(prorateToDateRange(3_000, "2026-03-20", "2026-04-08")).toBe(2_000);
+  it("scales across a month boundary with each month's own length", () => {
+    // 2026-03-20 .. 03-31 = 12 days x 3,000 / 31 = 1,161.2903 ; 04-01 .. 04-08 = 8 days x 3,000 / 30 = 800
+    // total 1,961.2903...
+    expect(prorateToDateRange(3_000, "2026-03-20", "2026-04-08")).toBeCloseTo(1_961.2903226, 6);
   });
 
   it("returns zero for a zero monthly amount", () => {
@@ -2086,8 +2182,8 @@ describe("prorateToDateRange", () => {
   });
 
   it("returns a negative amount for an inverted range, with no validation", () => {
-    // end before start => daysDiff -13. Pinned so a future guard is a visible
-    // behaviour change rather than a silent one.
-    expect(prorateToDateRange(3_000, "2026-03-15", "2026-03-01")).toBe((3_000 / 30) * -13);
+    // end before start => day count -13 (03-01 - 03-15 + 1), at the start month's rate 3,000 / 31.
+    // Pinned so a future guard is a visible behaviour change rather than a silent one.
+    expect(prorateToDateRange(3_000, "2026-03-15", "2026-03-01")).toBeCloseTo((3_000 / 31) * -13, 9);
   });
 });

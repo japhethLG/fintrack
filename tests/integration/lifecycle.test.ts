@@ -34,6 +34,7 @@ import {
   makeUserProfile,
 } from "../helpers/builders";
 import { d, daysBetween, duplicates } from "../helpers/dates";
+import { getTodayKey } from "@/lib/utils/dateUtils";
 import { freezeToday } from "../helpers/time";
 
 /**
@@ -218,8 +219,13 @@ const assertViewIsConsistent = (view: DerivedView, window: Window): void => {
   daysBetween(window.start, window.end).forEach((day) => {
     const balance = daily.get(day);
     expect(balance, `no DayBalance for ${day}`).toBeDefined();
-    // summed raw, not rounded: an invariant must not launder float noise away
-    const rows = balance!.transactions.filter((t) => t.status !== "skipped");
+    // summed raw, not rounded: an invariant must not launder float noise away.
+    // D5: an OVERDUE row (still projected, dated before today) is listed on its own day but moved
+    // nothing, so it is not in that day's totals; what is owed is deducted on today (overdueOwed).
+    const today = getTodayKey();
+    const rows = balance!.transactions.filter(
+      (t) => t.status !== "skipped" && !(t.status === "projected" && (t.actualDate || t.scheduledDate) < today)
+    );
     const sum = (type: Transaction["type"]) =>
       rows.filter((t) => t.type === type).reduce((total, t) => total + effective(t), 0);
     const income = sum("income");
@@ -227,7 +233,10 @@ const assertViewIsConsistent = (view: DerivedView, window: Window): void => {
 
     expect(balance!.totalIncome).toBeCloseTo(income, 6);
     expect(balance!.totalExpenses).toBeCloseTo(expenses, 6);
-    expect(balance!.closingBalance).toBeCloseTo(balance!.openingBalance + income - expenses, 6);
+    expect(balance!.closingBalance).toBeCloseTo(
+      balance!.openingBalance + income - expenses - (balance!.overdueOwed ?? 0),
+      6
+    );
     if (previousClosing !== null) {
       expect(balance!.openingBalance).toBeCloseTo(previousClosing, 6);
     }
@@ -300,13 +309,20 @@ beforeEach(() => {
   store.__reset();
 });
 
+// D5 NOTE (docs/audit/fixes/display-numbers.md). The scenarios below freeze "today" on the first day
+// of the window (2026-01-01) unless stated: every projected row is then UPCOMING, the series is
+// anchored on the realized balance, and an occurrence completed before its date is filed on the day
+// it was paid (today), which is what the realized balance already says. They were written with
+// today = 2026-01-02, when the 2026-01-01 salary was already a day overdue: under D5 an overdue
+// salary is not credited, so those curves were not what the model means any more.
+
 // ============================================================================
 // 1. HAPPY PATH
 // ============================================================================
 
 describe("happy path: project, then pay exactly what was projected", () => {
   beforeEach(() => {
-    freezeToday("2026-01-02");
+    freezeToday("2026-01-01");
     seedWorld(2_000);
   });
 
@@ -370,16 +386,20 @@ describe("happy path: project, then pay exactly what was projected", () => {
     expect(stored.scheduledDate).toBe("2026-01-05");
   });
 
-  it("leaves every derived closing balance untouched when the actual equals the projection", async () => {
+  it("leaves the curve from the due date on untouched when the actual equals the projection", async () => {
     const before = snapshot();
 
     await completeOccurrence(JAN_RENT_ID, 1_200);
 
-    // currentBalance is now 800, but calculateDailyBalances undoes completed
-    // rows to recover the 2000 opening, so the whole curve is NET unchanged
+    // REWRITTEN (D5). currentBalance is now 800 and the series is anchored on it, so the opening
+    // is still 800 + 1,200 = 2,000 and the curve is net unchanged, EXCEPT that the rent was paid
+    // today (01-01), three days before its due date, so it leaves the account on 01-01:
+    //   01-01: 2,000 + 3,000 salary - 1,200 rent = 3,800 (it was 5,000 before the early payment)
+    //   01-05 .. 03-05: identical to the baseline (3,800, 6,800, 5,600, 8,600, 7,400).
     const after = snapshot();
-    expect(closings(after)).toEqual(closings(before));
-    expect(closings(after)).toEqual(BASELINE_CLOSINGS);
+    expect(closings(before)).toEqual(BASELINE_CLOSINGS);
+    expect(closings(after)).toEqual([3_800, 3_800, 6_800, 5_600, 8_600, 7_400]);
+    expect(closings(after).slice(1)).toEqual(BASELINE_CLOSINGS.slice(1));
     expect(after.daily.get("2026-01-01")!.openingBalance).toBe(2_000);
   });
 });
@@ -390,7 +410,7 @@ describe("happy path: project, then pay exactly what was projected", () => {
 
 describe("overspend: the actual comes in above the projection", () => {
   beforeEach(() => {
-    freezeToday("2026-01-02");
+    freezeToday("2026-01-01");
     seedWorld(2_000);
   });
 
@@ -401,7 +421,10 @@ describe("overspend: the actual comes in above the projection", () => {
     await completeOccurrence(JAN_RENT_ID, 1_350);
 
     const after = snapshot();
-    expect(after.daily.get("2026-01-05")!.totalExpenses).toBe(1_350);
+    // REWRITTEN (D5): the rent was paid today (01-01), ahead of its 01-05 due date, so the day
+    // that carries the money is 01-01; the merged row still reports its due date.
+    expect(after.daily.get("2026-01-01")!.totalExpenses).toBe(1_350);
+    expect(after.daily.get("2026-01-05")!.totalExpenses).toBe(0);
     expect(rowOn(after, "2026-01-05").actualAmount).toBe(1_350);
   });
 
@@ -409,9 +432,9 @@ describe("overspend: the actual comes in above the projection", () => {
     await completeOccurrence(JAN_RENT_ID, 1_350);
 
     const after = snapshot();
-    // 150 overspend: the 2026-01-01 salary day is untouched, everything from
-    // 2026-01-05 onward is exactly 150 lower
-    expect(closings(after)).toEqual([5_000, 3_650, 6_650, 5_450, 8_450, 7_250]);
+    // REWRITTEN (D5). Paid today (01-01): 01-01 = 2,000 + 3,000 - 1,350 = 3,650, then the baseline
+    // shifted down by the 150 overspend: 3,650, 6,650, 5,450, 8,450, 7,250.
+    expect(closings(after)).toEqual([3_650, 3_650, 6_650, 5_450, 8_450, 7_250]);
     expect(cents(after.daily.get("2026-03-31")!.closingBalance)).toBe(7_250);
     expect(balance()).toBe(650);
   });
@@ -425,7 +448,10 @@ describe("overspend: the actual comes in above the projection", () => {
     expect(report.expenses.variance).toBe(150);
     // 150 / 1200 = 12.5%
     expect(report.expenses.variancePercent).toBeCloseTo(12.5, 6);
+    // REWRITTEN (HS-11/12): the plan also holds the pending salary (income categories are listed
+    // now): salary 3,000 planned and not yet received = -3,000, in first-seen (date) order.
     expect(report.byCategory).toEqual([
+      { category: "salary", projected: 3_000, actual: 0, variance: -3_000 },
       { category: "housing", projected: 1_200, actual: 1_350, variance: 150 },
     ]);
   });
@@ -434,7 +460,14 @@ describe("overspend: the actual comes in above the projection", () => {
     await completeOccurrence(JAN_RENT_ID, 1_350);
 
     const report = calculateVarianceReport(snapshot().transactions, "2026-01-01", "2026-01-31");
-    expect(report.income).toEqual({ projected: 0, actual: 0, variance: 0, variancePercent: 0 });
+    // REWRITTEN (HS-11): the plan includes the pending 3,000 salary; nothing has been received
+    // yet, so income is entirely under-delivered: 0 - 3,000 = -3,000 = -100%.
+    expect(report.income).toEqual({
+      projected: 3_000,
+      actual: 0,
+      variance: -3_000,
+      variancePercent: -100,
+    });
   });
 
   describe("known defects", () => {
@@ -462,7 +495,7 @@ describe("overspend: the actual comes in above the projection", () => {
 
 describe("correction: the recorded actual is edited, then moved to another day", () => {
   beforeEach(async () => {
-    freezeToday("2026-01-02");
+    freezeToday("2026-01-01");
     seedWorld(2_000);
     // the user first records 1350...
     await completeOccurrence(JAN_RENT_ID, 1_350);
@@ -494,26 +527,35 @@ describe("correction: the recorded actual is edited, then moved to another day",
     await completeOccurrence(onlyStoredRow().id, 1_100);
 
     const view = snapshot();
-    // 100 underspend against the 1200 projection: every day from 2026-01-05 is
-    // 100 HIGHER than the baseline
-    expect(closings(view)).toEqual([5_000, 3_900, 6_900, 5_700, 8_700, 7_500]);
-    expect(view.daily.get("2026-01-05")!.totalExpenses).toBe(1_100);
+    // REWRITTEN (D5). 100 underspend against the 1200 projection, paid today (01-01):
+    // 01-01 = 2,000 + 3,000 - 1,100 = 3,900; then 100 above the baseline: 6,900, 5,700, 8,700, 7,500.
+    expect(closings(view)).toEqual([3_900, 3_900, 6_900, 5_700, 8_700, 7_500]);
+    expect(view.daily.get("2026-01-01")!.totalExpenses).toBe(1_100);
     expect(view.transactions).toHaveLength(6);
   });
 
   it("moves the expense to the day it was actually paid, leaving the schedule alone", async () => {
-    await completeOccurrence(onlyStoredRow().id, 1_100);
+    const onlyRent = () =>
+      (store.__all<Transaction>("transactions") as Transaction[]).find(
+        (t) => t.occurrenceId === "exp-1_2026-01"
+      )!;
+    // REWRITTEN (D5). "Paid three days late" needs today to be after the payment, and by then the
+    // 01-01 salary must have been received too (an unpaid, overdue salary is not credited): the
+    // user records the salary, then corrects the rent and moves it to 01-08, and today is 01-08.
+    vi.setSystemTime(new Date(2026, 0, 8, 0, 0, 0, 0));
+    await completeOccurrence(SALARY_IDS[0], 3_000);
+    await completeOccurrence(onlyRent().id, 1_100);
     // paid three days late: 2026-01-05 scheduled, 2026-01-08 actual
-    await completeOccurrence(onlyStoredRow().id, 1_100, "2026-01-08");
+    await completeOccurrence(onlyRent().id, 1_100, "2026-01-08");
 
-    const stored = onlyStoredRow();
+    const stored = onlyRent();
     expect(stored.actualDate).toBe("2026-01-08");
     // the schedule is a statement about the obligation and is never rewritten
     expect(stored.scheduledDate).toBe("2026-01-05");
     expect(stored.occurrenceId).toBe("exp-1_2026-01");
 
     const view = snapshot();
-    // gone from the scheduled day...
+    // gone from the scheduled day... (salary 2,000 + 3,000 received on 01-01, rent not yet paid)
     expect(view.daily.get("2026-01-05")!.totalExpenses).toBe(0);
     expect(view.daily.get("2026-01-05")!.transactions).toEqual([]);
     expect(cents(view.daily.get("2026-01-05")!.closingBalance)).toBe(5_000);
@@ -557,7 +599,7 @@ describe("correction: the recorded actual is edited, then moved to another day",
 
 describe("undo: reverting a realized occurrence back to projected", () => {
   beforeEach(() => {
-    freezeToday("2026-01-02");
+    freezeToday("2026-01-01");
     seedWorld(2_000);
   });
 
@@ -625,7 +667,7 @@ describe("skip: an occurrence the user declares will not happen", () => {
 
   describe("seen from January", () => {
     beforeEach(async () => {
-      freezeToday("2026-01-02");
+      freezeToday("2026-01-01");
       seedWorld(2_000);
       await skipFebruaryRent();
     });
@@ -673,6 +715,10 @@ describe("skip: an occurrence the user declares will not happen", () => {
       freezeToday("2026-02-01");
       seedWorld(2_000);
       await skipFebruaryRent();
+      // D5: January's rent (01-05) is in the past; left projected it would be OVERDUE and owed, and
+      // coverage now counts overdue bills. This test is about the SKIPPED February rent, so
+      // January's is settled as skipped too.
+      await markTransactionSkippedAction(JAN_RENT_ID, undefined, USER, liveSources(), liveRules());
     });
 
     it("keeps a skipped occurrence out of the bill coverage report", () => {
@@ -704,7 +750,7 @@ describe("reschedule: dragging an occurrence to a different day", () => {
     });
 
   beforeEach(() => {
-    freezeToday("2026-03-01");
+    freezeToday("2026-01-01");
     seedWorld(2_000);
     store.__seedEntities("expense_rules", [insuranceRule()]);
   });
@@ -758,21 +804,27 @@ describe("reschedule: dragging an occurrence to a different day", () => {
   });
 
   it("reorders the bill coverage report around the moved bill", async () => {
-    // 30 days from 2026-03-01 spans both the old and the new rent date
-    const before = snapshot(WINDOW, 30);
+    // REWRITTEN (D5 + 14-day window): today is 2026-01-01 now, so a 90-day window (01-01 .. 03-31)
+    // spans every rent and the insurance. Days from 01-01: Jan 5 = 4, Feb 5 = 35, Mar 5 = 63,
+    // Mar 10 = 68, Mar 20 = 78 (31 + 28 + 19).
+    const before = snapshot(WINDOW, 90);
     expect(before.coverage.upcomingBills.map((b) => [b.transaction.name, b.daysUntilDue])).toEqual([
       ["Rent", 4],
-      ["Insurance", 9],
+      ["Rent", 35],
+      ["Rent", 63],
+      ["Insurance", 68],
     ]);
 
     await rescheduleTransactionAction(MAR_RENT_ID, "2026-03-20", USER, liveSources(), liveRules());
 
-    const after = snapshot(WINDOW, 30);
+    const after = snapshot(WINDOW, 90);
     expect(after.coverage.upcomingBills.map((b) => [b.transaction.name, b.daysUntilDue])).toEqual([
-      ["Insurance", 9],
-      ["Rent", 19],
+      ["Rent", 4],
+      ["Rent", 35],
+      ["Insurance", 68],
+      ["Rent", 78],
     ]);
-    expect(after.coverage.totalUpcoming).toBe(1_500);
+    expect(after.coverage.totalUpcoming).toBe(3_900); // 3 x 1,200 + 300
     expect(after.coverage.canCoverAll).toBe(true);
   });
 
@@ -802,7 +854,9 @@ describe("reschedule: dragging an occurrence to a different day", () => {
     expect(view.transactions.filter((t) => t.occurrenceId === "exp-1_2026-03")).toHaveLength(1);
     expect(rowOn(view, "2026-03-20").status).toBe("completed");
     expect(view.daily.get("2026-03-05")!.totalExpenses).toBe(0);
-    expect(view.daily.get("2026-03-20")!.totalExpenses).toBe(1_200);
+    // REWRITTEN (D5): paid on 01-01, ahead of its 03-20 date, the rent is filed on the day paid
+    expect(view.daily.get("2026-03-20")!.totalExpenses).toBe(0);
+    expect(view.daily.get("2026-01-01")!.totalExpenses).toBe(1_200);
   });
 });
 
@@ -814,7 +868,10 @@ describe("late payment: paid in February, scheduled in January", () => {
   beforeEach(async () => {
     freezeToday("2026-02-04");
     seedWorld(2_000);
-    // January's rent, 1250, actually paid on 2026-02-03
+    // D5: by 02-04 both salaries were received (an unpaid, overdue salary is not credited):
+    // balance 2,000 + 3,000 + 3,000 = 8,000, then January's rent, 1250, actually paid on 2026-02-03
+    await completeOccurrence(SALARY_IDS[0], 3_000);
+    await completeOccurrence(SALARY_IDS[1], 3_000);
     await completeOccurrence(JAN_RENT_ID, 1_250, "2026-02-03");
   });
 
@@ -873,13 +930,16 @@ describe("late payment: paid in February, scheduled in January", () => {
     expect(januaryVariance.expenses.variance).toBe(50);
 
     const februaryVariance = calculateVarianceReport(merged, "2026-02-01", "2026-02-28");
-    // February sees nothing, even though 1250 of February cash went out
-    expect(februaryVariance.expenses.projected).toBe(0);
+    // REWRITTEN (HS-11): February's plan is its own rent, 1,200, still unpaid (02-05 is tomorrow).
+    // The 1,250 of February cash that went out belongs to January's plan, so February has paid 0.
+    expect(februaryVariance.expenses.projected).toBe(1_200);
     expect(februaryVariance.expenses.actual).toBe(0);
   });
 
   it("keeps the scheduled date intact so the obligation stays in January", () => {
-    const stored = onlyStoredRow();
+    const stored = (store.__all<Transaction>("transactions") as Transaction[]).find(
+      (t) => t.occurrenceId === "exp-1_2026-01"
+    )!;
 
     expect(stored.scheduledDate).toBe("2026-01-05");
     expect(stored.actualDate).toBe("2026-02-03");
@@ -939,7 +999,7 @@ describe("loan lifecycle: paying the first of six amortized payments", () => {
     view.transactions.filter((t) => t.id.startsWith("proj_"));
 
   beforeEach(() => {
-    freezeToday("2026-01-02");
+    freezeToday("2026-01-01");
     seedLoanWorld();
   });
 
@@ -1143,10 +1203,16 @@ describe("loan lifecycle: paying the first of six amortized payments", () => {
 // ============================================================================
 
 describe("overdue: a projected bill whose day has passed", () => {
-  beforeEach(() => {
-    // February's rent (the 5th) is five days in the past and still unpaid
+  beforeEach(async () => {
+    // February's rent (the 5th) is five days in the past and still unpaid.
+    // The 01-01 salary, the 01-05 rent and the 02-01 salary are settled as skipped so that the
+    // 02-05 rent is the ONLY overdue row (an unpaid past salary is not credited, D5), and the
+    // realized balance stays 2,000.
     freezeToday("2026-02-10");
     seedWorld(2_000);
+    await markTransactionSkippedAction(SALARY_IDS[0], undefined, USER, liveSources(), liveRules());
+    await markTransactionSkippedAction(JAN_RENT_ID, undefined, USER, liveSources(), liveRules());
+    await markTransactionSkippedAction(SALARY_IDS[1], undefined, USER, liveSources(), liveRules());
   });
 
   it("keeps the overdue bill in the merged list", () => {
@@ -1159,42 +1225,41 @@ describe("overdue: a projected bill whose day has passed", () => {
     expect(feb.projectedAmount).toBe(1_200);
   });
 
-  it("keeps spending the overdue bill in the daily balance map", () => {
+  it("does not move the realized history, and owes the overdue bill from today", () => {
     const view = snapshot();
 
-    // the calendar/forecast still assumes the money goes out, which is right —
-    // the bill is owed
-    expect(view.daily.get("2026-02-05")!.totalExpenses).toBe(1_200);
-    expect(closings(view)).toEqual(BASELINE_CLOSINGS);
+    // REWRITTEN (D5). It used to spend the overdue bill on its own day (02-05) and show a curve
+    // that no balance anywhere agreed with. Now: the bill is listed (flagged) on 02-05 but moves
+    // nothing there, the realized balance stays 2,000, and today (02-10) owes it:
+    //   02-10: 2,000 - 1,200 owed = 800 ; 03-01: +3,000 salary = 3,800 ; 03-05: -1,200 rent = 2,600
+    expect(view.daily.get("2026-02-05")!.transactions.map((t) => t.id)).toEqual([FEB_RENT_ID]);
+    expect(view.daily.get("2026-02-05")!.totalExpenses).toBe(0);
+    expect(cents(view.daily.get("2026-02-05")!.closingBalance)).toBe(2_000);
+    expect(view.daily.get("2026-02-10")!.overdueOwed).toBe(1_200);
+    expect(cents(view.daily.get("2026-02-10")!.closingBalance)).toBe(800);
+    expect(closings(view)).toEqual([2_000, 2_000, 2_000, 2_000, 3_800, 2_600]);
   });
 
-  it("excludes the overdue bill from bill coverage", () => {
+  it("counts the overdue bill in bill coverage (it is owed now)", () => {
     const view = snapshot();
 
-    // getBillCoverageReport keeps only `date >= todayStr`
-    // (billCoverage.ts:27-32), so the unpaid 2026-02-05 rent is dropped and the
-    // 14-day window 2026-02-10..2026-02-24 looks completely clear
-    expect(view.coverage.upcomingBills).toEqual([]);
-    expect(view.coverage.totalUpcoming).toBe(0);
-    expect(view.coverage.projectedBalance).toBe(2_000);
+    // REWRITTEN (D5, it asserted the overdue bill was dropped and the window looked clear).
+    // 2,000 balance, the 02-05 rent owed (1,200 -> 800); nothing else falls in 02-10 .. 02-23.
+    expect(view.coverage.upcomingBills.map((b) => [b.transaction.scheduledDate, b.daysUntilDue])).toEqual([
+      ["2026-02-05", -5],
+    ]);
+    expect(view.coverage.totalUpcoming).toBe(1_200);
+    expect(view.coverage.projectedBalance).toBe(800);
     expect(view.coverage.canCoverAll).toBe(true);
   });
 
   describe("known defects", () => {
     /**
-     * DEFECT: `getBillCoverageReport` filters upcoming transactions with
-     * `date >= todayStr` (billCoverage.ts:29-31) and only excludes `completed`
-     * and `skipped` rows. A bill that is still `projected` but whose date has
-     * passed is neither paid nor cancelled — it is OVERDUE and still owed — yet
-     * it is silently dropped from `upcomingBills`, `totalUpcoming` and
-     * `projectedBalance`. The "can I cover my bills?" widget therefore
-     * overstates available cash by the sum of every unpaid overdue bill, which
-     * is exactly the situation in which the user most needs the warning. (The
-     * dashboard has a separate OverdueAlert surface, but that does not feed the
-     * coverage numbers, so the two views contradict each other.)
-     * CORRECT: an unpaid overdue bill must still be counted against the balance.
+     * FIXED (BAL-4 / D5): bill coverage used to drop an unpaid overdue bill (`date >= today`), so
+     * the "can I cover my bills?" widget overstated available cash by every overdue bill. An
+     * unpaid overdue bill is still counted against the balance.
      */
-    it.fails("KNOWN DEFECT: bill coverage counts an unpaid overdue bill", () => {
+    it("bill coverage counts an unpaid overdue bill", () => {
       const view = snapshot();
 
       expect(view.coverage.upcomingBills.map((b) => b.transaction.scheduledDate)).toEqual([
@@ -1205,8 +1270,19 @@ describe("overdue: a projected bill whose day has passed", () => {
     });
   });
 
+  it("flags the overdue bill as unable to be covered when the balance is short", async () => {
+    // a 1,000 balance cannot pay the 1,200 rent that is already owed
+    store.__seed("users", USER, makeUserProfile({ uid: USER, currentBalance: 1_000 }) as unknown as Record<string, unknown>);
+
+    const view = snapshot();
+    expect(view.coverage.canCoverAll).toBe(false);
+    expect(view.coverage.upcomingBills[0].shortfall).toBe(200);
+    expect(view.coverage.firstShortfall).toEqual({ date: "2026-02-05", amount: 200, billName: "Rent" });
+  });
+
   it("brings the overdue bill back into coverage once it is paid late", async () => {
-    await completeOccurrence(FEB_RENT_ID, 1_200, "2026-02-12");
+    // paid yesterday (REWRITTEN from 02-12: a late payment cannot be dated after today)
+    await completeOccurrence(FEB_RENT_ID, 1_200, "2026-02-09");
 
     const view = snapshot();
     // completed rows are excluded from coverage by design, but the money has now
@@ -1215,7 +1291,8 @@ describe("overdue: a projected bill whose day has passed", () => {
     expect(view.coverage.currentBalance).toBe(800);
     expect(view.coverage.upcomingBills).toEqual([]);
     expect(view.daily.get("2026-02-05")!.totalExpenses).toBe(0);
-    expect(view.daily.get("2026-02-12")!.totalExpenses).toBe(1_200);
+    expect(view.daily.get("2026-02-09")!.totalExpenses).toBe(1_200);
+    expect(view.daily.get("2026-02-10")!.overdueOwed).toBeUndefined();
   });
 });
 
@@ -1225,7 +1302,7 @@ describe("overdue: a projected bill whose day has passed", () => {
 
 describe("double-count guard", () => {
   beforeEach(() => {
-    freezeToday("2026-01-02");
+    freezeToday("2026-01-01");
     seedWorld(2_000);
   });
 
@@ -1289,7 +1366,9 @@ describe("double-count guard", () => {
     const view = snapshot();
     expect(view.transactions).toHaveLength(6);
     expect(view.daily.get("2026-01-05")!.totalExpenses).toBe(0);
-    expect(view.daily.get("2026-01-06")!.totalExpenses).toBe(900);
+    // REWRITTEN (D5): dated 01-06 but today is 01-01, so it is filed on the day it was paid
+    expect(view.daily.get("2026-01-06")!.totalExpenses).toBe(0);
+    expect(view.daily.get("2026-01-01")!.totalExpenses).toBe(900);
     expect(balance()).toBe(1_100);
   });
 });
