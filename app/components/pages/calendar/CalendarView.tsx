@@ -13,7 +13,7 @@ import {
 } from "@dnd-kit/core";
 import { useFinancial } from "@/contexts/FinancialContext";
 import { Transaction } from "@/lib/types";
-import { Button, Card, PageHeader, Icon, LoadingSpinner } from "@/components/common";
+import { Alert, Button, Card, PageHeader, Icon, LoadingSpinner } from "@/components/common";
 import { formatDate, isSameDay, startOfDay } from "@/lib/utils/dateUtils";
 import { getBalanceStatus } from "@/lib/logic/balanceCalculator/utils";
 import { useModal } from "@/components/modals";
@@ -42,6 +42,7 @@ const CalendarView: React.FC = () => {
   const [viewMode, setViewMode] = useState<"month" | "week">("month");
   const calendarCardRef = useRef<HTMLDivElement | null>(null);
   const [draggingTransaction, setDraggingTransaction] = useState<Transaction | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
   const sensors = useSensors(
     useSensor(MouseSensor, {
       activationConstraint: { distance: 8 },
@@ -286,7 +287,13 @@ const CalendarView: React.FC = () => {
     const currentDate = txn.actualDate || txn.scheduledDate;
     if (currentDate === targetDate) return;
 
-    await rescheduleTransaction(txn.id, targetDate);
+    setActionError(null);
+    try {
+      await rescheduleTransaction(txn.id, targetDate);
+    } catch (err) {
+      // a rejected move used to be an unhandled rejection: the item snapped back and nobody was told
+      setActionError(err instanceof Error ? err.message : "Failed to move the transaction");
+    }
   };
 
   // Month summary
@@ -421,6 +428,12 @@ const CalendarView: React.FC = () => {
             </div>
           }
         />
+
+        {actionError && (
+          <Alert variant="error" className="mb-4">
+            {actionError}
+          </Alert>
+        )}
 
         {/* Month Summary */}
         <MonthSummary

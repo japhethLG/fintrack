@@ -5,6 +5,7 @@ import { useSearchParams } from "next/navigation";
 import { useFinancial } from "@/contexts/FinancialContext";
 import { ExpenseRule, ExpenseRuleFormData } from "@/lib/types";
 import {
+  Alert,
   Button,
   Card,
   PageHeader,
@@ -78,15 +79,32 @@ const ExpenseManager: React.FC = () => {
     setShowForm(false);
   };
 
+  // A rejected delete / deactivate is shown to the user (E2E-ROB-04); it used to be an unhandled rejection
+  const [actionError, setActionError] = useState<string | null>(null);
+
   const handleDeleteRule = async () => {
     if (!selectedRuleId) return;
-    await removeExpenseRule(selectedRuleId);
-    setSelectedRuleId(null);
+    setActionError(null);
+    try {
+      await removeExpenseRule(selectedRuleId);
+      setSelectedRuleId(null);
+    } catch (err) {
+      setActionError(err instanceof Error ? err.message : "Failed to delete expense rule");
+    }
   };
 
   const handleToggleActive = async (isActive: boolean) => {
     if (!selectedRuleId) return;
-    await toggleExpenseRuleActive(selectedRuleId, isActive);
+    setActionError(null);
+    try {
+      await toggleExpenseRuleActive(selectedRuleId, isActive);
+    } catch (err) {
+      setActionError(
+        err instanceof Error
+          ? err.message
+          : `Failed to ${isActive ? "activate" : "deactivate"} expense rule`
+      );
+    }
   };
 
   const startEdit = () => {
@@ -156,6 +174,12 @@ const ExpenseManager: React.FC = () => {
           )
         }
       />
+
+      {actionError && (
+        <Alert variant="error" className="mb-6">
+          {actionError}
+        </Alert>
+      )}
 
       {/* Summary Cards */}
       {!showForm && (
