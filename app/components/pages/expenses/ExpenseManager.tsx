@@ -20,6 +20,7 @@ import ExpenseRuleCard from "./components/ExpenseRuleCard";
 import ExpenseRuleDetail from "./components/ExpenseRuleDetail";
 import { EXPENSE_FILTER_OPTIONS } from "./constants";
 import { getTodayKey, parseDate } from "@/lib/utils/dateUtils";
+import { TOTAL_DEBT_NOTE } from "@/lib/constants";
 import {
   isExpenseRuleCurrent,
   monthBounds,
@@ -207,6 +208,9 @@ const ExpenseManager: React.FC = () => {
             <p className="text-gray-400 text-xs lg:text-sm mb-1">Total Debt</p>
             <p className="text-lg lg:text-3xl font-bold text-danger">
               {formatCurrency(debtOwed)}
+            </p>
+            <p className="text-[10px] lg:text-xs text-gray-500 mt-1" title={TOTAL_DEBT_NOTE}>
+              {TOTAL_DEBT_NOTE}
             </p>
           </Card>
           <Card padding="md">

@@ -6,6 +6,7 @@ import { cn } from "@/lib/utils/cn";
 import { useCurrency } from "@/lib/hooks/useCurrency";
 import InsightCard from "./InsightCard";
 import { parseDate } from "@/lib/utils/dateUtils";
+import { TOTAL_DEBT_NOTE } from "@/lib/constants";
 import { RISK_HORIZON_DAYS } from "@/lib/logic/balanceCalculator/runway";
 
 interface Metrics {
@@ -114,7 +115,7 @@ const MetricsGrid: React.FC<IProps> = ({
           icon="credit_card"
           title="Total Debt"
           value={formatCurrency(metrics.totalDebt)}
-          subtitle={`Active in ${periodLabel || "selected period"}`}
+          subtitle={`${TOTAL_DEBT_NOTE} Active in ${periodLabel || "selected period"}.`}
           status={metrics.totalDebt > 0 ? "warning" : "success"}
         />
       </div>

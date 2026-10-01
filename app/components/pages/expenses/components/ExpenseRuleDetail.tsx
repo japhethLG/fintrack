@@ -3,6 +3,7 @@
 import React, { useState, useMemo } from "react";
 import { ExpenseRule } from "@/lib/types";
 import { EXPENSE_CATEGORY_LABELS } from "@/lib/constants";
+import { installmentRemaining } from "@/lib/logic/forecasting";
 import { Button, Card, Icon, Badge, Tooltip } from "@/components/common";
 import { cn } from "@/lib/utils/cn";
 import { useCurrency } from "@/lib/hooks/useCurrency";
@@ -550,11 +551,7 @@ const ExpenseRuleDetail: React.FC<IProps> = ({ rule, onEdit, onDelete, onToggleA
             <div>
               <p className="text-xs text-gray-400">Remaining</p>
               <p className="text-danger font-medium">
-                {formatCurrency(
-                  (rule.installmentConfig.installmentCount -
-                    rule.installmentConfig.installmentsPaid) *
-                    rule.installmentConfig.installmentAmount
-                )}
+                {formatCurrency(installmentRemaining(rule.installmentConfig))}
               </p>
             </div>
             <div>

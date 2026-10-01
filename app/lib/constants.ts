@@ -84,3 +84,10 @@ export const TRANSACTION_STATUS_BG_COLOR: Record<TransactionStatus, string> = {
   projected: "bg-warning/10",
   skipped: "bg-gray-700/30",
 };
+
+// ============================================================================
+// TOTAL DEBT
+// ============================================================================
+
+/** The one-line basis printed under every "Total Debt" figure (Expenses and Forecast). */
+export const TOTAL_DEBT_NOTE = "What you still owe. Loan interest is not included.";

@@ -7,6 +7,7 @@ import {
   monthBounds,
   plannedTotals,
   recurringPeriodTotals,
+  installmentRemaining,
   totalDebt,
 } from "@/lib/logic/forecasting/recurringTotals";
 import { getMonthlyMultiplier, prorateToDateRange } from "@/lib/utils/frequencyUtils";
@@ -169,6 +170,31 @@ describe("totalDebt", () => {
 
     // 12,000 + 1,000 + (6 - 2) x 200 = 13,800 ; the rent is no debt, the switched-off loan is not counted
     expect(totalDebt(rules)).toBe(13_800);
+  });
+});
+
+describe("installmentRemaining (MANUAL-L1)", () => {
+  const plan = (over: Record<string, unknown> = {}) =>
+    makeInstallmentRule(
+      {},
+      { totalAmount: 25_000, installmentCount: 12, installmentAmount: 2_083.33, installmentsPaid: 0, ...over }
+    ).installmentConfig!;
+
+  it("a 25,000 plan over 12 with nothing paid has 25,000 left, not 12 x 2,083.33 = 24,999.96", () => {
+    expect(installmentRemaining(plan())).toBe(25_000);
+    expect(totalDebt([makeInstallmentRule({}, plan())])).toBe(25_000);
+  });
+
+  it("the last installment absorbs the residual: 11 paid leaves 2,083.37", () => {
+    expect(installmentRemaining(plan({ installmentsPaid: 11 }))).toBe(2_083.37);
+  });
+
+  it("3 paid leaves 9 installments, the last of them 2,083.37: 8 x 2,083.33 + 2,083.37 = 18,750", () => {
+    expect(installmentRemaining(plan({ installmentsPaid: 3 }))).toBe(18_750);
+  });
+
+  it("a fully paid plan owes nothing", () => {
+    expect(installmentRemaining(plan({ installmentsPaid: 12 }))).toBe(0);
   });
 });
 
