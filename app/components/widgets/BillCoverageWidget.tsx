@@ -129,7 +129,7 @@ const BillCoverageWidget: React.FC<BillCoverageWidgetProps> = ({
           </div>
           <div>
             <p className="text-gray-400">Total Bills</p>
-            <p className="text-danger font-bold text-lg">-{formatCurrency(totalUpcoming)}</p>
+            <p className="text-danger font-bold text-lg">{formatCurrency(-totalUpcoming)}</p>
           </div>
           <div>
             <p className="text-gray-400">Bills Count</p>

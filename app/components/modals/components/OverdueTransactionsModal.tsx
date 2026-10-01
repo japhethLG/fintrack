@@ -20,7 +20,7 @@ export interface IProps {
 
 const OverdueTransactionsModal: React.FC<IProps> = ({ closeModal, modalData }) => {
   const { overdueTransactions, onReview } = modalData;
-  const { formatCurrency } = useCurrency();
+  const { formatCurrency, formatCurrencyWithSign } = useCurrency();
 
   const formatDisplayDate = (dateStr: string) => dayjs(dateStr).format("MMM D, YYYY");
 
@@ -104,8 +104,7 @@ const OverdueTransactionsModal: React.FC<IProps> = ({ closeModal, modalData }) =
                 <div className="flex items-center gap-4 shrink-0">
                   <div className="text-right">
                     <p className={cn("font-bold", isIncome ? "text-success" : "text-danger")}>
-                      {isIncome ? "+" : "-"}
-                      {formatCurrency(transaction.projectedAmount)}
+                      {formatCurrencyWithSign((isIncome ? 1 : -1) * (transaction.projectedAmount))}
                     </p>
                     <Badge variant="danger" size="sm" className="mt-1">
                       {daysOverdue} day{daysOverdue !== 1 ? "s" : ""} overdue

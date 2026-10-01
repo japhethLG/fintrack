@@ -84,7 +84,7 @@ const UpcomingActivityWidget: React.FC<IProps> = ({ onTransactionClick }) => {
         </div>
         <div className="bg-dark-800 p-3 rounded-lg border border-gray-800">
           <p className="text-xs text-gray-400 mb-1">Expenses</p>
-          <p className="text-danger font-bold text-sm">-{formatCurrency(stats.totalExpenses)}</p>
+          <p className="text-danger font-bold text-sm">{formatCurrency(-stats.totalExpenses)}</p>
         </div>
         <div className="bg-dark-800 p-3 rounded-lg border border-gray-800">
           <p className="text-xs text-gray-400 mb-1">Net Change</p>

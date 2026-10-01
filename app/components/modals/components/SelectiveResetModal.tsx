@@ -3,6 +3,7 @@
 import React, { useMemo, useState } from "react";
 import { Alert, Button, Checkbox, Icon } from "@/components/common";
 import { DeletableDataType } from "@/lib/types";
+import { useCurrency } from "@/lib/hooks/useCurrency";
 
 export interface IModalData {
   /** Map of collection counts to display next to each option */
@@ -35,7 +36,7 @@ const OPTIONS: Array<{ key: SelectionKey; label: string; description: string }> 
   {
     key: "all",
     label: "All Financial Data",
-    description: "Everything below (resets balance to $0)",
+    description: "Everything below (resets balance to {zero})",
   },
   { key: "income_sources", label: "Income Sources", description: "Recurring/one-time income" },
   { key: "expense_rules", label: "Expense Rules", description: "Bills, loans, credit cards" },
@@ -46,6 +47,8 @@ const OPTIONS: Array<{ key: SelectionKey; label: string; description: string }> 
 
 const SelectiveResetModal: React.FC<IProps> = ({ closeModal, modalData }) => {
   const { counts = {}, onConfirm, onCancel, isSubmitting } = modalData;
+  const { formatCurrency } = useCurrency();
+  const zero = formatCurrency(0);
 
   const [selected, setSelected] = useState<SelectionKey[]>([]);
 
@@ -56,12 +59,13 @@ const SelectiveResetModal: React.FC<IProps> = ({ closeModal, modalData }) => {
     () =>
       OPTIONS.map((option) => ({
         ...option,
+        description: option.description.replace("{zero}", zero),
         count:
           option.key === "all"
             ? ALL_TYPES.reduce((sum, type) => sum + (counts[type] ?? 0), 0)
             : counts[option.key] ?? 0,
       })),
-    [counts]
+    [counts, zero]
   );
 
   const toggleSelection = (type: SelectionKey) => {
@@ -110,7 +114,7 @@ const SelectiveResetModal: React.FC<IProps> = ({ closeModal, modalData }) => {
 
       {/* Warning */}
       <Alert variant="warning" className="mb-5">
-        This action cannot be undone. Resetting transactions will also set your balance to $0.
+        This action cannot be undone. Resetting transactions will also set your balance to {zero}.
       </Alert>
 
       {/* Options */}

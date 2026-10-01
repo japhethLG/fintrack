@@ -53,9 +53,8 @@ describe("Forecast page", () => {
 });
 
 describe("Settings page", () => {
-  knownDefect(
-    "UI-OBS-02",
-    "Low Balance Warning Threshold input is prefixed with a hard-coded peso sign for a USD user",
+  it(
+    "UI-OBS-02 — Low Balance Warning Threshold input is prefixed with a hard-coded peso sign for a USD user",
     async () => {
       // observed: prefix "₱" while every other amount on the page renders "$"
       await renderApp({

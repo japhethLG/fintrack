@@ -8,6 +8,7 @@ import { Button, Card, Icon, Alert } from "@/components/common";
 import { Form, FormInput } from "@/components/formElements";
 import { useAuth } from "@/contexts/AuthContext";
 import { useFinancial } from "@/contexts/FinancialContext";
+import { useCurrency } from "@/lib/hooks/useCurrency";
 import {
   overrideCurrentBalance,
   recalculateBalance,
@@ -38,6 +39,7 @@ const BalanceSection: React.FC = () => {
   // mixes in projections; deriving the balance from it made the mismatch banner and
   // "Recalculate Balance" wrong in both directions (UI-BAL-06/07/08).
   const { ledger, isInitialized } = useFinancial();
+  const { formatCurrency, currencySymbol } = useCurrency();
   const [isEditingCurrent, setIsEditingCurrent] = useState(false);
   const [isEditingInitial, setIsEditingInitial] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
@@ -159,13 +161,6 @@ const BalanceSection: React.FC = () => {
     setError(null);
   };
 
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat("en-PH", {
-      style: "currency",
-      currency: userProfile?.preferences?.currency || "PHP",
-    }).format(amount);
-  };
-
   const newComputedBalance =
     pendingInitialBalance !== null ? cleanMoney(pendingInitialBalance + ledger.sum) : null;
 
@@ -250,7 +245,7 @@ const BalanceSection: React.FC = () => {
                   inputName="newBalance"
                   type="number"
                   label="Override Current Balance"
-                  prefix="₱"
+                  prefix={currencySymbol}
                   placeholder="Enter new balance"
                 />
                 <div className="flex gap-2">
@@ -367,7 +362,7 @@ const BalanceSection: React.FC = () => {
                     inputName="initialBalance"
                     type="number"
                     label="Set Initial Balance"
-                    prefix="₱"
+                    prefix={currencySymbol}
                     placeholder="Enter initial balance"
                   />
                   <div className="flex gap-2">

@@ -44,7 +44,7 @@ const TransactionModal: React.FC<IProps> = ({ closeModal, modalData }) => {
     deleteManualTransaction,
   } = useFinancial();
   const { openModal } = useModal();
-  const { formatCurrency, formatCurrencyWithSign, currencySymbol } = useCurrency();
+  const { formatCurrencyWithSign, currencySymbol } = useCurrency();
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
@@ -192,8 +192,7 @@ const TransactionModal: React.FC<IProps> = ({ closeModal, modalData }) => {
             <div>
               <p className="text-xs text-gray-400">Expected Amount</p>
               <p className={cn("font-bold", isIncome ? "text-success" : "text-danger")}>
-                {isIncome ? "+" : "-"}
-                {formatCurrency(transaction.projectedAmount)}
+                {formatCurrencyWithSign((isIncome ? 1 : -1) * (transaction.projectedAmount))}
               </p>
             </div>
           </div>
@@ -211,8 +210,7 @@ const TransactionModal: React.FC<IProps> = ({ closeModal, modalData }) => {
                   <div>
                     <p className="text-xs text-gray-400">Actual Amount</p>
                     <p className={cn("font-bold", isIncome ? "text-success" : "text-danger")}>
-                      {isIncome ? "+" : "-"}
-                      {formatCurrency(transaction.actualAmount ?? transaction.projectedAmount)}
+                      {formatCurrencyWithSign((isIncome ? 1 : -1) * (transaction.actualAmount ?? transaction.projectedAmount))}
                     </p>
                   </div>
                 </>

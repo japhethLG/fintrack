@@ -3,6 +3,7 @@
 import React from "react";
 import Link from "next/link";
 import { useAuth } from "@/contexts/AuthContext";
+import { useCurrency } from "@/lib/hooks/useCurrency";
 import { Button, Icon, AnimatedElement } from "@/components/common";
 
 // Feature highlights instead of fake metrics
@@ -17,6 +18,7 @@ const chartBars = [35, 52, 48, 65, 58, 72, 85, 78, 92, 88, 95, 100];
 
 export const LandingHero: React.FC = () => {
   const { user } = useAuth();
+  const { formatCurrency, formatCurrencyWithSign } = useCurrency();
 
   return (
     <section className="relative min-h-screen flex items-center justify-center overflow-hidden pt-20">
@@ -110,10 +112,12 @@ export const LandingHero: React.FC = () => {
                 </div>
                 <span className="text-xs text-gray-400">Total Balance</span>
               </div>
-              <div className="text-2xl font-bold text-white">$24,580</div>
+              <div className="text-2xl font-bold text-white">
+                {formatCurrency(24580, { maximumFractionDigits: 0 })}
+              </div>
               <div className="text-xs text-success mt-1 flex items-center gap-1">
                 <Icon name="arrow_upward" size={12} />
-                +$2,340 this month
+                {formatCurrencyWithSign(2340, { maximumFractionDigits: 0 })} this month
               </div>
             </div>
           </div>
@@ -138,7 +142,8 @@ export const LandingHero: React.FC = () => {
                 <span className="text-xs text-gray-400">AI Insight</span>
               </div>
               <p className="text-sm text-white leading-relaxed">
-                "You could save $340/mo by optimizing subscriptions"
+                &quot;You could save {formatCurrency(340, { maximumFractionDigits: 0 })}/mo by optimizing
+                subscriptions&quot;
               </p>
             </div>
           </div>

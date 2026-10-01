@@ -171,7 +171,7 @@ export function ModalProvider(props: IModalProviderProps): React.ReactElement {
             closable={modal.closable}
             className={modal.className}
             centered={modal.centered}
-            data-testid={modalName.replace(/([A-Z])/g, "-$1").toLowerCase().slice(1)}
+            data-testid={modalName.replace(/([A-Z])/g, (letter) => `-${letter}`).toLowerCase().slice(1)}
           />
         );
       })}

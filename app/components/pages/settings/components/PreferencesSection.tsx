@@ -8,6 +8,8 @@ import { Button, Card, Icon, Alert } from "@/components/common";
 import { Form, FormInput, FormSelect } from "@/components/formElements";
 import { useAuth } from "@/contexts/AuthContext";
 import { updateUserProfile } from "@/lib/firebase/firestore";
+import { useCurrency } from "@/lib/hooks/useCurrency";
+import { resolveCurrency } from "@/lib/utils/currency";
 import type { UserProfile } from "@/lib/types";
 import {
   CURRENCY_OPTIONS,
@@ -30,7 +32,7 @@ const DEFAULT_WARNING_THRESHOLD = 500;
 
 /** Form values for the stored preferences; a stored 0 is a real threshold, not "missing". */
 const valuesFrom = (preferences: Partial<UserProfile["preferences"]> | undefined): PreferencesForm => ({
-  currency: preferences?.currency || "PHP",
+  currency: resolveCurrency(preferences?.currency),
   dateFormat: preferences?.dateFormat || "MM/DD/YYYY",
   startOfWeek: String(preferences?.startOfWeek ?? 0),
   theme: preferences?.theme || "dark",
@@ -39,6 +41,7 @@ const valuesFrom = (preferences: Partial<UserProfile["preferences"]> | undefined
 
 const PreferencesSection: React.FC = () => {
   const { user, userProfile } = useAuth();
+  const { currencySymbol } = useCurrency();
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
@@ -134,7 +137,7 @@ const PreferencesSection: React.FC = () => {
               inputName="defaultWarningThreshold"
               type="number"
               label="Low Balance Warning Threshold"
-              prefix="₱"
+              prefix={currencySymbol}
               placeholder="500"
             />
             <p className="text-xs text-gray-500 mt-1">

@@ -143,12 +143,12 @@ const MonthlyOverview: React.FC<IProps> = ({
               <div>
                 <p className="text-xs text-gray-500 mb-1">Budgeted</p>
                 <p className="text-xl font-semibold text-gray-400">
-                  -{formatCurrency(budgetedExpenses)}
+                  {formatCurrency(-budgetedExpenses)}
                 </p>
               </div>
               <div>
                 <p className="text-xs text-gray-500 mb-1">Actual/Projected</p>
-                <p className="text-xl font-bold text-danger">-{formatCurrency(actualExpenses)}</p>
+                <p className="text-xl font-bold text-danger">{formatCurrency(-actualExpenses)}</p>
               </div>
             </div>
           </div>
@@ -242,7 +242,7 @@ const MonthlyOverview: React.FC<IProps> = ({
           </div>
           <div>
             <p className="text-gray-400 text-sm">Expenses</p>
-            <p className="text-2xl font-bold text-danger">-{formatCurrency(actualExpenses)}</p>
+            <p className="text-2xl font-bold text-danger">{formatCurrency(-actualExpenses)}</p>
           </div>
           <div>
             <p className="text-gray-400 text-sm">Net Change</p>
@@ -269,7 +269,7 @@ const MonthlyOverview: React.FC<IProps> = ({
           </div>
           <div>
             <p className="text-gray-400 text-sm">Expected Expenses</p>
-            <p className="text-2xl font-bold text-danger">-{formatCurrency(budgetedExpenses)}</p>
+            <p className="text-2xl font-bold text-danger">{formatCurrency(-budgetedExpenses)}</p>
           </div>
           <div>
             <p className="text-gray-400 text-sm">Expected Net</p>

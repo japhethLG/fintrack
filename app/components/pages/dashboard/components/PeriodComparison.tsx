@@ -115,7 +115,7 @@ const PeriodComparison: React.FC<IProps> = ({ transactions, dateRange }) => {
           </div>
           <div className="flex items-baseline justify-between">
             <span className="text-xl font-bold text-danger">
-              -{formatCurrency(comparisonData.current.expenses)}
+              {formatCurrency(-comparisonData.current.expenses)}
             </span>
             <span className="text-xs text-gray-500">
               was {formatCurrency(comparisonData.prev.expenses)}

@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useMemo, useCallback } from "react";
+import React, { useMemo } from "react";
 import {
   ResponsiveContainer,
   AreaChart,
@@ -59,7 +59,7 @@ const CustomXAxisTick = ({
 };
 
 const CashFlowChart: React.FC<IProps> = ({ data }) => {
-  const { currencySymbol, formatCurrency } = useCurrency();
+  const { formatCurrency, formatCurrencyWithSign, formatCompactCurrency } = useCurrency();
 
   // Calculate opening and closing balances
   const { openingBalance, closingBalance, change, changePercent } = useMemo(() => {
@@ -80,31 +80,8 @@ const CashFlowChart: React.FC<IProps> = ({ data }) => {
     };
   }, [data]);
 
-  /**
-   * Formats a value for Y-axis display, choosing the appropriate scale
-   */
-  const formatYAxisValue = useCallback(
-    (value: number, maxValue: number): string => {
-      const absMax = Math.abs(maxValue);
-
-      // For values >= 10k, show in "k" format
-      if (absMax >= 10000) {
-        return `${currencySymbol}${(value / 1000).toFixed(0)}k`;
-      }
-      // For values >= 1k, show in "k" format with one decimal
-      if (absMax >= 1000) {
-        return `${currencySymbol}${(value / 1000).toFixed(1)}k`;
-      }
-      // For smaller values, show the full number
-      return formatCurrency(value);
-    },
-    [currencySymbol, formatCurrency]
-  );
-  // Calculate the max value for smart formatting
-  const maxBalance = useMemo(() => {
-    if (data.length === 0) return 0;
-    return Math.max(...data.map((d) => Math.abs(d.balance)));
-  }, [data]);
+  // Y-axis ticks: compact (k / M / B), sign before the symbol
+  const formatYAxisValue = formatCompactCurrency;
 
   // Find today's label by matching the date
   const todayLabel = useMemo(() => {
@@ -137,8 +114,7 @@ const CashFlowChart: React.FC<IProps> = ({ data }) => {
           >
             <Icon name={change >= 0 ? "trending_up" : "trending_down"} size={16} />
             <span>
-              {change >= 0 ? "+" : ""}
-              {formatCurrency(change, { maximumFractionDigits: 0 })}
+              {formatCurrencyWithSign(change)}
             </span>
             {changePercent && (
               <span className="text-xs opacity-70">
@@ -208,7 +184,7 @@ const CashFlowChart: React.FC<IProps> = ({ data }) => {
                 stroke="#6c757d"
                 tickLine={false}
                 axisLine={false}
-                tickFormatter={(value) => formatYAxisValue(value, maxBalance)}
+                tickFormatter={formatYAxisValue}
                 tick={{ fontSize: 12 }}
                 width={70}
               />

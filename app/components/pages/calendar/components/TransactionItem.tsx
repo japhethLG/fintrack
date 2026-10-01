@@ -5,6 +5,7 @@ import { Transaction } from "@/lib/types";
 import { Icon, Badge } from "@/components/common";
 import { cn } from "@/lib/utils/cn";
 import { TRANSACTION_STATUS_BADGE_VARIANT } from "@/lib/constants";
+import { useCurrency } from "@/lib/hooks/useCurrency";
 
 interface IProps {
   transaction: Transaction;
@@ -12,6 +13,7 @@ interface IProps {
 }
 
 const TransactionItem: React.FC<IProps> = ({ transaction, onClick }) => {
+  const { formatCurrencyWithSign } = useCurrency();
   const isIncome = transaction.type === "income";
   const isSkipped = transaction.status === "skipped";
 
@@ -61,8 +63,9 @@ const TransactionItem: React.FC<IProps> = ({ transaction, onClick }) => {
             {transaction.name}
           </p>
           <p className={cn("font-bold text-sm whitespace-nowrap flex-shrink-0", amountColor)}>
-            {isIncome ? "+" : "-"}$
-            {(transaction.actualAmount ?? transaction.projectedAmount).toLocaleString()}
+            {formatCurrencyWithSign(
+              (isIncome ? 1 : -1) * (transaction.actualAmount ?? transaction.projectedAmount)
+            )}
           </p>
         </div>
 

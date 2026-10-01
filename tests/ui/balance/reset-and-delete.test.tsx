@@ -6,7 +6,6 @@ import {
   screen,
   within,
   waitFor,
-  knownDefect,
   makeAlert,
   makeBalanceSnapshot,
   makeExpenseRule,
@@ -191,9 +190,8 @@ describe("messages and copy around the reset", () => {
     expect(screen.getByText("Selected financial data has been reset successfully.")).toBeInTheDocument();
   }, 40_000);
 
-  knownDefect(
-    "UI-BAL-17",
-    "the post-reset message tells a USD user 'Your balance has been reset to ₱0'",
+  it(
+    "UI-BAL-17 — the post-reset message tells a USD user 'Your balance has been reset to ₱0'",
     async () => {
       // observed: "…Your balance has been reset to ₱0. Update your initial balance in Settings → Balance Management."
       const app = await renderApp({ route: "/settings", today: "2026-01-15", seed: world() });
@@ -205,9 +203,8 @@ describe("messages and copy around the reset", () => {
     40_000
   );
 
-  knownDefect(
-    "UI-BAL-18",
-    "the Selective Reset modal promises 'balance to $0' to a PHP user",
+  it(
+    "UI-BAL-18 — the Selective Reset modal promises 'balance to $0' to a PHP user",
     async () => {
       // observed: warning "…will also set your balance to $0." and "All Financial Data … (resets balance to $0)" for currency PHP
       const app = await renderApp({
@@ -223,9 +220,8 @@ describe("messages and copy around the reset", () => {
     40_000
   );
 
-  knownDefect(
-    "UI-BAL-19",
-    "the Danger Zone blurb says 'Balance resets to $0' for a PHP user",
+  it(
+    "UI-BAL-19 — the Danger Zone blurb says 'Balance resets to $0' for a PHP user",
     async () => {
       await renderApp({
         route: "/settings",

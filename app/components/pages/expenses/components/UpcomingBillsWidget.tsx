@@ -119,7 +119,7 @@ const UpcomingBillsWidget: React.FC = () => {
                       </div>
                       <div className="text-right">
                         <p className="font-bold text-danger">
-                          -{formatCurrency(t.projectedAmount)}
+                          {formatCurrency(-t.projectedAmount)}
                         </p>
                         <Badge variant="warning" className="text-xs">
                           {t.status}

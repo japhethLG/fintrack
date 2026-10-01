@@ -8,6 +8,7 @@ import { useFinancial } from "@/contexts/FinancialContext";
 import { DeletableDataType } from "@/lib/types";
 import { countBalanceHistory } from "@/lib/firebase/firestore";
 import { useModal } from "@/components/modals";
+import { useCurrency } from "@/lib/hooks/useCurrency";
 
 const DATA_LABELS: Record<DeletableDataType, string> = {
   income_sources: "Income Sources",
@@ -21,6 +22,7 @@ const DangerZone: React.FC = () => {
   const router = useRouter();
   const { openModal, closeModal } = useModal();
   const { user, resetSelectiveFinancialData, deleteAccount } = useAuth();
+  const { formatCurrency } = useCurrency();
   const { incomeSources, expenseRules, storedTransactions, alerts } = useFinancial();
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -115,7 +117,7 @@ const DangerZone: React.FC = () => {
 
                 if (deletedTransactions) {
                   resetSuccess(
-                    "Selected data reset successfully. Your balance has been reset to ₱0. Update your initial balance in Settings → Balance Management."
+                    `Selected data reset successfully. Your balance has been reset to ${formatCurrency(0)}. Update your initial balance in Settings → Balance Management.`
                   );
                 } else if (deletedRules) {
                   resetSuccess(
@@ -187,7 +189,7 @@ const DangerZone: React.FC = () => {
               <h4 className="font-medium text-white">Reset Financial Data</h4>
               <p className="text-sm text-gray-400 mt-1">
                 Choose exactly what to delete or pick "All Financial Data" to wipe everything.
-                Balance resets to $0 when transactions are removed.
+                Balance resets to {formatCurrency(0)} when transactions are removed.
               </p>
             </div>
             <Button

@@ -116,9 +116,8 @@ describe("calendar balance vs the stored balance", () => {
 });
 
 describe("calendar presentation of money", () => {
-  knownDefect(
-    "UI-BAL-37",
-    "a negative closing balance is printed in the grid without its minus sign (Math.abs)",
+  it(
+    "UI-BAL-37 — a negative closing balance is printed in the grid without its minus sign (Math.abs)",
     async () => {
       // observed: day 25 shows "$20" for a balance of -$20 (only the colour says it is negative)
       const app = await renderApp({
@@ -139,9 +138,8 @@ describe("calendar presentation of money", () => {
     40_000
   );
 
-  knownDefect(
-    "UI-BAL-38",
-    "month summary rounds cents away on signed amounts (+$1,235 for a 1,234.56 income)",
+  it(
+    "UI-BAL-38 — month summary rounds cents away on signed amounts (+$1,235 for a 1,234.56 income)",
     async () => {
       // observed: Income "+$1,235", Net Change "+$1,235" (formatCurrencyWithSign defaults to 0 decimals)
       await renderApp({

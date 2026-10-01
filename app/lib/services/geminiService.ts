@@ -6,6 +6,7 @@ import {
   VarianceReport,
 } from "@/lib/types";
 import { GoogleGenAI } from "@google/genai";
+import { getCurrencySymbol } from "@/lib/utils/currency";
 import { getEffectiveApiKey, isApiKeyConfigured, isProduction } from "./apiKeyService";
 
 // ============================================================================
@@ -95,7 +96,7 @@ export interface AnalysisContext {
   currentBalance: number;
   billCoverage?: BillCoverageReport;
   varianceReport?: VarianceReport;
-  /** Currency symbol to use for formatting (e.g., "$", "₱", "€") */
+  /** Currency symbol to use for formatting (defaults to the default currency's symbol) */
   currencySymbol?: string;
   /** Pre-computed summary for the selected period */
   periodSummary?: {
@@ -222,7 +223,7 @@ export const analyzeBudget = async (
       expenseRules,
       currentBalance,
       billCoverage,
-      currencySymbol = "$",
+      currencySymbol = getCurrencySymbol(),
       periodSummary,
     } = context;
 
@@ -326,7 +327,7 @@ export const getSmartInsights = async (context: AnalysisContext): Promise<Analys
 // Helper to format transaction data for the AI
 export const formatTransactionsForAI = (
   transactions: Transaction[],
-  currencySymbol: string = "$"
+  currencySymbol: string = getCurrencySymbol()
 ): string => {
   const completed = transactions.filter((t) => t.status === "completed");
   const pending = transactions.filter((t) => t.status === "projected");
@@ -348,7 +349,7 @@ export const formatTransactionsForAI = (
 // Helper to format income sources for the AI
 export const formatIncomeSourcesForAI = (
   sources: IncomeSource[],
-  currencySymbol: string = "$"
+  currencySymbol: string = getCurrencySymbol()
 ): string => {
   let text = "## Income Sources\n";
   sources
@@ -363,7 +364,7 @@ export const formatIncomeSourcesForAI = (
 // Helper to format expense rules for the AI
 export const formatExpenseRulesForAI = (
   rules: ExpenseRule[],
-  currencySymbol: string = "$"
+  currencySymbol: string = getCurrencySymbol()
 ): string => {
   let text = "## Expense Rules\n";
   rules
