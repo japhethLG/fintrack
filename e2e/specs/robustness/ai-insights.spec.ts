@@ -1,5 +1,5 @@
 /** AI Forecast with the Gemini stub (window.__fintrackE2E.geminiResponse/geminiError/geminiCalls). */
-import { test, expect, seedAndLogin, userProfile, fixedExpense, incomeSource, knownDefect } from "../../index";
+import { test, expect, seedAndLogin, userProfile, fixedExpense, incomeSource } from "../../index";
 import { isResponsive } from "./support";
 import type { Page } from "@playwright/test";
 
@@ -9,7 +9,7 @@ const seed = {
   expenseRules: [fixedExpense({ id: "r1", name: "Rent", amount: 1200, startDate: "2026-01-01", scheduleConfig: { dayOfMonth: 1 } })],
 };
 
-type Call = { model: string; context: { currentBalance: number; currencySymbol?: string; periodSummary: { dateRange: { start: string; end: string } }; transactions: Array<{ status: string; scheduledDate: string }> } };
+type Call = { model: string; prompt: string; context: { currentBalance: number; currencySymbol?: string; periodSummary: { dateRange: { start: string; end: string } }; transactions: Array<{ status: string; scheduledDate: string }> } };
 const bridge = (page: Page, patch: { geminiResponse?: string; geminiError?: string }) =>
   page.evaluate((p) => Object.assign((window as unknown as { __fintrackE2E: object }).__fintrackE2E, p), patch);
 const calls = (page: Page) => page.evaluate(() => (window as unknown as { __fintrackE2E: { geminiCalls: unknown[] } }).__fintrackE2E.geminiCalls) as Promise<Call[]>;
@@ -73,17 +73,19 @@ test("a 60k-character response keeps the page responsive and inside the viewport
 });
 
 test("the 'Upcoming (next 30 days)' transactions sent to the AI must be upcoming", async ({ page }) => {
-  knownDefect(
-    "E2E-ROB-12",
-    "context.transactions starts at 2026-01-01; the real prompt takes the first 15 'projected' rows and labels them 'Upcoming (next 30 days)' => overdue Jan/Feb rows are sent as upcoming"
-  );
   await generate(page);
   await expect(page.getByRole("heading", { name: "AI Analysis Report" })).toBeVisible();
   const [call] = await calls(page);
-  // Same selection the real prompt builder makes (geminiService.formatTransactions): first 15 projected rows.
-  const listedAsUpcoming = call.context.transactions.filter((t) => t.status === "projected").slice(0, 15);
-  expect(listedAsUpcoming.length).toBeGreaterThan(0);
-  for (const t of listedAsUpcoming) {
-    expect(t.scheduledDate >= "2026-03-10" && t.scheduledDate <= "2026-04-09", `${t.scheduledDate} is not within the next 30 days`).toBe(true);
+  // precondition: the page hands over rows older than today (the seed's rules start 2026-01-01, today is 2026-03-10)
+  expect(call.context.transactions.some((t) => t.status === "projected" && t.scheduledDate < "2026-03-10")).toBe(true);
+  // the real prompt: every dated line under "Upcoming" is within [today, today + 30 days]
+  const upcoming = (call.prompt.split("Upcoming (next 30 days):\n")[1] ?? "").split("\n\n")[0];
+  const dates = upcoming.match(/^- (\d{4}-\d{2}-\d{2}):/gm) ?? [];
+  expect(dates.length).toBeGreaterThan(0);
+  for (const line of dates) {
+    const date = line.slice(2, 12);
+    expect(date >= "2026-03-10" && date <= "2026-04-09", `${date} is not within the next 30 days`).toBe(true);
   }
+  // overdue rows are still told to the AI, in their own section
+  expect(call.prompt).toContain("Overdue (past due, still unpaid):");
 });
