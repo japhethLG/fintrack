@@ -118,16 +118,16 @@ export const dragOverlay = (page: Page): Locator => page.locator("div.drop-shado
 
 /**
  * Drag `source` and drop it on `target`.
- *  - "overlay" (default): the pointer is placed so that the CENTRE OF THE FLOATING OVERLAY is over the
- *    centre of the target cell. dnd-kit's rectIntersection collision uses the overlay rect (221px wide, wider
- *    than a 117px day cell), so this is the only placement that lands on the intended cell every time.
- *  - "pointer": the pointer itself is placed on the target cell centre (what a person actually does).
+ *  - "pointer" (default): the pointer itself is placed on the target cell centre (what a person actually
+ *    does). The calendar picks the cell under the pointer (E2E-CAL-03, fixed).
+ *  - "overlay": the pointer is placed so that the CENTRE OF THE FLOATING OVERLAY is over the centre of the
+ *    target cell. Kept for tests that need the overlay, not the pointer, over a cell.
  */
 export const dragTo = async (
   page: Page,
   source: Locator,
   target: Locator,
-  mode: "overlay" | "pointer" = "overlay"
+  mode: "overlay" | "pointer" = "pointer"
 ): Promise<void> => {
   await source.scrollIntoViewIfNeeded();
   const s = await source.boundingBox();

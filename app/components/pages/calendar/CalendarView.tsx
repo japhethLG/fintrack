@@ -2,12 +2,15 @@
 
 import React, { useState, useMemo, useRef, useCallback } from "react";
 import {
+  CollisionDetection,
   DndContext,
   DragEndEvent,
   DragStartEvent,
   DragOverlay,
   MouseSensor,
   TouchSensor,
+  pointerWithin,
+  rectIntersection,
   useSensor,
   useSensors,
 } from "@dnd-kit/core";
@@ -26,6 +29,14 @@ import MonthSummary from "./components/MonthSummary";
 import PeriodBalanceSummary from "./components/PeriodBalanceSummary";
 import DayDetailSidebar from "./components/DayDetailSidebar";
 import TransactionItem from "./components/TransactionItem";
+
+// The drag overlay is wider than a day cell, so rect intersection picks a
+// neighbouring cell. Drop on the cell under the pointer; fall back to rect
+// intersection only when the pointer is outside every cell.
+const dropUnderPointer: CollisionDetection = (args) => {
+  const underPointer = pointerWithin(args);
+  return underPointer.length > 0 ? underPointer : rectIntersection(args);
+};
 
 const CalendarView: React.FC = () => {
   const {
@@ -374,7 +385,12 @@ const CalendarView: React.FC = () => {
   }
 
   return (
-    <DndContext sensors={sensors} onDragStart={handleDragStart} onDragEnd={handleDragEnd}>
+    <DndContext
+      sensors={sensors}
+      collisionDetection={dropUnderPointer}
+      onDragStart={handleDragStart}
+      onDragEnd={handleDragEnd}
+    >
       <div className="p-4 lg:p-10 max-w-7xl mx-auto animate-fade-in">
         <PageHeader
           title="Financial Calendar"

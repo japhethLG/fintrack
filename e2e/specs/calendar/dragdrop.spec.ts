@@ -14,7 +14,7 @@
  * April (before any drag): Payday 4/17 (+777, overridden), Rent 4/18 (-200)
  *   -> opening 1300, closing 1300 + 777 - 200 = 1877.
  */
-import { test, expect, seedAndLogin, userProfile, incomeSource, fixedExpense, completedTransaction, knownDefect, readStore } from "../../index";
+import { test, expect, seedAndLogin, userProfile, incomeSource, fixedExpense, completedTransaction, readStore } from "../../index";
 import {
   completeInDialog,
   dragTo,
@@ -142,10 +142,8 @@ test.describe("drag a projected occurrence to another day", () => {
   });
 
   test("dropping with the POINTER on a day cell lands on that cell, not its right-hand neighbour", async ({ page }) => {
-    knownDefect(
-      "E2E-CAL-03",
-      "drop target is chosen from the 221px-wide floating overlay rect (dnd-kit rectIntersection), not from the pointer: releasing over Fri 3/20 files Rent under Sat 3/21"
-    );
+    // E2E-CAL-03 (fixed): the drop target used to come from the 221px-wide overlay rect
+    // (rectIntersection), so releasing over Fri 3/20 filed Rent under Sat 3/21.
     await boot(page);
     await dragTo(page, monthCell(page, "2026-03", "2026-03-18").getByText("Rent"), monthCell(page, "2026-03", "2026-03-20"), "pointer");
     await expect.poll(async () => (await overridesOf(page, "expense_rules", "rent"))?.["rent_2026-03"] !== undefined).toBe(true);
