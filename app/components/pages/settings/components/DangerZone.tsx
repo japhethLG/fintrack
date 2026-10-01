@@ -74,15 +74,14 @@ const DangerZone: React.FC = () => {
     setTimeout(() => setSuccess(null), 5000);
   };
 
+  // Rejects with a readable message when the account could NOT be deleted (wrong password, ...): the
+  // confirmation dialog stays open and shows it, so the user can retry without retyping everything.
   const handleDeleteAccount = async (password?: string) => {
-    setIsLoading(true);
     setError(null);
-
     try {
       await deleteAccount({ password });
       router.push("/login");
     } catch (err) {
-      setIsLoading(false);
       const message = err instanceof Error ? err.message : "Failed to delete account";
       if (err instanceof AccountDeletionIncompleteError) {
         // the data is gone and the user has been signed out: this page is about to go away, so the
@@ -91,8 +90,7 @@ const DangerZone: React.FC = () => {
         router.push("/login");
         return;
       }
-      setError(message);
-      closeModal("ConfirmModal");
+      throw new Error(message);
     }
   };
 

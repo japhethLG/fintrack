@@ -13,11 +13,12 @@
  *     actual, pending rows at their plan, skipped rows nowhere).
  *   - `annualRecurringTotals`: the occurrences of the next 12 months.
  *   - `plannedTotals`: the PLAN of a period: every non-skipped row at its projected amount.
- *   - `totalDebt`: loan and card balances plus the unpaid instalments.
+ *   - `totalDebt`: what is still owed: loan principal and card balances plus the unpaid instalments.
  */
 
-import { ExpenseRule, IncomeSource, Transaction } from "@/lib/types";
+import { ExpenseRule, IncomeSource, InstallmentConfig, Transaction } from "@/lib/types";
 import { generateProjections } from "@/lib/logic/projectionEngine";
+import { buildInstallmentAmounts } from "@/lib/logic/projectionEngine/installmentProjections";
 import { amountOf, rowDate } from "@/lib/logic/balanceCalculator/openItems";
 import { dateFromDayNumber, dayNumberOfDate, formatDate, getTodayKey, parseDate } from "@/lib/utils/dateUtils";
 
@@ -143,23 +144,35 @@ export const plannedTotals = (
 };
 
 /**
- * What is still owed on loans, cards and installment plans: outstanding loan and card balances plus
- * the unpaid instalments (remaining x instalment amount). Switched-off rules are not counted.
+ * What is still to be paid on an installment plan: the amounts of the unpaid installments, exact to
+ * the cent. The LAST installment absorbs the rounding residual (`buildInstallmentAmounts`), so a
+ * 25,000 plan over 12 with nothing paid has 25,000 remaining, not 12 x 2,083.33 = 24,999.96.
  */
-export const totalDebt = (rules: readonly ExpenseRule[]): number =>
-  rules.reduce((sum, rule) => {
-    if (!rule.isActive) return sum;
-    if (rule.loanConfig) return sum + rule.loanConfig.currentBalance;
-    if (rule.creditConfig) return sum + rule.creditConfig.currentBalance;
-    if (rule.installmentConfig) {
-      const remaining = Math.max(
-        rule.installmentConfig.installmentCount - rule.installmentConfig.installmentsPaid,
-        0
-      );
-      return sum + remaining * rule.installmentConfig.installmentAmount;
-    }
-    return sum;
+export const installmentRemaining = (config: InstallmentConfig): number => {
+  const amounts = buildInstallmentAmounts(config);
+  const paid = Math.max(0, Math.floor(Number.isFinite(config.installmentsPaid) ? config.installmentsPaid : 0));
+  const remaining = amounts.slice(paid).reduce((sum, a) => sum + a, 0);
+  return Math.round(remaining * 100) / 100;
+};
+
+/**
+ * What you still owe, on ONE basis everywhere (Expenses and Forecast print this same number):
+ *   - loans: the outstanding PRINCIPAL balance (interest still to come is not included);
+ *   - cards: the outstanding balance;
+ *   - installment plans: the unpaid installments (`installmentRemaining`; a plan's own surcharge is
+ *     part of its fixed instalments, so it is included).
+ * Switched-off rules are not counted.
+ */
+export const totalDebt = (rules: readonly ExpenseRule[]): number => {
+  const sum = rules.reduce((acc, rule) => {
+    if (!rule.isActive) return acc;
+    if (rule.loanConfig) return acc + rule.loanConfig.currentBalance;
+    if (rule.creditConfig) return acc + rule.creditConfig.currentBalance;
+    if (rule.installmentConfig) return acc + installmentRemaining(rule.installmentConfig);
+    return acc;
   }, 0);
+  return Math.round(sum * 100) / 100;
+};
 
 /** First and last day (YYYY-MM-DD) of the calendar month containing `day`. */
 export const monthBounds = (day: string): { start: string; end: string } => {

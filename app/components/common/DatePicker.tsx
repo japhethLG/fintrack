@@ -7,6 +7,7 @@ import type { Dayjs } from "dayjs";
 import dayjs from "dayjs";
 
 import { cn } from "@/lib/utils/cn";
+import { useDatePreferences } from "@/lib/hooks/useDatePreferences";
 
 // ============================================================================
 // DATE PICKER COMPONENT
@@ -25,7 +26,7 @@ export interface DatePickerProps extends Omit<AntDatePickerProps, "value" | "onC
   disabled?: boolean;
   /** Disable specific dates */
   disabledDate?: (date: Dayjs) => boolean;
-  /** Date format */
+  /** Date format; defaults to the user's Settings > Date Format */
   format?: string;
   /** Additional class names */
   className?: string;
@@ -52,7 +53,7 @@ export const DatePicker: React.FC<DatePickerProps> = ({
   onChange,
   disabled,
   disabledDate,
-  format = "MM/DD/YYYY",
+  format: formatProp,
   className,
   placeholder,
   required,
@@ -63,6 +64,8 @@ export const DatePicker: React.FC<DatePickerProps> = ({
   picker = "date",
   ...rest
 }) => {
+  const { dateFormat } = useDatePreferences();
+  const format = formatProp ?? dateFormat;
   const pickerId =
     id || (label ? `datepicker-${label.toLowerCase().replace(/\s+/g, "-")}` : undefined);
 

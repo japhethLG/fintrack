@@ -9,7 +9,13 @@ import { Form, FormInput } from "@/components/formElements";
 import { useAuth } from "@/contexts/AuthContext";
 import { useFinancial } from "@/contexts/FinancialContext";
 import { updateUserProfile } from "@/lib/firebase/firestore";
-import { reauthenticateUser, updateUserEmail, updateUserPassword } from "@/lib/firebase/auth";
+import {
+  isGoogleOnlyUser,
+  reauthenticateUser,
+  updateUserEmail,
+  updateUserPassword,
+} from "@/lib/firebase/auth";
+import { useDatePreferences } from "@/lib/hooks/useDatePreferences";
 
 type EditMode = "none" | "displayName" | "email" | "password";
 
@@ -68,6 +74,9 @@ const getAuthErrorMessage = (error: unknown): string => {
 const ProfileSection: React.FC = () => {
   const { user, userProfile } = useAuth();
   const { updateProfilePicture } = useFinancial();
+  const { formatDate } = useDatePreferences();
+  // A Google-only account has no password to change (and its email belongs to Google)
+  const googleOnly = isGoogleOnlyUser(user);
   const [editMode, setEditMode] = useState<EditMode>("none");
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -291,14 +300,18 @@ const ProfileSection: React.FC = () => {
                 <Icon name="mail" size={18} className="text-gray-500" />
                 <span className="text-white">{user?.email || "No email"}</span>
               </div>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => startEdit("email")}
-                icon={<Icon name="edit" size={16} />}
-              >
-                Change
-              </Button>
+              {googleOnly ? (
+                <span className="text-xs text-gray-500">Managed by Google</span>
+              ) : (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => startEdit("email")}
+                  icon={<Icon name="edit" size={16} />}
+                >
+                  Change
+                </Button>
+              )}
             </div>
           )}
         </div>
@@ -350,16 +363,20 @@ const ProfileSection: React.FC = () => {
             <div className="flex items-center justify-between p-3 bg-gray-800/50 rounded-lg border border-gray-700">
               <div className="flex items-center gap-2">
                 <Icon name="lock" size={18} className="text-gray-500" />
-                <span className="text-gray-400">••••••••</span>
+                <span className="text-gray-400">
+                  {googleOnly ? "You sign in with Google, so there is no password to change." : "••••••••"}
+                </span>
               </div>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => startEdit("password")}
-                icon={<Icon name="edit" size={16} />}
-              >
-                Change
-              </Button>
+              {!googleOnly && (
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => startEdit("password")}
+                  icon={<Icon name="edit" size={16} />}
+                >
+                  Change
+                </Button>
+              )}
             </div>
           )}
         </div>
@@ -371,7 +388,7 @@ const ProfileSection: React.FC = () => {
             <Icon name="calendar_today" size={18} className="text-gray-500" />
             <span className="text-gray-300">
               {userProfile?.createdAt
-                ? new Date(userProfile.createdAt.toDate()).toLocaleDateString()
+                ? formatDate(userProfile.createdAt.toDate())
                 : "Unknown"}
             </span>
           </div>

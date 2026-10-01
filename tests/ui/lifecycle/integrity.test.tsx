@@ -120,7 +120,8 @@ describe("dates as the Transactions list prints them (America/New_York, UTC-5)",
       expect(within(dlg).getByText(/Sat, Jan 10, 2026/)).toBeInTheDocument(); // precondition: the modal is right
       await app.user.click(within(dlg).getByRole("button", { name: "Cancel" }));
       await waitFor(() => expect(screen.queryByRole("dialog")).not.toBeInTheDocument());
-      expect(rowFor(app, tx.id).textContent).toContain("1/10/2026");
+      // REWRITTEN (MANUAL-L5): numeric dates follow the Date Format preference (default MM/DD/YYYY, zero padded)
+      expect(rowFor(app, tx.id).textContent).toContain("01/10/2026");
     },
     T
   );
@@ -161,5 +162,6 @@ describe("decisions not made yet", () => {
   // "overdue unpaid bill (D5): every view owes it, none moves the realized balance" in
   // tests/ui/display/forecast.test.tsx.
   it.todo("DECISION: is a variance attributed to the scheduled month or the month it was actually paid?");
-  it.todo("DECISION: does the overdue modal's 'Total Overdue' add missed income to missed bills?");
+  // RESOLVED (MANUAL-M5): the overdue dialog totals bills and missed income SEPARATELY, never added.
+  // Test: tests/ui/display/labels.test.tsx.
 });

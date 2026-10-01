@@ -4,6 +4,7 @@ import React, { useState } from "react";
 import { Card, Alert, Icon, Button } from "@/components/common";
 import { cn } from "@/lib/utils/cn";
 import { useCurrency } from "@/lib/hooks/useCurrency";
+import { categoryLabel } from "@/lib/utils/categoryLabel";
 
 interface CategoryBreakdown {
   category: string;
@@ -318,7 +319,7 @@ const MonthlyOverview: React.FC<IProps> = ({
               <div key={cat.category} className="flex items-center justify-between">
                 <div className="flex items-center gap-2">
                   <span className="text-gray-500 text-sm w-4">{i + 1}.</span>
-                  <span className="text-white capitalize">{cat.category}</span>
+                  <span className="text-white">{categoryLabel(cat.category)}</span>
                 </div>
                 <div className="flex items-center gap-4">
                   <div className="w-24 h-2 bg-gray-700 rounded-full overflow-hidden">

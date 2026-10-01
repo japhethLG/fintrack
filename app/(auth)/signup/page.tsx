@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { useAuth } from "@/contexts/AuthContext";
 import { Button, Input, Alert, LoadingSpinner, Divider } from "@/components/common";
 import { getAssetPath } from "@/lib/utils/assetPath";
+import { validateSignupPasswords, type SignupPasswordErrors } from "@/lib/utils/passwordRules";
 import Link from "next/link";
 
 const getAuthErrorMessage = (error: unknown): string => {
@@ -30,6 +31,8 @@ const getAuthErrorMessage = (error: unknown): string => {
 export default function SignupPage() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
+  const [fieldErrors, setFieldErrors] = useState<SignupPasswordErrors>({});
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false);
   const { user, loading: authLoading, signup, loginWithGoogle } = useAuth();
@@ -44,6 +47,9 @@ export default function SignupPage() {
   const handleSignup = async (e: FormEvent) => {
     e.preventDefault();
     setError("");
+    const problems = validateSignupPasswords(password, confirmPassword);
+    setFieldErrors(problems);
+    if (problems.password || problems.confirmPassword) return;
     setLoading(true);
 
     try {
@@ -155,7 +161,21 @@ export default function SignupPage() {
           value={password}
           onChange={(e) => setPassword(e.target.value)}
           required
-          placeholder="••••••••"
+          placeholder="At least 6 characters"
+          autoComplete="new-password"
+          error={fieldErrors.password}
+        />
+
+        <Input
+          id="confirm-password"
+          type="password"
+          label="Confirm Password"
+          value={confirmPassword}
+          onChange={(e) => setConfirmPassword(e.target.value)}
+          required
+          placeholder="Type it again"
+          autoComplete="new-password"
+          error={fieldErrors.confirmPassword}
         />
 
         <Button

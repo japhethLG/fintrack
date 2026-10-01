@@ -20,6 +20,7 @@ import ExpenseRuleCard from "./components/ExpenseRuleCard";
 import ExpenseRuleDetail from "./components/ExpenseRuleDetail";
 import { EXPENSE_FILTER_OPTIONS } from "./constants";
 import { getTodayKey, parseDate } from "@/lib/utils/dateUtils";
+import { TOTAL_DEBT_NOTE } from "@/lib/constants";
 import {
   isExpenseRuleCurrent,
   monthBounds,
@@ -28,6 +29,8 @@ import {
 } from "@/lib/logic/forecasting";
 import dayjs from "dayjs";
 import UpcomingBillsWidget from "./components/UpcomingBillsWidget";
+import { amountTone } from "@/lib/utils/amountTone";
+import { cn } from "@/lib/utils/cn";
 
 const ExpenseManager: React.FC = () => {
   const { formatCurrency } = useCurrency();
@@ -205,7 +208,7 @@ const ExpenseManager: React.FC = () => {
           </Card>
           <Card padding="md">
             <p className="text-gray-400 text-xs lg:text-sm mb-1">Monthly Recurring</p>
-            <p className="text-lg lg:text-3xl font-bold text-danger">
+            <p className={cn("text-lg lg:text-3xl font-bold", amountTone(recurringMonthly, "text-danger"))}>
               {formatCurrency(recurringMonthly)}
             </p>
             <p className="text-[10px] lg:text-xs text-gray-500 mt-1">Scheduled for {monthLabel}</p>
@@ -218,9 +221,12 @@ const ExpenseManager: React.FC = () => {
           </Card>
           <Card padding="md">
             <p className="text-gray-400 text-xs lg:text-sm mb-1">Total Debt</p>
-            <p className="text-lg lg:text-3xl font-bold text-danger">
+            <p className={cn("text-lg lg:text-3xl font-bold", amountTone(debtOwed, "text-danger"))}>
               {formatCurrency(debtOwed)}
             </p>
+            <span className="block text-[10px] lg:text-xs text-gray-500 mt-1" title={TOTAL_DEBT_NOTE}>
+              {TOTAL_DEBT_NOTE}
+            </span>
           </Card>
           <Card padding="md">
             <p className="text-gray-400 text-xs lg:text-sm mb-1">Priority Bills</p>

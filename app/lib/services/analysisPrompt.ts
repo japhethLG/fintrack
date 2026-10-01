@@ -1,4 +1,5 @@
 import type {
+  CreditConfig,
   Transaction,
   IncomeSource,
   ExpenseRule,
@@ -6,7 +7,11 @@ import type {
   VarianceReport,
 } from "@/lib/types";
 import { getCurrencySymbol } from "@/lib/utils/currency";
-import { addDays, formatDate, getTodayKey, parseDate } from "@/lib/utils/dateUtils";
+import { calculatePayoffSummary } from "@/lib/logic/creditCardCalculator";
+import { getTodayKey, lastDayOfNextDays } from "@/lib/utils/dateUtils";
+
+/** The "Upcoming" window of the prompt: the next 30 days, today included (see `lastDayOfNextDays`). */
+const UPCOMING_DAYS = 30;
 
 /**
  * The text sent to the AI. Pure (no SDK, no network), so tests and the E2E stub run the REAL prompt builder.
@@ -47,6 +52,22 @@ const formatIncomeSources = (incomeSources: IncomeSource[], symbol: string) => {
     .join("\n");
 };
 
+/**
+ * The card's minimum-payment trap, in words, when the app's own detection (the same
+ * `isMinimumPaymentTrap` the card's detail view warns with) says the payment barely covers the interest.
+ */
+const minimumPaymentTrapNote = (config: CreditConfig, symbol: string): string => {
+  const summary = calculatePayoffSummary(config);
+  if (!summary.isMinimumPaymentTrap) return "";
+  const payoff = Number.isFinite(summary.monthsToPayoff)
+    ? `it would take ${summary.monthsToPayoff} months to pay off`
+    : "it will never be paid off at this payment";
+  return (
+    `\n  WARNING (minimum-payment trap): the payment of ${symbol}${summary.effectiveMonthlyPayment.toFixed(2)} ` +
+    `barely covers the monthly interest of ${symbol}${summary.currentMonthlyInterest.toFixed(2)}; ${payoff}.`
+  );
+};
+
 const formatExpenseRules = (expenseRules: ExpenseRule[], symbol: string) => {
   if (!expenseRules || expenseRules.length === 0) return "No expense rules configured.";
   return expenseRules
@@ -58,6 +79,7 @@ const formatExpenseRules = (expenseRules: ExpenseRule[], symbol: string) => {
       }
       if (r.creditConfig) {
         details += `\n  Credit Card: ${symbol}${r.creditConfig.currentBalance}/${symbol}${r.creditConfig.creditLimit}, ${r.creditConfig.apr}% APR`;
+        details += minimumPaymentTrapNote(r.creditConfig, symbol);
       }
       if (r.isPriority) details += " [PRIORITY]";
       return details;
@@ -69,10 +91,10 @@ const formatTransactions = (transactions: Transaction[], symbol: string) => {
   if (transactions.length === 0) return "No transactions.";
 
   const completed = transactions.filter((t) => t.status === "completed");
-  // "Upcoming" means due from today to today + 30 days. A still-projected row dated before today is
+  // "Upcoming" means due in the next 30 days: today and the 29 days after it (the same window every "next N days" widget uses). A still-projected row dated before today is
   // OVERDUE and says so in its own section (E2E-ROB-12: they used to be listed as upcoming).
   const today = getTodayKey();
-  const horizon = formatDate(addDays(parseDate(today), 30));
+  const horizon = lastDayOfNextDays(today, UPCOMING_DAYS);
   const projectedRows = transactions
     .filter((t) => t.status === "projected")
     .sort((a, b) => (a.scheduledDate < b.scheduledDate ? -1 : a.scheduledDate > b.scheduledDate ? 1 : 0));
@@ -100,7 +122,7 @@ const formatTransactions = (transactions: Transaction[], symbol: string) => {
   }
 
   if (upcoming.length > 0) {
-    text += "\nUpcoming (next 30 days):\n";
+    text += `\nUpcoming (next ${UPCOMING_DAYS} days):\n`;
     upcoming.slice(0, 15).forEach((t) => {
       text += `- ${t.scheduledDate}: ${t.name} ${t.type === "income" ? "+" : "-"}${symbol}${t.projectedAmount} [${t.status}]\n`;
     });

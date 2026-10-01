@@ -59,7 +59,8 @@ export const makeUserProfile = (overrides: Partial<UserProfile> = {}): UserProfi
   scheduleModelVersion: 1,
   preferences: {
     currency: "USD",
-    dateFormat: "YYYY-MM-DD",
+    // the real default (a brand-new profile gets it too): the date pickers and numeric dates print in it
+    dateFormat: "MM/DD/YYYY",
     startOfWeek: 0,
     theme: "dark",
     defaultWarningThreshold: 500,

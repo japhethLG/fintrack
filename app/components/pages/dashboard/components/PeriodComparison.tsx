@@ -6,7 +6,9 @@ import { Transaction } from "@/lib/types";
 import { getPeriodStats, percentChange } from "@/lib/logic/healthScore";
 import { cn } from "@/lib/utils/cn";
 import { useCurrency } from "@/lib/hooks/useCurrency";
+import { useDatePreferences } from "@/lib/hooks/useDatePreferences";
 import { dateFromDayNumber, dayNumberOfDate, formatDate, parseDate } from "@/lib/utils/dateUtils";
+import { amountTone } from "@/lib/utils/amountTone";
 
 interface IProps {
   transactions: Transaction[];
@@ -18,6 +20,7 @@ interface IProps {
 
 const PeriodComparison: React.FC<IProps> = ({ transactions, dateRange }) => {
   const { formatCurrency, formatCurrencyWithSign } = useCurrency();
+  const { formatDayMonth } = useDatePreferences();
 
   // Calculate previous period stats
   const comparisonData = useMemo(() => {
@@ -49,9 +52,9 @@ const PeriodComparison: React.FC<IProps> = ({ transactions, dateRange }) => {
         expenses: calculateChange(currentStats.expenses, prevStats.expenses),
         net: calculateChange(currentStats.net, prevStats.net),
       },
-      prevPeriodLabel: `${prevStart.toLocaleDateString("en-US", { month: "short", day: "numeric" })} - ${prevEnd.toLocaleDateString("en-US", { month: "short", day: "numeric" })}`,
+      prevPeriodLabel: `${formatDayMonth(prevStart)} - ${formatDayMonth(prevEnd)}`,
     };
-  }, [transactions, dateRange]);
+  }, [transactions, dateRange, formatDayMonth]);
 
   const renderChange = (
     percent: number | null,
@@ -118,7 +121,7 @@ const PeriodComparison: React.FC<IProps> = ({ transactions, dateRange }) => {
             {renderChange(comparisonData.changes.expenses, "expense", comparisonData.current.expenses)}
           </div>
           <div className="flex items-baseline justify-between">
-            <span className="text-xl font-bold text-danger">
+            <span className={cn("text-xl font-bold", amountTone(comparisonData.current.expenses, "text-danger"))}>
               {formatCurrency(-comparisonData.current.expenses)}
             </span>
             <span className="text-xs text-gray-500">

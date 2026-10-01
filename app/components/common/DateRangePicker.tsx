@@ -11,6 +11,7 @@ import {
 import dayjs, { type Dayjs } from "dayjs";
 
 import { cn } from "@/lib/utils/cn";
+import { useDatePreferences } from "@/lib/hooks/useDatePreferences";
 import { Button } from "./Button";
 
 const { RangePicker } = DatePicker;
@@ -65,7 +66,7 @@ export interface DateRangePickerProps {
   disabled?: boolean;
   /** Disable specific dates */
   disabledDate?: (date: Dayjs) => boolean;
-  /** Date format */
+  /** Date format; defaults to the user's Settings > Date Format */
   format?: string;
   /** Additional class names */
   className?: string;
@@ -93,7 +94,7 @@ export const DateRangePicker: React.FC<DateRangePickerProps> = ({
   onChange,
   disabled,
   disabledDate,
-  format = "MM/DD/YYYY",
+  format: formatProp,
   className,
   placeholder = ["Start date", "End date"],
   required,
@@ -103,6 +104,8 @@ export const DateRangePicker: React.FC<DateRangePickerProps> = ({
   showQuickSelect = true,
   presets,
 }) => {
+  const { dateFormat } = useDatePreferences();
+  const format = formatProp ?? dateFormat;
   const pickerId =
     id || (label ? `daterange-${label.toLowerCase().replace(/\s+/g, "-")}` : undefined);
   const [dateRange, setDateRange] = React.useState<DateRange>(value || defaultValue);

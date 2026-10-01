@@ -66,7 +66,7 @@ describe("Forecast: runway and next crunch", () => {
     expect(money(f, "Current Balance")).toBe(500);
     const rc = runwayCard(f);
     expect(within(rc).getByText("9 days")).toBeInTheDocument(); // Mar 16 -> Mar 25
-    expect(within(rc).getByText("Crunch on 3/25/2026")).toBeInTheDocument();
+    expect(within(rc).getByText("Crunch on 03/25/2026")).toBeInTheDocument();
     expect(colorToken(rc)).toBe("warning");
     // Dashboard health uses the same horizon: 9 days falls in the 7-13 day tier = 20/100
     expect(healthComponent(card(app.container as HTMLElement, "Financial Health"), "Cash Runway")).toBe(20);
@@ -88,7 +88,7 @@ describe("Forecast: runway and next crunch", () => {
     "UI-DISP-33 — Forecast 'Cash Runway' declares 0 days / crunch today for a user whose balance ALREADY includes a bill completed today",
     async () => {
       // balance 100 (= 300 - the 200 bill paid today), nothing else scheduled.
-      // observed: Forecast '0 days' + 'Crunch on 3/16/2026' while the Dashboard health card scores the same
+      // observed: Forecast '0 days' + 'Crunch on 03/16/2026' while the Dashboard health card scores the same
       // balance 100/100 for runway ('90+ days').
       const { f, page } = await fc(
         {
@@ -111,14 +111,14 @@ describe("Forecast: runway and next crunch", () => {
       // observed before: '120 days' next to 'No crunch detected' (runway scanned 365 days, the crunch 90).
       // REWRITTEN: both read ONE 90-day walk (the default projection window always covers 90 days;
       // a longer claim would over-state the runway once the generated rows run out, BAL-7).
-      // balance 1,000 and a 1,500 bill 60 days out (2026-05-15): '60 days' AND 'Crunch on 5/15/2026'.
+      // balance 1,000 and a 1,500 bill 60 days out (2026-05-15): '60 days' AND 'Crunch on 05/15/2026'.
       const near = await fc({
         profile: { currentBalance: 1_000, initialBalance: 1_000 },
         transactions: [manual("Roof", "expense", 1_500, "2026-05-15", "projected")],
       });
       const rcNear = runwayCard(near.f);
       expect(within(rcNear).getByText("60 days")).toBeInTheDocument();
-      expect(within(rcNear).getByText("Crunch on 5/15/2026")).toBeInTheDocument();
+      expect(within(rcNear).getByText("Crunch on 05/15/2026")).toBeInTheDocument();
       expect(rcNear.textContent).not.toContain("No crunch detected");
       near.app.unmount();
 
@@ -198,7 +198,7 @@ describe("Forecast: runway and next crunch", () => {
     // the risk views
     const rc = runwayCard(page("forecast"));
     expect(within(rc).getByText("0 days")).toBeInTheDocument();
-    expect(within(rc).getByText("Crunch on 3/16/2026")).toBeInTheDocument();
+    expect(within(rc).getByText("Crunch on 03/16/2026")).toBeInTheDocument();
     expect(healthComponent(card(page("dashboard"), "Financial Health"), "Cash Runway")).toBe(0);
     expect(within(page("forecast")).getByText("1 Bill at Risk")).toBeInTheDocument();
   });
@@ -242,17 +242,20 @@ describe("Forecast: Actual metrics and overview", () => {
   it(
     "UI-DISP-36 — picking 'Next 30 Days' keeps the savings-rate subtitle saying '... this month'",
     async () => {
-      // Mar 16..Apr 15: income 4,750 (Payroll Mar30 2,000 + Freelance Apr10 750 + Payroll Apr15 2,000);
-      // expenses 2,929.8817 (see households.ts window list) -> surplus 1,820.1183, rate 38.3%.
+      // REWRITTEN (MANUAL-L4): "Next 30 Days" is 30 days, today included: Mar 16..Apr 14 (it was Mar 16..Apr 15,
+      // 31 days, which also took the Apr 15 payroll).
+      // Mar 16..Apr 14: income 2,750 (Payroll Mar30 2,000 + Freelance Apr10 750);
+      // expenses 2,929.8817 (Rent Apr1 1,200 + groceries Mar21/28, Apr4/11 600 + power 90 + loan 564.8817 + card 25 +
+      // laptop 200 + dentist 250) -> surplus -179.8817, rate -6.5%.
       // observed subtitle: "$1,820.12 this month" for a 31-day window.
       const { f, app } = await fc(h1Seed());
       const inputs = screen.getAllByPlaceholderText("Start date");
       await app.user.click(inputs[0]);
       await app.user.click(await screen.findByRole("button", { name: "Next 30 Days" }));
-      expect(within(f).getAllByText("Insights for Mar 16 - Apr 15, 2026").length).toBe(1); // precondition
+      expect(within(f).getAllByText("Insights for Mar 16 - Apr 14, 2026").length).toBe(1); // precondition
       const savings = card(f, "Actual Savings Rate");
-      expect(within(savings).getByText("38.3%")).toBeInTheDocument(); // precondition
-      expect(savings.textContent).toContain("$1,820.12");
+      expect(within(savings).getByText("-6.5%")).toBeInTheDocument(); // precondition
+      expect(savings.textContent).toContain("$179.88");
       expect(savings.textContent).not.toMatch(/this month/);
     }
   );

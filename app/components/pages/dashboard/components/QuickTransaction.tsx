@@ -5,6 +5,7 @@ import { Transaction } from "@/lib/types";
 import { Icon, Badge } from "@/components/common";
 import { cn } from "@/lib/utils/cn";
 import { useCurrency } from "@/lib/hooks/useCurrency";
+import { useDatePreferences } from "@/lib/hooks/useDatePreferences";
 import { formatDate, parseDate } from "@/lib/utils/dateUtils";
 import { TRANSACTION_STATUS_BADGE_VARIANT } from "@/lib/constants";
 
@@ -15,6 +16,7 @@ interface IProps {
 
 const QuickTransaction: React.FC<IProps> = ({ transaction, onClick }) => {
   const { formatCurrencyWithSign } = useCurrency();
+  const { formatDayMonth } = useDatePreferences();
   const isIncome = transaction.type === "income";
   const today = formatDate(new Date()); // YYYY-MM-DD
   const isPast = transaction.scheduledDate < today; // String comparison (today is NOT past)
@@ -47,10 +49,7 @@ const QuickTransaction: React.FC<IProps> = ({ transaction, onClick }) => {
         <div>
           <p className="font-medium text-white text-sm">{transaction.name}</p>
           <p className="text-xs text-gray-400">
-            {parseDate(transaction.scheduledDate).toLocaleDateString("en-US", {
-              month: "short",
-              day: "numeric",
-            })}
+            {formatDayMonth(transaction.scheduledDate)}
           </p>
         </div>
       </div>

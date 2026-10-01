@@ -1,10 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { makeExpenseRule, makeManualTransaction } from "../helpers/builders";
+import { makeCreditRule, makeExpenseRule, makeManualTransaction } from "../helpers/builders";
+import { calculatePayoffSummary } from "@/lib/logic/creditCardCalculator";
 
 /**
  * E2E-ROB-12: the prompt's "Upcoming (next 30 days)" list used to be the first 15 projected rows of whatever
  * list the page passed, so overdue rows were sent to the AI as upcoming. The real prompt is captured here by
- * replacing the Gemini SDK; "today" is frozen at 2026-03-10 (UTC), so the next 30 days are Mar 10 .. Apr 9.
+ * replacing the Gemini SDK; "today" is frozen at 2026-03-10 (UTC), so the next 30 days are Mar 10 .. Apr 8 (30 days, today included: the one definition every
+ * "next N days" window uses; MANUAL-L4).
  */
 
 const sent: string[] = [];
@@ -57,14 +59,16 @@ describe("the AI prompt's transaction lists", () => {
   });
   afterEach(() => vi.useRealTimers());
 
-  it("'Upcoming (next 30 days)' holds only rows due from today to today + 30 days", async () => {
+  it("'Upcoming (next 30 days)' holds only rows due today and in the 29 days after it", async () => {
+    // REWRITTEN (MANUAL-L4): the window was today..today+30 (31 days) while the Expense Manager's
+    // "Next 30 days" was 30 days, so day 31 was in the prompt and not on the page.
     const text = await prompt([
       projected("o1", "Old Jan", "2026-01-05"),
       projected("o2", "Old Mar", "2026-03-09"), // yesterday: overdue
       projected("u1", "Due Today", "2026-03-10"),
       projected("u2", "Mid", "2026-03-25"),
-      projected("u3", "Edge", "2026-04-09"), // today + 30 days: included
-      projected("f1", "Far", "2026-04-10"), // beyond the window
+      projected("u3", "Edge", "2026-04-08"), // today + 29 days: the 30th day, included
+      projected("f1", "Far", "2026-04-09"), // today + 30 days: the 31st day, not in "next 30 days"
     ]);
     const upcoming = section(text, "Upcoming (next 30 days):");
     expect(upcoming).toContain("Due Today");
@@ -105,5 +109,33 @@ describe("the AI prompt's transaction lists", () => {
     // nearest 15 of Mar 11..Mar 30 are Mar 11..Mar 25
     expect(listed[0]).toBe("Bill 11");
     expect(listed[14]).toBe("Bill 25");
+  });
+});
+
+describe("the AI prompt flags the credit-card minimum-payment trap (MANUAL-j)", () => {
+  const promptFor = async (rules: ReturnType<typeof makeCreditRule>[]) => {
+    sent.length = 0;
+    await analyzeBudget({ transactions: [], incomeSources: [], expenseRules: rules, currentBalance: 1_000 });
+    return sent[0];
+  };
+
+  it("a card whose payment barely covers its interest carries a WARNING line with the numbers", async () => {
+    // 5,000 at 24% APR: interest 100.00 a month; the 2% minimum is also 100.00
+    const trap = makeCreditRule({ id: "trap", name: "Trap Card" });
+    expect(calculatePayoffSummary(trap.creditConfig!).isMinimumPaymentTrap).toBe(true); // the app's own detection
+    const text = await promptFor([trap]);
+    expect(text).toContain("Trap Card");
+    expect(text).toContain("minimum-payment trap");
+    expect(text).toMatch(/payment of \D?100\.00 barely covers the monthly interest of \D?100\.00/);
+    expect(text).toContain("never be paid off");
+  });
+
+  it("a card paid down properly gets no warning", async () => {
+    const fine = makeCreditRule(
+      { id: "fine", name: "Fine Card" },
+      { paymentStrategy: "fixed", fixedPaymentAmount: 1_000 }
+    );
+    expect(calculatePayoffSummary(fine.creditConfig!).isMinimumPaymentTrap).toBe(false);
+    expect(await promptFor([fine])).not.toContain("minimum-payment trap");
   });
 });

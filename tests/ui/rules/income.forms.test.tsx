@@ -786,7 +786,9 @@ describe("income wizard: dates rendered on the Review step and detail card in a 
       }).then(async (app) => {
         await app.user.click(screen.getAllByText("Payroll")[0]);
         const startCell = (await screen.findByText("Start Date")).nextElementSibling!;
-        expect(startCell.textContent).toBe("2/10/2026");
+        // REWRITTEN (MANUAL-L5): the detail card follows the Date Format preference (default
+        // MM/DD/YYYY, zero padded) instead of the browser's locale format
+        expect(startCell.textContent).toBe("02/10/2026");
       });
     }
   );

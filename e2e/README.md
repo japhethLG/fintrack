@@ -219,7 +219,8 @@ mean the *test* is wrong, and make the run exit non-zero.
 - Overdue projected occurrences count toward balances/"Opening" figures, so a seed with
   `startDate` months ago produces "N Overdue Transactions" and big opening balances. Use a
   `startDate` near today (or `completedTransaction`s) when you want a quiet dashboard.
-- The Recharts "width(-1) and height(-1)" console *warning* appears on first render — ignore.
+- The Recharts "width(-1) and height(-1)" console warning on first render is fixed (the charts pass
+  `initialDimension`); a new occurrence is a regression.
 - Amounts render with/without cents depending on the widget (`$5,000.00` vs `$5,000`).
 - `page.getByText("$3,000")` matches several widgets: scope it (`main`, a card heading) or `.first()`.
 - Staleness is decided by source mtimes (`serve.mjs`); `npm run e2e:build` is stale-aware, force a

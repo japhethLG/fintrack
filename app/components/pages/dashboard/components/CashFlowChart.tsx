@@ -14,6 +14,7 @@ import { Card, Icon } from "@/components/common";
 import { useCurrency } from "@/lib/hooks/useCurrency";
 import { cn } from "@/lib/utils/cn";
 import { getTodayKey } from "@/lib/utils/dateUtils";
+import { CHART_INITIAL_DIMENSION, flatSeriesDomain } from "@/lib/utils/chartAxis";
 
 interface ChartDataPoint {
   date: string;
@@ -167,7 +168,7 @@ const CashFlowChart: React.FC<IProps> = ({ data }) => {
 
       <div className="h-[200px] w-full">
         {hasData ? (
-          <ResponsiveContainer width="100%" height="100%">
+          <ResponsiveContainer width="100%" height="100%" initialDimension={CHART_INITIAL_DIMENSION}>
             <AreaChart data={data}>
               <defs>
                 <linearGradient id="colorBalance" x1="0" y1="0" x2="0" y2="1">
@@ -192,6 +193,7 @@ const CashFlowChart: React.FC<IProps> = ({ data }) => {
                 tickFormatter={formatYAxisValue}
                 tick={{ fontSize: 12 }}
                 width={70}
+                domain={flatSeriesDomain(data.map((d) => d.balance))}
               />
               <Tooltip
                 contentStyle={{

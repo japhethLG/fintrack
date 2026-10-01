@@ -5,10 +5,10 @@ import { IncomeSource } from "@/lib/types";
 import { Button, Card, Icon, Badge } from "@/components/common";
 import { cn } from "@/lib/utils/cn";
 import { useCurrency } from "@/lib/hooks/useCurrency";
+import { useDatePreferences } from "@/lib/hooks/useDatePreferences";
 import { SOURCE_TYPE_ICONS, FREQUENCY_LABELS } from "../constants";
 import { categoryLabel } from "@/lib/utils/categoryLabel";
 import { weekendAdjustmentLabel } from "@/lib/utils/ruleLabels";
-import { parseDate } from "@/lib/utils/dateUtils";
 import { describeSchedule } from "@/lib/logic/ruleSchedule";
 
 interface IProps {
@@ -22,6 +22,7 @@ interface IProps {
 const IncomeSourceDetail: React.FC<IProps> = ({ source, onEdit, onDelete, onToggleActive }) => {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const { formatCurrency } = useCurrency();
+  const { formatDate } = useDatePreferences();
 
   const getScheduleDescription = () =>
     describeSchedule(source.frequency, source.scheduleConfig, source.startDate, FREQUENCY_LABELS[source.frequency]);
@@ -74,13 +75,13 @@ const IncomeSourceDetail: React.FC<IProps> = ({ source, onEdit, onDelete, onTogg
         <div>
           <p className="text-gray-400 text-sm mb-1">Start Date</p>
           <p className="text-white font-medium">
-            {parseDate(source.startDate).toLocaleDateString()}
+            {formatDate(source.startDate)}
           </p>
         </div>
         <div>
           <p className="text-gray-400 text-sm mb-1">End Date</p>
           <p className="text-white font-medium">
-            {source.endDate ? parseDate(source.endDate).toLocaleDateString() : "Ongoing"}
+            {source.endDate ? formatDate(source.endDate) : "Ongoing"}
           </p>
         </div>
         <div>

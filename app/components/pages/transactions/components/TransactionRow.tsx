@@ -5,8 +5,10 @@ import { Transaction } from "@/lib/types";
 import { Button, Icon, Badge } from "@/components/common";
 import { cn } from "@/lib/utils/cn";
 import { useCurrency } from "@/lib/hooks/useCurrency";
+import { useDatePreferences } from "@/lib/hooks/useDatePreferences";
 import { STATUS_VARIANTS } from "../constants";
-import { parseDate } from "@/lib/utils/dateUtils";
+import { categoryLabel } from "@/lib/utils/categoryLabel";
+import { amountTone } from "@/lib/utils/amountTone";
 
 interface IProps {
   transaction: Transaction;
@@ -15,6 +17,7 @@ interface IProps {
 
 const TransactionRow: React.FC<IProps> = ({ transaction, onAction }) => {
   const { formatCurrencyWithSign } = useCurrency();
+  const { formatDate } = useDatePreferences();
   const isIncome = transaction.type === "income";
   const amount = transaction.actualAmount ?? transaction.projectedAmount;
   const hasVariance = transaction.variance && transaction.variance !== 0;
@@ -51,7 +54,7 @@ const TransactionRow: React.FC<IProps> = ({ transaction, onAction }) => {
             </div>
             <div className="flex items-center gap-2 mt-1">
               <Badge variant="default" className="text-xs">
-                {transaction.category}
+                {categoryLabel(transaction.category)}
               </Badge>
               {transaction.sourceType === "manual" && (
                 <Badge variant="primary" className="text-xs">
@@ -67,18 +70,18 @@ const TransactionRow: React.FC<IProps> = ({ transaction, onAction }) => {
           {/* Date */}
           <div className="text-right hidden md:block">
             <p className="text-sm text-gray-300">
-              {parseDate(transaction.actualDate || transaction.scheduledDate).toLocaleDateString()}
+              {formatDate(transaction.actualDate || transaction.scheduledDate)}
             </p>
             {transaction.actualDate && transaction.actualDate !== transaction.scheduledDate && (
               <p className="text-xs text-gray-500 line-through">
-                {parseDate(transaction.scheduledDate).toLocaleDateString()}
+                {formatDate(transaction.scheduledDate)}
               </p>
             )}
           </div>
 
           {/* Amount */}
           <div className="text-right min-w-[100px]">
-            <p className={cn("font-bold", isIncome ? "text-success" : "text-danger")}>
+            <p className={cn("font-bold", amountTone(amount, isIncome ? "text-success" : "text-danger"))}>
               {formatCurrencyWithSign((isIncome ? 1 : -1) * (amount))}
             </p>
             {hasVariance && (

@@ -69,7 +69,8 @@ describe("saving preferences", () => {
     await settings().findByText("Preferences saved successfully!");
     await app.settle();
     const after = app.store.__get<Record<string, unknown>>("users", "user-1")!;
-    expect(prefsOf(app)).toMatchObject({ currency: "EUR", dateFormat: "YYYY-MM-DD", startOfWeek: 0, theme: "dark", defaultWarningThreshold: 500 });
+    // REWRITTEN (MANUAL-L5): the fixture profile now carries the real default date format
+    expect(prefsOf(app)).toMatchObject({ currency: "EUR", dateFormat: "MM/DD/YYYY", startOfWeek: 0, theme: "dark", defaultWarningThreshold: 500 });
     // only `preferences` and `updatedAt` moved: balance fields, identity and stamps are byte-identical
     for (const key of ["currentBalance", "initialBalance", "balanceLastUpdatedAt", "email", "displayName", "uid"]) {
       expect(after[key]).toEqual(before[key]);
@@ -254,11 +255,10 @@ describe("week start and date format preferences (both offered in Settings)", ()
     }
   );
 
-  knownDefect(
-    "UI-BAL-27",
-    "Date Format = DD/MM/YYYY is ignored: Settings still prints 'Last updated' as an ISO date",
+  it(
+    "UI-BAL-27 (fixed, MANUAL-L5): Date Format = DD/MM/YYYY is honoured: Settings prints 'Last updated' day first",
     async () => {
-      // observed: "Last updated: 2026-01-15" for a profile whose dateFormat is DD/MM/YYYY
+      // was: "Last updated: 2026-01-15" for a profile whose dateFormat is DD/MM/YYYY
       await renderApp({
         route: "/settings",
         today: TODAY,

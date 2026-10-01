@@ -25,6 +25,7 @@ import {
 import { savingsRatePercent, summarizePeriod } from "@/lib/logic/healthScore";
 import { plannedTotals, totalDebt } from "@/lib/logic/forecasting";
 import { useCurrency } from "@/lib/hooks/useCurrency";
+import { useDatePreferences } from "@/lib/hooks/useDatePreferences";
 import {
   LoadingSpinner,
   Icon,
@@ -37,8 +38,9 @@ import MetricsGrid from "./components/MetricsGrid";
 import MonthlyOverview from "./components/MonthlyOverview";
 import AIAnalysisPanel from "./components/AIAnalysisPanel";
 
-// Forecast-specific date range presets
-const FORECAST_PRESETS = [
+// Forecast-specific date range presets. "Next N days" is N calendar days, today included
+// (today + N - 1; see `lastDayOfNextDays`).
+const getForecastPresets = () => [
   {
     value: "this-month",
     label: "This Month",
@@ -47,17 +49,17 @@ const FORECAST_PRESETS = [
   {
     value: "next-30",
     label: "Next 30 Days",
-    range: [dayjs(), dayjs().add(30, "day")] as [dayjs.Dayjs, dayjs.Dayjs],
+    range: [dayjs(), dayjs().add(29, "day")] as [dayjs.Dayjs, dayjs.Dayjs],
   },
   {
     value: "next-60",
     label: "Next 60 Days",
-    range: [dayjs(), dayjs().add(60, "day")] as [dayjs.Dayjs, dayjs.Dayjs],
+    range: [dayjs(), dayjs().add(59, "day")] as [dayjs.Dayjs, dayjs.Dayjs],
   },
   {
     value: "next-90",
     label: "Next 90 Days",
-    range: [dayjs(), dayjs().add(90, "day")] as [dayjs.Dayjs, dayjs.Dayjs],
+    range: [dayjs(), dayjs().add(89, "day")] as [dayjs.Dayjs, dayjs.Dayjs],
   },
   {
     value: "this-quarter",
@@ -77,6 +79,7 @@ const Forecast: React.FC = () => {
     setViewDateRange,
   } = useFinancial();
   const { currencySymbol } = useCurrency();
+  const { formatDayMonth, formatDayMonthYear } = useDatePreferences();
   const { openModal } = useModal();
 
   const [analysis, setAnalysis] = useState<string | null>(null);
@@ -166,8 +169,8 @@ const Forecast: React.FC = () => {
     ) {
       return start.format("MMMM YYYY");
     }
-    return `${start.format("MMM D")} - ${end.format("MMM D, YYYY")}`;
-  }, [dateRange]);
+    return `${formatDayMonth(start.toDate())} - ${formatDayMonthYear(end.toDate())}`;
+  }, [dateRange, formatDayMonth, formatDayMonthYear]);
 
   // Calculate ACTUAL metrics from transactions: the same definition the Dashboard and the Calendar
   // use (healthScore/periodStats.ts), so a period prints the same income, expenses and net.
@@ -355,7 +358,7 @@ const Forecast: React.FC = () => {
           <DateRangePicker
             value={dateRange as [dayjs.Dayjs | null, dayjs.Dayjs | null]}
             onChange={(dates) => setDateRange(dates as [dayjs.Dayjs | null, dayjs.Dayjs | null])}
-            presets={FORECAST_PRESETS.map((p) => ({
+            presets={getForecastPresets().map((p) => ({
               value: p.value,
               label: p.label,
               range: p.range as [dayjs.Dayjs, dayjs.Dayjs],

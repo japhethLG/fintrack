@@ -4,12 +4,13 @@ import React, { useState, useMemo } from "react";
 import { useFinancial } from "@/contexts/FinancialContext";
 import { Transaction } from "@/lib/types";
 import { Card, Icon, Badge, Select, Tabs, Button } from "@/components/common";
-import { formatDate, addDays, getTodayKey, parseDate } from "@/lib/utils/dateUtils";
+import { getTodayKey, lastDayOfNextDays } from "@/lib/utils/dateUtils";
 import { getBillCoverageReport } from "@/lib/logic/balanceCalculator";
 import { BillItem } from "@/components/widgets/BillItem";
 import QuickTransaction from "./QuickTransaction";
 import { cn } from "@/lib/utils/cn";
 import { useCurrency } from "@/lib/hooks/useCurrency";
+import { amountTone } from "@/lib/utils/amountTone";
 
 interface IProps {
   onTransactionClick: (transaction: Transaction) => void;
@@ -34,7 +35,7 @@ const UpcomingActivityWidget: React.FC<IProps> = ({ onTransactionClick }) => {
     // tab's coverage report uses, so both tabs describe the same rows).
     const today = getTodayKey();
     const daysAhead = parseInt(selectedDays, 10);
-    const endDateStr = formatDate(addDays(parseDate(today), daysAhead - 1));
+    const endDateStr = lastDayOfNextDays(today, daysAhead);
 
     const filtered = transactions
       .filter((t) => {
@@ -80,13 +81,15 @@ const UpcomingActivityWidget: React.FC<IProps> = ({ onTransactionClick }) => {
       <div className="grid grid-cols-3 gap-3">
         <div className="bg-dark-800 p-3 rounded-lg border border-gray-800">
           <p className="text-xs text-gray-400 mb-1">Income</p>
-          <p className="text-success font-bold text-sm">
+          <p className={cn("font-bold text-sm", amountTone(stats.totalIncome, "text-success"))}>
             {formatCurrencyWithSign(stats.totalIncome)}
           </p>
         </div>
         <div className="bg-dark-800 p-3 rounded-lg border border-gray-800">
           <p className="text-xs text-gray-400 mb-1">Expenses</p>
-          <p className="text-danger font-bold text-sm">{formatCurrency(-stats.totalExpenses)}</p>
+          <p className={cn("font-bold text-sm", amountTone(stats.totalExpenses, "text-danger"))}>
+            {formatCurrency(-stats.totalExpenses)}
+          </p>
         </div>
         <div className="bg-dark-800 p-3 rounded-lg border border-gray-800">
           <p className="text-xs text-gray-400 mb-1">Net Change</p>

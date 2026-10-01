@@ -4,9 +4,11 @@ import React from "react";
 import { Card, Icon } from "@/components/common";
 import { cn } from "@/lib/utils/cn";
 import { useCurrency } from "@/lib/hooks/useCurrency";
+import { useDatePreferences } from "@/lib/hooks/useDatePreferences";
 import InsightCard from "./InsightCard";
-import { parseDate } from "@/lib/utils/dateUtils";
+import { TOTAL_DEBT_NOTE } from "@/lib/constants";
 import { RISK_HORIZON_DAYS } from "@/lib/logic/balanceCalculator/runway";
+import { amountTone } from "@/lib/utils/amountTone";
 
 interface Metrics {
   balance: number;
@@ -46,6 +48,7 @@ const MetricsGrid: React.FC<IProps> = ({
   periodLabel,
 }) => {
   const { formatCurrency } = useCurrency();
+  const { formatDate } = useDatePreferences();
 
   // Calculate variance percentages
   const incomeVariance =
@@ -91,7 +94,7 @@ const MetricsGrid: React.FC<IProps> = ({
             }
             subtitle={
               metrics.nextCrunch
-                ? `Crunch on ${parseDate(metrics.nextCrunch.date).toLocaleDateString()}`
+                ? `Crunch on ${formatDate(metrics.nextCrunch.date)}`
                 : "No crunch detected"
             }
             status={metrics.runway.runOutDate ? "warning" : "success"}
@@ -114,7 +117,7 @@ const MetricsGrid: React.FC<IProps> = ({
           icon="credit_card"
           title="Total Debt"
           value={formatCurrency(metrics.totalDebt)}
-          subtitle={`Active in ${periodLabel || "selected period"}`}
+          subtitle={`${TOTAL_DEBT_NOTE} Active in ${periodLabel || "selected period"}.`}
           status={metrics.totalDebt > 0 ? "warning" : "success"}
         />
       </div>
@@ -184,7 +187,7 @@ const MetricsGrid: React.FC<IProps> = ({
               <Icon name="arrow_forward" size="sm" className="text-gray-600 mb-2" />
               <div className="text-right">
                 <p className="text-xs text-gray-500">Actual</p>
-                <p className="text-lg font-bold text-danger">
+                <p className={cn("text-lg font-bold", amountTone(actualMetrics.monthlyExpenses, "text-danger"))}>
                   {formatCurrency(actualMetrics.monthlyExpenses)}
                 </p>
               </div>

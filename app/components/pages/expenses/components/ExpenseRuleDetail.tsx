@@ -3,9 +3,11 @@
 import React, { useState, useMemo } from "react";
 import { ExpenseRule } from "@/lib/types";
 import { EXPENSE_CATEGORY_LABELS } from "@/lib/constants";
+import { installmentRemaining } from "@/lib/logic/forecasting";
 import { Button, Card, Icon, Badge, Tooltip } from "@/components/common";
 import { cn } from "@/lib/utils/cn";
 import { useCurrency } from "@/lib/hooks/useCurrency";
+import { useDatePreferences } from "@/lib/hooks/useDatePreferences";
 import { EXPENSE_TYPE_ICONS, EXPENSE_TYPE_LABELS, FREQUENCY_LABELS } from "../constants";
 import {
   calculatePayoffSummary,
@@ -14,7 +16,6 @@ import {
   type CreditCardPayoffSummary,
   type PayoffScenario,
 } from "@/lib/logic/creditCardCalculator";
-import { parseDate } from "@/lib/utils/dateUtils";
 import { describeSchedule, lastMonthlyPaymentDate, ordinal } from "@/lib/logic/ruleSchedule";
 import { categoryLabel } from "@/lib/utils/categoryLabel";
 import { weekendAdjustmentLabel } from "@/lib/utils/ruleLabels";
@@ -31,6 +32,7 @@ const ExpenseRuleDetail: React.FC<IProps> = ({ rule, onEdit, onDelete, onToggleA
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const [showPayoffScenarios, setShowPayoffScenarios] = useState(false);
   const { formatCurrency } = useCurrency();
+  const { formatDate } = useDatePreferences();
 
   // Get the display amount based on payment strategy for credit cards
   const getDisplayAmount = () => {
@@ -569,11 +571,7 @@ const ExpenseRuleDetail: React.FC<IProps> = ({ rule, onEdit, onDelete, onToggleA
             <div>
               <p className="text-xs text-gray-400">Remaining</p>
               <p className="text-danger font-medium">
-                {formatCurrency(
-                  (rule.installmentConfig.installmentCount -
-                    rule.installmentConfig.installmentsPaid) *
-                    rule.installmentConfig.installmentAmount
-                )}
+                {formatCurrency(installmentRemaining(rule.installmentConfig))}
               </p>
             </div>
             <div>
@@ -603,16 +601,12 @@ const ExpenseRuleDetail: React.FC<IProps> = ({ rule, onEdit, onDelete, onToggleA
           <p className="text-gray-400 text-sm mb-1">
             {rule.loanConfig || rule.installmentConfig ? "First Payment Date" : "Start Date"}
           </p>
-          <p className="text-white font-medium">{parseDate(rule.startDate).toLocaleDateString()}</p>
+          <p className="text-white font-medium">{formatDate(rule.startDate)}</p>
         </div>
         <div>
           <p className="text-gray-400 text-sm mb-1">End Date</p>
           <p className="text-white font-medium">
-            {rule.endDate
-              ? parseDate(rule.endDate).toLocaleDateString()
-              : lastPayment
-                ? lastPayment.toLocaleDateString()
-                : "Ongoing"}
+            {rule.endDate ? formatDate(rule.endDate) : lastPayment ? formatDate(lastPayment) : "Ongoing"}
           </p>
         </div>
         <div>

@@ -108,14 +108,15 @@ test.describe("date labels and buckets (America/New_York shows the previous day)
     await expect(page.locator("h4.uppercase")).toHaveText(/^WEDNESDAY, APR 1$/i);
   });
 
-  test("Transactions list prints the scheduled date of the first rows as 1/1/2026", async ({ page }, testInfo) => {
+  test("Transactions list prints the scheduled date of the first rows as 01/01/2026", async ({ page }, testInfo) => {
     await at(page, tzOf(testInfo), "2026-03-31", "23:30");
     await seedAndLogin(page, household(), { path: "/transactions" });
     await expect(page.getByRole("heading", { name: "Transactions", level: 1 })).toBeVisible();
     await expect(page.getByText(/^Transactions \(\d+\)$/)).toBeVisible();
     const first = page.locator("div.cursor-pointer.border-b").first();
     await expect(first).toContainText("Acme Payroll");
-    await expect(first).toContainText("1/1/2026");
+    // REWRITTEN (MANUAL-L5): numeric dates follow the Date Format preference (default MM/DD/YYYY, zero padded)
+    await expect(first).toContainText("01/01/2026");
     await expect(first).not.toContainText("12/31/2025");
   });
 
@@ -146,12 +147,12 @@ test.describe("date labels and buckets (America/New_York shows the previous day)
     await expect(card.getByText("was $500.00", { exact: true }).first()).toBeVisible();
   });
 
-  test("Income rule detail shows Start Date 1/1/2026", async ({ page }, testInfo) => {
+  test("Income rule detail shows Start Date 01/01/2026", async ({ page }, testInfo) => {
     await at(page, tzOf(testInfo), "2026-03-31", "23:30");
     await seedAndLogin(page, household(), { path: "/income" });
     await expect(page.getByRole("heading", { name: "Income Management", level: 1 })).toBeVisible();
     await page.getByRole("heading", { name: "Acme Payroll", level: 4 }).click();
-    await expect(page.getByText("Start Date").locator("xpath=following-sibling::p")).toHaveText("1/1/2026");
+    await expect(page.getByText("Start Date").locator("xpath=following-sibling::p")).toHaveText("01/01/2026"); // REWRITTEN (MANUAL-L5): zero padded
   });
 });
 

@@ -4,8 +4,9 @@ import React, { useState, useMemo } from "react";
 import { useFinancial } from "@/contexts/FinancialContext";
 import { Transaction } from "@/lib/types";
 import { Card, Icon, Select, Badge } from "@/components/common";
-import { addDays, formatDate, getTodayKey, parseDate } from "@/lib/utils/dateUtils";
+import { getTodayKey, lastDayOfNextDays } from "@/lib/utils/dateUtils";
 import { useCurrency } from "@/lib/hooks/useCurrency";
+import { useDatePreferences } from "@/lib/hooks/useDatePreferences";
 import { useModal } from "@/components/modals";
 import { categoryLabel } from "@/lib/utils/categoryLabel";
 
@@ -18,6 +19,7 @@ const RANGE_OPTIONS = [
 const UpcomingBillsWidget: React.FC = () => {
   const { transactions } = useFinancial();
   const { formatCurrency } = useCurrency();
+  const { formatWeekdayDayMonth } = useDatePreferences();
   const { openModal } = useModal();
   const [selectedDays, setSelectedDays] = useState("30");
 
@@ -25,7 +27,7 @@ const UpcomingBillsWidget: React.FC = () => {
     // "Next N days" is exactly N calendar days: today .. today + N - 1
     const today = getTodayKey();
     const daysAhead = parseInt(selectedDays, 10);
-    const endDateStr = formatDate(addDays(parseDate(today), daysAhead - 1));
+    const endDateStr = lastDayOfNextDays(today, daysAhead);
 
     return transactions
       .filter((t) => {
@@ -95,11 +97,7 @@ const UpcomingBillsWidget: React.FC = () => {
             .map((date) => (
               <div key={date}>
                 <h4 className="text-gray-400 text-xs font-bold uppercase tracking-wider mb-3">
-                  {parseDate(date).toLocaleDateString(undefined, {
-                    weekday: "long",
-                    month: "short",
-                    day: "numeric",
-                  })}
+                  {formatWeekdayDayMonth(date)}
                 </h4>
                 <div className="space-y-3">
                   {groupedBills[date].map((t) => (

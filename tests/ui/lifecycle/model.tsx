@@ -120,7 +120,11 @@ export class Model {
     switch (g.do) {
       case "complete": {
         const amt = g.amount ?? (e.status === "completed" ? e.actual! : e.projected);
-        const dt = g.date ?? (e.status === "completed" ? e.actualDate! : e.sched);
+        // REWRITTEN (MANUAL-k): the dialog's Actual Date defaults to today for a bill scheduled in the
+        // future (paying early happens today), to the scheduled date otherwise. The kit's clock is 2026-01-15.
+        const dt =
+          g.date ??
+          (e.status === "completed" ? e.actualDate! : e.sched > "2026-01-15" ? "2026-01-15" : e.sched);
         e.status = "completed";
         e.actual = amt;
         e.actualDate = dt;
@@ -144,13 +148,17 @@ export class Model {
         e.deleted = true;
         return;
       case "edit": {
+        const wasCompleted = e.status === "completed";
         if (g.type) e.type = g.type;
         if (g.date) e.sched = g.date;
         if (g.amount !== undefined) e.projected = g.amount;
         if (g.status) e.status = g.status;
         if (e.status === "completed") {
           e.actual = g.amount ?? e.actual ?? e.projected;
-          e.actualDate = e.sched;
+          // REWRITTEN (MANUAL-k): the form only re-dates the actual when the date changed or the row becomes
+          // completed (ManualTransactionForm/formHelpers); a row completed early keeps its actual date
+          // (today), which no longer equals the scheduled date.
+          if (g.date || !wasCompleted) e.actualDate = e.sched;
         } else {
           e.actual = undefined;
           e.actualDate = undefined;

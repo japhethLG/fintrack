@@ -126,8 +126,10 @@ describe("first login: profile creation", () => {
       expect(new Date().getTimezoneOffset()).toBe(-480);
       expect(new Date().getDate()).toBe(15);
       const label = screen.getByText(/^Last updated:/);
-      expect(label.textContent).toMatch(/^Last updated: \d{4}-\d{2}-\d{2}$/);
-      expect(label.textContent).toBe("Last updated: 2026-01-15");
+      // REWRITTEN (MANUAL-L5): the label follows the Date Format preference (default MM/DD/YYYY);
+      // it used to print the stored ISO key.
+      expect(label.textContent).toMatch(/^Last updated: \d{2}\/\d{2}\/\d{4}$/);
+      expect(label.textContent).toBe("Last updated: 01/15/2026");
     }
   );
 
@@ -144,8 +146,10 @@ describe("first login: profile creation", () => {
       expect(new Date().getTimezoneOffset()).toBe(300);
       expect(new Date().getDate()).toBe(15);
       const label = screen.getByText(/^Last updated:/);
-      expect(label.textContent).toMatch(/^Last updated: \d{4}-\d{2}-\d{2}$/);
-      expect(label.textContent).toBe("Last updated: 2026-01-15");
+      // REWRITTEN (MANUAL-L5): the label follows the Date Format preference (default MM/DD/YYYY);
+      // it used to print the stored ISO key.
+      expect(label.textContent).toMatch(/^Last updated: \d{2}\/\d{2}\/\d{4}$/);
+      expect(label.textContent).toBe("Last updated: 01/15/2026");
     }
   );
 });
@@ -155,6 +159,8 @@ describe("sign-up and Google sign-in create the profile", () => {
     const app = await renderApp({ route: "/signup", user: null });
     await app.user.type(screen.getByLabelText("Email"), "new@example.com");
     await app.user.type(screen.getByLabelText("Password"), "hunter22");
+    // REWRITTEN (MANUAL-g): the form now asks for the password twice
+    await app.user.type(screen.getByLabelText("Confirm Password"), "hunter22");
     await app.user.click(screen.getByRole("button", { name: "Sign Up" }));
     await waitFor(() => expect(app.auth.__callsTo("createUserWithEmailAndPassword")).toHaveLength(1));
     expect(app.auth.__callsTo("createUserWithEmailAndPassword")[0].args).toEqual(["new@example.com", "hunter22"]);
@@ -173,7 +179,10 @@ describe("sign-up and Google sign-in create the profile", () => {
   it("sign-up surfaces Firebase's weak-password and email-in-use errors in plain words and creates nothing", async () => {
     const app = await renderApp({ route: "/signup", user: null });
     await app.user.type(screen.getByLabelText("Email"), "new@example.com");
-    await app.user.type(screen.getByLabelText("Password"), "123");
+    // REWRITTEN (MANUAL-g): "123" is now stopped by the form itself (see signup validation below), so the
+    // server-side weak-password message is exercised with a password that passes the client check
+    await app.user.type(screen.getByLabelText("Password"), "123456");
+    await app.user.type(screen.getByLabelText("Confirm Password"), "123456");
     app.auth.__failNext("createUserWithEmailAndPassword", new Error("Firebase: Error (auth/weak-password)."));
     await app.user.click(screen.getByRole("button", { name: "Sign Up" }));
     expect(await screen.findByText(/Password is too weak/)).toBeInTheDocument();
@@ -450,15 +459,16 @@ describe("balance override and the calendar date it stamps", () => {
         today: "2026-01-15T00:30",
         seed: { profile: { currentBalance: 100, initialBalance: 100, balanceLastUpdatedAt: "2026-01-01" } },
       });
-      expect(screen.getByText("Last updated: 2026-01-01")).toBeInTheDocument();
+      // REWRITTEN (MANUAL-L5): the label follows the Date Format preference (default MM/DD/YYYY)
+      expect(screen.getByText("Last updated: 01/01/2026")).toBeInTheDocument();
       await app.user.click(screen.getByRole("button", { name: /Override Current Balance/ }));
       await app.user.type(screen.getByLabelText("Override Current Balance"), "250");
       await app.user.click(screen.getByRole("button", { name: "Override Balance" }));
       await screen.findByText("Balance updated successfully!");
       await app.settle();
       expect(storedBalance(app)).toBe(250);
-      const label = screen.getByText(/^Last updated: 20\d\d-\d\d-\d\d$/);
-      expect(label.textContent).toBe("Last updated: 2026-01-15");
+      const label = screen.getByText(/^Last updated: \d\d\/\d\d\/20\d\d$/);
+      expect(label.textContent).toBe("Last updated: 01/15/2026");
     }
   );
 });

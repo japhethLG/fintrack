@@ -1,5 +1,6 @@
 import * as yup from "yup";
 import { Transaction } from "@/lib/types";
+import { getTodayKey } from "@/lib/utils/dateUtils";
 
 // Mode for rule-based transactions
 export type RuleBasedMode = "complete" | "skip" | "revert";
@@ -18,6 +19,14 @@ export interface CompleteTransactionFormValues {
   scheduledDate?: string;
 }
 
+/**
+ * The date a row is completed on, when nothing was recorded yet: the scheduled date, but never a day
+ * in the future. Paying a bill early happens TODAY; defaulting to the scheduled date recorded a
+ * future "actual" date (MANUAL-k). A scheduled date of today or earlier is kept.
+ */
+export const defaultActualDate = (scheduledDate: string, today: string = getTodayKey()): string =>
+  scheduledDate > today ? today : scheduledDate;
+
 export const getDefaultValues = (transaction: Transaction): CompleteTransactionFormValues => {
   const isManual = transaction.sourceType === "manual";
   const defaultMode = "complete"; // Default to complete for all transactions
@@ -25,7 +34,7 @@ export const getDefaultValues = (transaction: Transaction): CompleteTransactionF
   return {
     mode: defaultMode as any,
     actualAmount: (transaction.actualAmount ?? transaction.projectedAmount).toString(),
-    actualDate: transaction.actualDate || transaction.scheduledDate,
+    actualDate: transaction.actualDate || defaultActualDate(transaction.scheduledDate),
     notes: transaction.notes || "",
     // Manual transaction fields
     name: isManual ? transaction.name : undefined,

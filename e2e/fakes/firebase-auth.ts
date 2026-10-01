@@ -8,6 +8,8 @@
  *  - sign-in with an email that matches a seeded account / users profile signs
  *    in as that uid; otherwise a deterministic uid is derived.
  *  - Google popup signs in as `auth.config.googleUser` (default provided).
+ *  - like real Firebase, a password shorter than 6 characters is refused with `auth/weak-password`
+ *    (sign-up and password change).
  */
 import {
   accounts,
@@ -105,12 +107,16 @@ export const signInWithEmailAndPassword = async (
   return credentialFor();
 };
 
+/** Firebase Auth's minimum password length. */
+const MIN_PASSWORD_LENGTH = 6;
+
 export const createUserWithEmailAndPassword = async (
   _auth: Auth,
   email: string,
   password: string
 ): Promise<UserCredential> => {
   maybeReject(authConfig().rejectSignUp);
+  if (password.length < MIN_PASSWORD_LENGTH) throw authError("auth/weak-password");
   const { uid, known } = resolveUidByEmail(email);
   if (known) throw authError("auth/email-already-in-use");
   // Remember the password so a later sign-in with a wrong one is rejected.
@@ -157,6 +163,7 @@ export const updateEmail = async (user: FakeUser, newEmail: string): Promise<voi
 
 export const updatePassword = async (user: FakeUser, newPassword: string): Promise<void> => {
   maybeReject(authConfig().rejectUpdatePassword);
+  if (newPassword.length < MIN_PASSWORD_LENGTH) throw authError("auth/weak-password");
   if (user.email) setAccountPassword(user.email, newPassword);
 };
 

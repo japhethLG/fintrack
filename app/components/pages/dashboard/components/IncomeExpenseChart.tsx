@@ -17,6 +17,7 @@ import { Transaction } from "@/lib/types";
 import { useCurrency } from "@/lib/hooks/useCurrency";
 import { getIncomeExpenseChartData, getBestBucketType } from "@/lib/logic/healthScore";
 import dayjs from "dayjs";
+import { CHART_INITIAL_DIMENSION } from "@/lib/utils/chartAxis";
 
 interface IProps {
   transactions: Transaction[];
@@ -49,15 +50,15 @@ const IncomeExpenseChart: React.FC<IProps> = ({ transactions, dateRange }) => {
 
     switch (selectedRange) {
       case "last7":
-        start = today.subtract(7, "day").format("YYYY-MM-DD");
+        start = today.subtract(6, "day").format("YYYY-MM-DD");
         end = today.format("YYYY-MM-DD");
         break;
       case "last30":
-        start = today.subtract(30, "day").format("YYYY-MM-DD");
+        start = today.subtract(29, "day").format("YYYY-MM-DD");
         end = today.format("YYYY-MM-DD");
         break;
       case "last90":
-        start = today.subtract(90, "day").format("YYYY-MM-DD");
+        start = today.subtract(89, "day").format("YYYY-MM-DD");
         end = today.format("YYYY-MM-DD");
         break;
       case "ytd":
@@ -105,7 +106,7 @@ const IncomeExpenseChart: React.FC<IProps> = ({ transactions, dateRange }) => {
 
       <div className="h-[300px] w-full">
         {hasData ? (
-          <ResponsiveContainer width="100%" height="100%">
+          <ResponsiveContainer width="100%" height="100%" initialDimension={CHART_INITIAL_DIMENSION}>
             <BarChart data={data} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="#2d3748" vertical={false} />
               <XAxis
