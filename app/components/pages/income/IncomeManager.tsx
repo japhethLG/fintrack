@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useFinancial } from "@/contexts/FinancialContext";
 import { IncomeSource, IncomeSourceFormData } from "@/lib/types";
 import {
@@ -48,6 +48,18 @@ const IncomeManager: React.FC = () => {
 
   // Handle query param for auto-selecting source (from transaction modal)
   const searchParams = useSearchParams();
+  const router = useRouter();
+  // The calendar's right-click "Add Income" lands here as `?new=1&date=YYYY-MM-DD`: open the wizard
+  // with that day as the start date (MANUAL-L7), then clear the query so a refresh does not reopen it.
+  const [prefillDate, setPrefillDate] = useState<string | null>(null);
+  useEffect(() => {
+    if (searchParams.get("new") !== "1") return;
+    const date = searchParams.get("date");
+    setEditingSource(null);
+    setPrefillDate(date && /^\d{4}-\d{2}-\d{2}$/.test(date) ? date : null);
+    setShowForm(true);
+    router.replace("/income");
+  }, [searchParams, router]);
   useEffect(() => {
     const sourceId = searchParams.get("source");
     if (sourceId && incomeSources.some((s) => s.id === sourceId)) {
@@ -69,6 +81,7 @@ const IncomeManager: React.FC = () => {
   const handleCreateSource = async (data: IncomeSourceFormData) => {
     const source = await createIncomeSource(data);
     setShowForm(false);
+    setPrefillDate(null);
     setSelectedSourceId(source.id);
   };
 
@@ -208,11 +221,18 @@ const IncomeManager: React.FC = () => {
       {showForm ? (
         <Card padding="lg">
           <IncomeSourceForm
-            initialData={editingSource ? incomeSourceToFormValues(editingSource) : undefined}
+            initialData={
+              editingSource
+                ? incomeSourceToFormValues(editingSource)
+                : prefillDate
+                  ? { startDate: prefillDate }
+                  : undefined
+            }
             onSubmit={editingSource ? handleEditSource : handleCreateSource}
             onCancel={() => {
               setShowForm(false);
               setEditingSource(null);
+              setPrefillDate(null);
             }}
             isEditing={!!editingSource}
           />

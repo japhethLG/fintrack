@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useEffect } from "react";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useFinancial } from "@/contexts/FinancialContext";
 import { ExpenseRule, ExpenseRuleFormData } from "@/lib/types";
 import {
@@ -48,6 +48,18 @@ const ExpenseManager: React.FC = () => {
 
   // Handle query param for auto-selecting rule (from transaction modal)
   const searchParams = useSearchParams();
+  const router = useRouter();
+  // The calendar's right-click "Add Expense" lands here as `?new=1&date=YYYY-MM-DD`: open the wizard
+  // with that day as the start date (MANUAL-L7), then clear the query so a refresh does not reopen it.
+  const [prefillDate, setPrefillDate] = useState<string | null>(null);
+  useEffect(() => {
+    if (searchParams.get("new") !== "1") return;
+    const date = searchParams.get("date");
+    setEditingRule(null);
+    setPrefillDate(date && /^\d{4}-\d{2}-\d{2}$/.test(date) ? date : null);
+    setShowForm(true);
+    router.replace("/expenses");
+  }, [searchParams, router]);
   useEffect(() => {
     const sourceId = searchParams.get("source");
     if (sourceId && expenseRules.some((r) => r.id === sourceId)) {
@@ -78,6 +90,7 @@ const ExpenseManager: React.FC = () => {
   const handleCreateRule = async (data: ExpenseRuleFormData) => {
     const rule = await createExpenseRule(data);
     setShowForm(false);
+    setPrefillDate(null);
     setSelectedRuleId(rule.id);
   };
 
@@ -222,11 +235,18 @@ const ExpenseManager: React.FC = () => {
       {showForm ? (
         <Card padding="lg">
           <ExpenseRuleForm
-            initialData={editingRule ? expenseRuleToFormValues(editingRule) : undefined}
+            initialData={
+              editingRule
+                ? expenseRuleToFormValues(editingRule)
+                : prefillDate
+                  ? { startDate: prefillDate }
+                  : undefined
+            }
             onSubmit={editingRule ? handleEditRule : handleCreateRule}
             onCancel={() => {
               setShowForm(false);
               setEditingRule(null);
+              setPrefillDate(null);
             }}
             isEditing={!!editingRule}
           />
