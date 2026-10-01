@@ -8,6 +8,7 @@ import { useDatePreferences } from "@/lib/hooks/useDatePreferences";
 import InsightCard from "./InsightCard";
 import { TOTAL_DEBT_NOTE } from "@/lib/constants";
 import { RISK_HORIZON_DAYS } from "@/lib/logic/balanceCalculator/runway";
+import { amountTone } from "@/lib/utils/amountTone";
 
 interface Metrics {
   balance: number;
@@ -186,7 +187,7 @@ const MetricsGrid: React.FC<IProps> = ({
               <Icon name="arrow_forward" size="sm" className="text-gray-600 mb-2" />
               <div className="text-right">
                 <p className="text-xs text-gray-500">Actual</p>
-                <p className="text-lg font-bold text-danger">
+                <p className={cn("text-lg font-bold", amountTone(actualMetrics.monthlyExpenses, "text-danger"))}>
                   {formatCurrency(actualMetrics.monthlyExpenses)}
                 </p>
               </div>

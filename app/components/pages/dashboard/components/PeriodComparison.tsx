@@ -8,6 +8,7 @@ import { cn } from "@/lib/utils/cn";
 import { useCurrency } from "@/lib/hooks/useCurrency";
 import { useDatePreferences } from "@/lib/hooks/useDatePreferences";
 import { dateFromDayNumber, dayNumberOfDate, formatDate, parseDate } from "@/lib/utils/dateUtils";
+import { amountTone } from "@/lib/utils/amountTone";
 
 interface IProps {
   transactions: Transaction[];
@@ -120,7 +121,7 @@ const PeriodComparison: React.FC<IProps> = ({ transactions, dateRange }) => {
             {renderChange(comparisonData.changes.expenses, "expense", comparisonData.current.expenses)}
           </div>
           <div className="flex items-baseline justify-between">
-            <span className="text-xl font-bold text-danger">
+            <span className={cn("text-xl font-bold", amountTone(comparisonData.current.expenses, "text-danger"))}>
               {formatCurrency(-comparisonData.current.expenses)}
             </span>
             <span className="text-xs text-gray-500">

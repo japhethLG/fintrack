@@ -6,6 +6,7 @@ import { Card, Icon, Button } from "@/components/common";
 import { useCurrency } from "@/lib/hooks/useCurrency";
 import { cn } from "@/lib/utils/cn";
 import { categoryLabel } from "@/lib/utils/categoryLabel";
+import { CHART_INITIAL_DIMENSION } from "@/lib/utils/chartAxis";
 
 interface CategoryData {
   name: string;
@@ -80,7 +81,7 @@ const CategoryPieChart: React.FC<IProps> = ({
 
       {/* Chart */}
       <div className="flex-1 flex items-center justify-center relative">
-        <ResponsiveContainer width="100%" height={200}>
+        <ResponsiveContainer width="100%" height={200} initialDimension={CHART_INITIAL_DIMENSION}>
           <PieChart className="z-10">
             <Pie
               data={chartData}

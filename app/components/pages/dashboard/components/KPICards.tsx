@@ -4,6 +4,7 @@ import React from "react";
 import { Card, Icon } from "@/components/common";
 import { cn } from "@/lib/utils/cn";
 import { useCurrency } from "@/lib/hooks/useCurrency";
+import { amountTone } from "@/lib/utils/amountTone";
 
 interface PeriodStats {
   income: number;
@@ -38,7 +39,7 @@ const KPICards: React.FC<IProps> = ({ currentBalance, stats }) => {
     {
       label: "Total Income",
       value: formatCurrencyWithSign(stats.income),
-      color: "text-success",
+      color: amountTone(stats.income, "text-success"),
       icon: "trending_up",
       iconColor: "text-success",
       subtitle: `${stats.completedIncomeCount} completed, ${stats.pendingIncomeCount} projected`,
@@ -46,7 +47,7 @@ const KPICards: React.FC<IProps> = ({ currentBalance, stats }) => {
     {
       label: "Total Expenses",
       value: formatCurrency(-stats.expenses),
-      color: "text-danger",
+      color: amountTone(stats.expenses, "text-danger"),
       icon: "trending_down",
       iconColor: "text-danger",
       subtitle: `${stats.completedExpenseCount} completed, ${stats.pendingExpenseCount} projected`,
@@ -54,7 +55,7 @@ const KPICards: React.FC<IProps> = ({ currentBalance, stats }) => {
     {
       label: "Net Flow",
       value: formatCurrencyWithSign(stats.net),
-      color: stats.net >= 0 ? "text-success" : "text-danger",
+      color: amountTone(stats.net, stats.net >= 0 ? "text-success" : "text-danger"),
       icon: stats.net >= 0 ? "savings" : "money_off",
       iconColor: stats.net >= 0 ? "text-success" : "text-danger",
       subtitle: `${stats.net >= 0 ? "Surplus" : "Deficit"} for period`,

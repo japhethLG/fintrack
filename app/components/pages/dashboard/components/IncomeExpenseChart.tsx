@@ -17,6 +17,7 @@ import { Transaction } from "@/lib/types";
 import { useCurrency } from "@/lib/hooks/useCurrency";
 import { getIncomeExpenseChartData, getBestBucketType } from "@/lib/logic/healthScore";
 import dayjs from "dayjs";
+import { CHART_INITIAL_DIMENSION } from "@/lib/utils/chartAxis";
 
 interface IProps {
   transactions: Transaction[];
@@ -105,7 +106,7 @@ const IncomeExpenseChart: React.FC<IProps> = ({ transactions, dateRange }) => {
 
       <div className="h-[300px] w-full">
         {hasData ? (
-          <ResponsiveContainer width="100%" height="100%">
+          <ResponsiveContainer width="100%" height="100%" initialDimension={CHART_INITIAL_DIMENSION}>
             <BarChart data={data} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="#2d3748" vertical={false} />
               <XAxis

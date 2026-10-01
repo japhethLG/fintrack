@@ -15,7 +15,9 @@
  * neither printed nor counted as a failure in strict mode.
  */
 export const ENV_NOISE: RegExp[] = [
-  // recharts ResponsiveContainer logs on its first, pre-measurement render.
+  // recharts ResponsiveContainer logs "width(0) and height(0)" while jsdom (which lays nothing out) has not
+  // reported a size yet. The browser-only "width(-1)" variant is fixed (initialDimension) and tested in
+  // tests/ui/display/charts.test.tsx.
   /of chart should be greater than 0/,
   // Landing page uses styled-jsx (`<style jsx>`), compiled away by Next's SWC.
   /non-boolean attribute[\s\S]*\bjsx\b/,

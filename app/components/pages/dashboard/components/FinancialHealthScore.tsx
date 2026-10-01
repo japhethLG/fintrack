@@ -5,6 +5,7 @@ import { ResponsiveContainer, PieChart, Pie, Cell } from "recharts";
 import { Card, Icon, Tooltip as CommonTooltip, Button } from "@/components/common";
 import { HealthScoreBreakdown } from "@/lib/logic/healthScore";
 import { cn } from "@/lib/utils/cn";
+import { CHART_INITIAL_DIMENSION } from "@/lib/utils/chartAxis";
 
 interface IProps {
   healthScore: HealthScoreBreakdown;
@@ -67,7 +68,7 @@ const FinancialHealthScore: React.FC<IProps> = ({ healthScore }) => {
 
         {/* Gauge Chart */}
         <div className="h-[60px] w-[60px] relative">
-          <ResponsiveContainer width="100%" height="100%">
+          <ResponsiveContainer width="100%" height="100%" initialDimension={CHART_INITIAL_DIMENSION}>
             <PieChart>
               <Pie
                 data={gaugeData}

@@ -8,6 +8,7 @@ import { useCurrency } from "@/lib/hooks/useCurrency";
 import { useDatePreferences } from "@/lib/hooks/useDatePreferences";
 import { STATUS_VARIANTS } from "../constants";
 import { categoryLabel } from "@/lib/utils/categoryLabel";
+import { amountTone } from "@/lib/utils/amountTone";
 
 interface IProps {
   transaction: Transaction;
@@ -80,7 +81,7 @@ const TransactionRow: React.FC<IProps> = ({ transaction, onAction }) => {
 
           {/* Amount */}
           <div className="text-right min-w-[100px]">
-            <p className={cn("font-bold", isIncome ? "text-success" : "text-danger")}>
+            <p className={cn("font-bold", amountTone(amount, isIncome ? "text-success" : "text-danger"))}>
               {formatCurrencyWithSign((isIncome ? 1 : -1) * (amount))}
             </p>
             {hasVariance && (

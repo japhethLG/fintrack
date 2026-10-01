@@ -8,6 +8,7 @@ import { Card, Icon, Badge, Select } from "@/components/common";
 import { cn } from "@/lib/utils/cn";
 import { useCurrency } from "@/lib/hooks/useCurrency";
 import { BillItem } from "./BillItem";
+import { amountTone } from "@/lib/utils/amountTone";
 
 // ============================================================================
 // CONSTANTS
@@ -129,7 +130,9 @@ const BillCoverageWidget: React.FC<BillCoverageWidgetProps> = ({
           </div>
           <div>
             <p className="text-gray-400">Total Bills</p>
-            <p className="text-danger font-bold text-lg">{formatCurrency(-totalUpcoming)}</p>
+            <p className={cn("font-bold text-lg", amountTone(totalUpcoming, "text-danger"))}>
+              {formatCurrency(-totalUpcoming)}
+            </p>
           </div>
           <div>
             <p className="text-gray-400">Bills Count</p>
