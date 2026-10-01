@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
-import { Button, Input, Icon } from "@/components/common";
+import { Alert, Button, Input, Icon } from "@/components/common";
 
 export interface IModalData {
   title?: string;
@@ -12,7 +12,13 @@ export interface IModalData {
   isLoading?: boolean;
   /** Ask for the account password too (reauthentication); it is handed to onConfirm. */
   requirePassword?: boolean;
-  onConfirm: (password?: string) => void;
+  /**
+   * What confirming does. When it returns a promise the dialog stays open (busy) until it settles:
+   * if it REJECTS, the dialog stays open and shows the error, with everything the user typed kept,
+   * so a wrong password can be corrected without starting over. A plain function closes the dialog
+   * straight away.
+   */
+  onConfirm: (password?: string) => void | Promise<void>;
   onCancel?: () => void;
   onCloseModal?: () => void;
 }
@@ -36,6 +42,9 @@ const ConfirmModal: React.FC<IProps> = ({ closeModal, modalData }) => {
 
   const [inputValue, setInputValue] = useState("");
   const [password, setPassword] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState<string | null>(null);
+  const busy = isLoading || submitting;
 
   const needsConfirmText = !!confirmText;
   const isConfirmEnabled =
@@ -46,9 +55,21 @@ const ConfirmModal: React.FC<IProps> = ({ closeModal, modalData }) => {
     closeModal();
   };
 
-  const handleConfirm = () => {
-    onConfirm(requirePassword ? password : undefined);
-    closeModal();
+  const handleConfirm = async () => {
+    setSubmitError(null);
+    const result = onConfirm(requirePassword ? password : undefined);
+    if (!(result instanceof Promise)) {
+      closeModal();
+      return;
+    }
+    setSubmitting(true);
+    try {
+      await result;
+      closeModal();
+    } catch (err) {
+      setSubmitError(err instanceof Error ? err.message : "Something went wrong. Please try again.");
+      setSubmitting(false);
+    }
   };
 
   const getButtonVariant = () => {
@@ -99,7 +120,10 @@ const ConfirmModal: React.FC<IProps> = ({ closeModal, modalData }) => {
           </p>
           <Input
             value={inputValue}
-            onChange={(e) => setInputValue(e.target.value)}
+            onChange={(e) => {
+              setInputValue(e.target.value);
+              setSubmitError(null);
+            }}
             placeholder={`Type "${confirmText}" to confirm`}
             className="font-mono"
             autoFocus
@@ -116,10 +140,19 @@ const ConfirmModal: React.FC<IProps> = ({ closeModal, modalData }) => {
             id="confirm-password"
             type="password"
             value={password}
-            onChange={(e) => setPassword(e.target.value)}
+            onChange={(e) => {
+              setPassword(e.target.value);
+              setSubmitError(null);
+            }}
             placeholder="Enter your password to confirm it's you"
             autoComplete="current-password"
           />
+        </div>
+      )}
+
+      {submitError && (
+        <div className="mb-4">
+          <Alert variant="error">{submitError}</Alert>
         </div>
       )}
 
@@ -130,7 +163,7 @@ const ConfirmModal: React.FC<IProps> = ({ closeModal, modalData }) => {
           variant="ghost"
           className="flex-1"
           onClick={handleCancel}
-          disabled={isLoading}
+          disabled={busy}
         >
           Cancel
         </Button>
@@ -139,10 +172,10 @@ const ConfirmModal: React.FC<IProps> = ({ closeModal, modalData }) => {
           variant={getButtonVariant()}
           className="flex-1"
           onClick={handleConfirm}
-          disabled={!isConfirmEnabled || isLoading}
-          loading={isLoading}
+          disabled={!isConfirmEnabled || busy}
+          loading={busy}
         >
-          {isLoading ? "Processing..." : confirmButtonText}
+          {busy ? "Processing..." : confirmButtonText}
         </Button>
       </div>
     </div>

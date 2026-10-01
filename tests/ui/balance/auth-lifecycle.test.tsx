@@ -159,6 +159,8 @@ describe("sign-up and Google sign-in create the profile", () => {
     const app = await renderApp({ route: "/signup", user: null });
     await app.user.type(screen.getByLabelText("Email"), "new@example.com");
     await app.user.type(screen.getByLabelText("Password"), "hunter22");
+    // REWRITTEN (MANUAL-g): the form now asks for the password twice
+    await app.user.type(screen.getByLabelText("Confirm Password"), "hunter22");
     await app.user.click(screen.getByRole("button", { name: "Sign Up" }));
     await waitFor(() => expect(app.auth.__callsTo("createUserWithEmailAndPassword")).toHaveLength(1));
     expect(app.auth.__callsTo("createUserWithEmailAndPassword")[0].args).toEqual(["new@example.com", "hunter22"]);
@@ -177,7 +179,10 @@ describe("sign-up and Google sign-in create the profile", () => {
   it("sign-up surfaces Firebase's weak-password and email-in-use errors in plain words and creates nothing", async () => {
     const app = await renderApp({ route: "/signup", user: null });
     await app.user.type(screen.getByLabelText("Email"), "new@example.com");
-    await app.user.type(screen.getByLabelText("Password"), "123");
+    // REWRITTEN (MANUAL-g): "123" is now stopped by the form itself (see signup validation below), so the
+    // server-side weak-password message is exercised with a password that passes the client check
+    await app.user.type(screen.getByLabelText("Password"), "123456");
+    await app.user.type(screen.getByLabelText("Confirm Password"), "123456");
     app.auth.__failNext("createUserWithEmailAndPassword", new Error("Firebase: Error (auth/weak-password)."));
     await app.user.click(screen.getByRole("button", { name: "Sign Up" }));
     expect(await screen.findByText(/Password is too weak/)).toBeInTheDocument();

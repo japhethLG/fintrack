@@ -131,6 +131,7 @@ export const signUpViaForm = async (page: Page, email: string, password = "e2e-p
   await page.goto("/signup");
   await page.getByLabel("Email", { exact: true }).fill(email);
   await page.getByLabel("Password", { exact: true }).fill(password);
+  await page.getByLabel("Confirm Password", { exact: true }).fill(password);
   await page.getByRole("button", { name: "Sign Up", exact: true }).click();
   await expect(page.getByRole("heading", { name: "Dashboard", level: 1 })).toBeVisible();
 };
