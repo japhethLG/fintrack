@@ -5,7 +5,9 @@ import { Transaction } from "@/lib/types";
 import { Icon, Badge } from "@/components/common";
 import { cn } from "@/lib/utils/cn";
 import { TRANSACTION_STATUS_BADGE_VARIANT } from "@/lib/constants";
-import { isOverdue } from "@/lib/logic/balanceCalculator/openItems";
+import { isOverdue, rowDate } from "@/lib/logic/balanceCalculator/openItems";
+import { categoryLabel } from "@/lib/utils/categoryLabel";
+import { getTodayKey, parseDate } from "@/lib/utils/dateUtils";
 import { useCurrency } from "@/lib/hooks/useCurrency";
 
 interface IProps {
@@ -19,6 +21,10 @@ const TransactionItem: React.FC<IProps> = ({ transaction, onClick }) => {
   const isSkipped = transaction.status === "skipped";
   // Still projected and dated before today: owed (an expense) or late (an income), not yet realized
   const overdue = isOverdue(transaction);
+  // Completed and dated after today: paid ahead of its date. Listed on its own day, but the money
+  // moved on today, so the day's totals do not count it again (MANUAL-M10).
+  const today = getTodayKey();
+  const paidAhead = transaction.status === "completed" && rowDate(transaction) > today;
 
   // Determine colors based on type and skipped status
   const bgColor = isSkipped
@@ -74,7 +80,7 @@ const TransactionItem: React.FC<IProps> = ({ transaction, onClick }) => {
 
         {/* Bottom row: Category and Status */}
         <div className="flex items-center justify-between gap-2">
-          <p className="text-xs text-gray-400 truncate">{transaction.category}</p>
+          <p className="text-xs text-gray-400 truncate">{categoryLabel(transaction.category)}</p>
           <Badge
             variant={overdue ? "danger" : TRANSACTION_STATUS_BADGE_VARIANT[transaction.status]}
             className="text-xs flex-shrink-0"
@@ -82,6 +88,13 @@ const TransactionItem: React.FC<IProps> = ({ transaction, onClick }) => {
             {overdue ? "overdue" : transaction.status}
           </Badge>
         </div>
+        {paidAhead && (
+          <p className="mt-1 text-xs text-gray-500">
+            Paid early: counted on{" "}
+            {parseDate(today).toLocaleDateString("en-US", { month: "short", day: "numeric" })}, not
+            on this day
+          </p>
+        )}
       </div>
     </div>
   );

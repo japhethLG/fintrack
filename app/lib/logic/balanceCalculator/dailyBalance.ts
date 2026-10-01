@@ -15,8 +15,12 @@
  *                    owed now, so they are deducted on today (`overdueOwed`); overdue income has
  *                    not arrived and is not credited.
  *
- * Every day satisfies: closing = opening + totalIncome - totalExpenses - (overdueOwed on today),
- * except that a completed row dated after today counts on today instead of on its own day.
+ * Every day satisfies: closing = opening + movedIncome - movedExpenses - (overdueOwed on today).
+ * `totalIncome` / `totalExpenses` are what is LISTED and totalled on the day (a row on its own date);
+ * `movedIncome` / `movedExpenses` are what actually MOVED the balance that day. They differ only for a
+ * completed row dated after today (paid ahead of its date): listed on its own day, moved on today. The
+ * day panel prints the moved figures so its totals agree with its opening-to-closing change, and shows
+ * the paid-ahead rows (`paidAhead`, today only) where the money really moved (MANUAL-M10).
  *   skipped row    : nothing.
  *
  * Hence: today's OPENING balance is B (less anything completed today) and, when nothing is due or
@@ -59,6 +63,12 @@ export const calculateDailyBalances = (
   const rowsByDay = new Map<string, Transaction[]>();
   const completedFlowByDay = new Map<string, number>();
   const openFlowByDay = new Map<string, number>();
+  // The same movements split by direction, and the rows paid ahead of their date (for the day panel).
+  const movedIncomeByDay = new Map<string, number>();
+  const movedExpensesByDay = new Map<string, number>();
+  const paidAhead: Transaction[] = [];
+  const addTo = (map: Map<string, number>, day: string, amount: number) =>
+    map.set(day, (map.get(day) ?? 0) + amount);
 
   for (const t of transactions) {
     const own = rowDate(t);
@@ -76,8 +86,11 @@ export const calculateDailyBalances = (
       // dated later (paid ahead of its due date), which is what the realized balance already says.
       const moved = own > today ? today : own;
       completedFlowByDay.set(moved, (completedFlowByDay.get(moved) ?? 0) + signed);
+      addTo(t.type === "income" ? movedIncomeByDay : movedExpensesByDay, moved, amount);
+      if (own > today) paidAhead.push(t);
     } else if (t.status === "projected" && own >= today) {
       openFlowByDay.set(own, (openFlowByDay.get(own) ?? 0) + signed);
+      addTo(t.type === "income" ? movedIncomeByDay : movedExpensesByDay, own, amount);
     }
     // an overdue projected row (own < today) does not move the balance on its own day
   }
@@ -136,12 +149,15 @@ export const calculateDailyBalances = (
       closingBalance,
       totalIncome: income,
       totalExpenses: expenses,
+      movedIncome: movedIncomeByDay.get(dateKey) ?? 0,
+      movedExpenses: movedExpensesByDay.get(dateKey) ?? 0,
       projectedIncome,
       projectedExpenses,
       transactions: dayTransactions,
       status: getBalanceStatus(closingBalance, warningThreshold),
     };
     if (dateKey === today && overdueOwed > 0) day.overdueOwed = overdueOwed;
+    if (dateKey === today && paidAhead.length > 0) day.paidAhead = paidAhead;
     balances.set(dateKey, day);
 
     runningBalance = closingBalance;

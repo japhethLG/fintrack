@@ -17,12 +17,14 @@ import type { CalendarDay } from "../types";
 interface IProps {
   day: CalendarDay;
   isSelected: boolean;
+  /** Phone width: compact amounts and tighter padding so a balance never spills into the next day. */
+  compact?: boolean;
   onClick: () => void;
   onTransactionClick?: (transaction: Transaction) => void;
 }
 
-const DayCell: React.FC<IProps> = ({ day, isSelected, onClick, onTransactionClick }) => {
-  const { formatCurrency } = useCurrency();
+const DayCell: React.FC<IProps> = ({ day, isSelected, compact, onClick, onTransactionClick }) => {
+  const { formatCurrency, formatCompactCurrency } = useCurrency();
   const router = useRouter();
   const { openModal } = useModal();
   const { date, isCurrentMonth, isToday, isPast, dayBalance } = day;
@@ -73,7 +75,7 @@ const DayCell: React.FC<IProps> = ({ day, isSelected, onClick, onTransactionClic
       icon: "trending_up",
       variant: "success" as const,
       onClick: () => {
-        router.push("/income");
+        router.push(`/income?new=1&date=${dateKey}`);
       },
       divider: true,
     },
@@ -83,7 +85,7 @@ const DayCell: React.FC<IProps> = ({ day, isSelected, onClick, onTransactionClic
       icon: "trending_down",
       variant: "default" as const,
       onClick: () => {
-        router.push("/expenses");
+        router.push(`/expenses?new=1&date=${dateKey}`);
       },
     },
   ];
@@ -93,7 +95,7 @@ const DayCell: React.FC<IProps> = ({ day, isSelected, onClick, onTransactionClic
       <div
         ref={setNodeRef}
         className={cn(
-          "min-h-[100px] p-2 border border-gray-800 cursor-pointer transition-all",
+          "min-h-[100px] min-w-0 overflow-hidden p-1 md:p-2 border border-gray-800 cursor-pointer transition-all",
           isCurrentMonth ? "bg-gray-900/50" : "bg-gray-900/20",
           isSelected && "ring-2 ring-primary bg-primary/10",
           isToday && "border-primary",
@@ -104,7 +106,7 @@ const DayCell: React.FC<IProps> = ({ day, isSelected, onClick, onTransactionClic
         onContextMenu={handleContextMenu}
       >
         {/* Date header */}
-        <div className="flex items-start justify-between mb-1">
+        <div className="flex flex-col items-start gap-0.5 mb-1 md:flex-row md:justify-between">
           <span
             className={cn(
               "text-sm font-medium",
@@ -120,8 +122,20 @@ const DayCell: React.FC<IProps> = ({ day, isSelected, onClick, onTransactionClic
 
           {/* Balance indicator */}
           {dayBalance && isCurrentMonth && (
-            <span className={cn("text-xs font-medium", STATUS_COLORS[dayBalance.status])}>
-              {formatCurrency(dayBalance.closingBalance)}
+            <span
+              className={cn(
+                "text-[10px] md:text-xs font-medium whitespace-nowrap",
+                STATUS_COLORS[dayBalance.status]
+              )}
+              title={
+                dayBalance.overdueOwed
+                  ? `Projected: after ${formatCurrency(dayBalance.overdueOwed)} overdue`
+                  : formatCurrency(dayBalance.closingBalance)
+              }
+            >
+              {compact
+                ? formatCompactCurrency(dayBalance.closingBalance)
+                : formatCurrency(dayBalance.closingBalance)}
             </span>
           )}
         </div>

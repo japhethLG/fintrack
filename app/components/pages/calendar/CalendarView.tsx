@@ -2,6 +2,7 @@
 
 import React, { useState, useMemo, useRef, useCallback } from "react";
 import {
+  Announcements,
   CollisionDetection,
   DndContext,
   DragEndEvent,
@@ -17,7 +18,10 @@ import {
 import { useFinancial } from "@/contexts/FinancialContext";
 import { Transaction } from "@/lib/types";
 import { Alert, Button, Card, PageHeader, Icon, LoadingSpinner } from "@/components/common";
-import { formatDate, isSameDay, startOfDay } from "@/lib/utils/dateUtils";
+import { formatDate, getTodayKey, isSameDay, parseDate, startOfDay } from "@/lib/utils/dateUtils";
+import { rowDate } from "@/lib/logic/balanceCalculator/openItems";
+import { useCurrency } from "@/lib/hooks/useCurrency";
+import { useMediaQuery } from "@/lib/hooks/useMediaQuery";
 import { getBalanceStatus } from "@/lib/logic/balanceCalculator/utils";
 import { summarizePeriod } from "@/lib/logic/healthScore";
 import { useModal } from "@/components/modals";
@@ -38,6 +42,35 @@ const dropUnderPointer: CollisionDetection = (args) => {
   return underPointer.length > 0 ? underPointer : rectIntersection(args);
 };
 
+// Screen readers: name the transaction and the day, never the internal ids dnd-kit would read out.
+const dayLabel = (key: unknown): string =>
+  typeof key === "string"
+    ? parseDate(key).toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })
+    : "no day";
+
+const transactionLabel = (active: { data: { current?: Record<string, unknown> } }): string => {
+  const txn = active.data.current?.transaction as Transaction | undefined;
+  return txn ? `${txn.name}, ${dayLabel(rowDate(txn))}` : "transaction";
+};
+
+const announcements: Announcements = {
+  onDragStart: ({ active }) => `Picked up ${transactionLabel(active)}.`,
+  onDragOver: ({ active, over }) =>
+    over
+      ? `${transactionLabel(active)} is over ${dayLabel(over.id)}.`
+      : `${transactionLabel(active)} is not over a day.`,
+  onDragEnd: ({ active, over }) =>
+    over
+      ? `${transactionLabel(active)} was dropped on ${dayLabel(over.id)}.`
+      : `${transactionLabel(active)} was dropped outside the calendar and stays where it was.`,
+  onDragCancel: ({ active }) => `Moving ${transactionLabel(active)} was cancelled.`,
+};
+
+const screenReaderInstructions = {
+  draggable:
+    "Drag this transaction onto another day to reschedule it. To change its date without dragging, open the transaction.",
+};
+
 const CalendarView: React.FC = () => {
   const {
     transactions,
@@ -48,6 +81,9 @@ const CalendarView: React.FC = () => {
     userProfile,
   } = useFinancial();
   const { openModal } = useModal();
+  const { formatCurrency } = useCurrency();
+  // 7 columns on a phone leave ~50px per day: amounts print compact there (MANUAL-M4)
+  const isCompact = useMediaQuery("(max-width: 767px)");
 
   const [currentDate, setCurrentDate] = useState(new Date());
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
@@ -193,26 +229,23 @@ const CalendarView: React.FC = () => {
     const startKey = formatDate(start);
     const endKey = formatDate(end);
 
-    let income = 0;
-    let expenses = 0;
-
     const rangeTransactions = transactions.filter((t) => {
       const date = t.actualDate || t.scheduledDate;
       return date >= startKey && date <= endKey;
     });
 
-    // The one definition of a period's income and expenses (healthScore/periodStats.ts)
+    // The one definition of a period's income and expenses (healthScore/periodStats.ts). The same
+    // period feeds the sidebar AND the top tiles, so the tiles describe the month or the week on show.
     const period = summarizePeriod(transactions, startKey, endKey);
-    income = period.income;
-    expenses = period.expenses;
 
     return {
       start,
       end,
       startKey,
       endKey,
-      income,
-      expenses,
+      income: period.income,
+      expenses: period.expenses,
+      period,
       transactions: rangeTransactions,
     };
   }, [viewMode, currentDate, transactions, calendarWeekDays]);
@@ -302,23 +335,22 @@ const CalendarView: React.FC = () => {
     }
   };
 
-  // Month summary
-  const monthSummary = useMemo(() => {
-    const year = currentDate.getFullYear();
-    const month = currentDate.getMonth();
-    const startKey = formatDate(new Date(year, month, 1));
-    const endKey = formatDate(new Date(year, month + 1, 0));
+  // Summary tiles: the period being viewed (the month, or the week in week view; MANUAL-M2).
+  // Skipped rows are in no total and in neither count (summarizePeriod keeps them apart)
+  const periodSummary = {
+    income: rangeInfo.period.income,
+    expenses: rangeInfo.period.expenses,
+    net: rangeInfo.period.net,
+    projected: rangeInfo.period.pendingIncomeCount + rangeInfo.period.pendingExpenseCount,
+    completed: rangeInfo.period.completedCount,
+  };
 
-    // Skipped rows are in no total and in neither count (summarizePeriod keeps them apart)
-    const period = summarizePeriod(transactions, startKey, endKey);
-    return {
-      income: period.income,
-      expenses: period.expenses,
-      net: period.net,
-      projected: period.pendingIncomeCount + period.pendingExpenseCount,
-      completed: period.completedCount,
-    };
-  }, [transactions, currentDate]);
+  // Today's balance is a projection when something is overdue (MANUAL-M6): the Dashboard prints the
+  // realized balance, the calendar deducts what is owed. Say so, with both figures.
+  const todayKey = getTodayKey();
+  const todayBalance = dailyBalances.get(todayKey);
+  const overdueOwed = todayBalance?.overdueOwed ?? 0;
+  const todayInView = rangeInfo.startKey <= todayKey && todayKey <= rangeInfo.endKey;
 
   // Period balance summary (opening/closing for current view)
   const periodBalance = useMemo(() => {
@@ -387,6 +419,7 @@ const CalendarView: React.FC = () => {
   return (
     <DndContext
       sensors={sensors}
+      accessibility={{ announcements, screenReaderInstructions }}
       collisionDetection={dropUnderPointer}
       onDragStart={handleDragStart}
       onDragEnd={handleDragEnd}
@@ -434,11 +467,11 @@ const CalendarView: React.FC = () => {
 
         {/* Month Summary */}
         <MonthSummary
-          income={monthSummary.income}
-          expenses={monthSummary.expenses}
-          net={monthSummary.net}
-          projected={monthSummary.projected}
-          completed={monthSummary.completed}
+          income={periodSummary.income}
+          expenses={periodSummary.expenses}
+          net={periodSummary.net}
+          projected={periodSummary.projected}
+          completed={periodSummary.completed}
         />
 
         {/* Period Balance Summary (Opening/Closing) */}
@@ -449,6 +482,20 @@ const CalendarView: React.FC = () => {
           startDateLabel={periodBalance.startDateLabel}
           endDateLabel={periodBalance.endDateLabel}
         />
+
+        {overdueOwed > 0 && todayInView && todayBalance && (
+          <div
+            className="mb-4 flex items-start gap-2 rounded-lg border border-warning/30 bg-warning/10 p-3 text-xs lg:text-sm text-gray-300"
+          >
+            <Icon name="info" size={16} className="mt-0.5 text-warning flex-shrink-0" />
+            <p>
+              Today&apos;s closing balance on the calendar, {formatCurrency(todayBalance.closingBalance)},
+              is projected: it deducts {formatCurrency(overdueOwed)} of overdue bills that are still
+              unpaid and counts what is still due today. Your current balance is{" "}
+              {formatCurrency(userProfile?.currentBalance ?? 0)} and only changes when they are paid.
+            </p>
+          </div>
+        )}
 
         <div className="grid grid-cols-1 lg:grid-cols-4 gap-4 lg:gap-6">
           {/* Calendar Grid */}
@@ -497,6 +544,7 @@ const CalendarView: React.FC = () => {
                       <DayCell
                         key={i}
                         day={day}
+                        compact={isCompact}
                         isSelected={selectedDate ? isSameDay(selectedDate, day.date) : false}
                         onTransactionClick={openTransactionModal}
                         onClick={() =>
@@ -517,6 +565,7 @@ const CalendarView: React.FC = () => {
                     <WeekDayCell
                       key={i}
                       day={day}
+                      compact={isCompact}
                       isSelected={selectedDate ? isSameDay(selectedDate, day.date) : false}
                       onClick={() =>
                         setSelectedDate((prev) =>
