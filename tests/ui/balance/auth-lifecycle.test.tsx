@@ -459,15 +459,16 @@ describe("balance override and the calendar date it stamps", () => {
         today: "2026-01-15T00:30",
         seed: { profile: { currentBalance: 100, initialBalance: 100, balanceLastUpdatedAt: "2026-01-01" } },
       });
-      expect(screen.getByText("Last updated: 2026-01-01")).toBeInTheDocument();
+      // REWRITTEN (MANUAL-L5): the label follows the Date Format preference (default MM/DD/YYYY)
+      expect(screen.getByText("Last updated: 01/01/2026")).toBeInTheDocument();
       await app.user.click(screen.getByRole("button", { name: /Override Current Balance/ }));
       await app.user.type(screen.getByLabelText("Override Current Balance"), "250");
       await app.user.click(screen.getByRole("button", { name: "Override Balance" }));
       await screen.findByText("Balance updated successfully!");
       await app.settle();
       expect(storedBalance(app)).toBe(250);
-      const label = screen.getByText(/^Last updated: 20\d\d-\d\d-\d\d$/);
-      expect(label.textContent).toBe("Last updated: 2026-01-15");
+      const label = screen.getByText(/^Last updated: \d\d\/\d\d\/20\d\d$/);
+      expect(label.textContent).toBe("Last updated: 01/15/2026");
     }
   );
 });
