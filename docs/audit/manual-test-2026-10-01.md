@@ -32,6 +32,55 @@ The core money flows are right. Every balance, total and schedule I checked by h
 
 **New issues found by hand:** 1 high, 10 medium, 8 low, plus cosmetic and UX notes. Part 1 covered the main journey; Part 2 (at the end) covers every income type, every expense type and their calendar actions.
 
+## Fix status (2026-10-01)
+
+Every issue below is fixed on `claude/financial-projections-engine-g5fgkv`. Each fix has a regression test that was checked to fail on the old code; a few tests are guards for behaviour that already worked. The issue descriptions further down are kept as found.
+
+| Issue | Fix |
+| --- | --- |
+| H1 | Loan, card and installment schedules are windowed on the date a payment is shown, so a dragged payment keeps its interest/principal split (and is no longer lost when dragged across months). |
+| M1 | An edit keeps the stored monthly payment unless a loan term changes (principal, balance, rate, term, calculation type). |
+| M2 | Week view's top tiles summarise the week on show. |
+| M3 | The wizards save only from their Create/Save button; Enter never submits them. |
+| M4 | Phone widths print compact amounts (full amount in the tooltip); no cell content overflows. |
+| M5 | The overdue dialog shows "Overdue Bills" and "Income Not Yet Recorded" separately, with no combined total. |
+| M6 | A note explains that the calendar's today figure is projected (after unpaid overdue bills), unlike the current balance. |
+| M7 | One "First Payment Date" drives the loan; the wizard no longer shows a second, different date. |
+| M8 | The income Category follows the chosen type. |
+| M9 | Plans record which payments are paid; the remaining schedule fills the earliest unpaid months. |
+| M10 | The day panel's totals count what moved the balance that day; early payments are marked "Paid early" on their scheduled day. |
+| L1 | Installment Remaining is exact (₱25,000.00, not ₱24,999.96). |
+| L2, L3 | Debt projections, breakdowns and stored debt balances are whole cents, and schedules still sum exactly to the balance. |
+| L4 | Every "next N days" window is exactly N days, today included. |
+| L5 | Date Format and Start of Week are honoured across the app, including the calendar. |
+| L6 | Total Debt is "what you still owe": loan principal + card balance + remaining installments, with a note that loan interest is not included. |
+| L7 | Right-click "Add Income/Expense" opens the wizard on the clicked day. |
+| L8 | The Pay Full Balance preview shows only the payments that happen, and the one-time expense preview appears. The one-time income and daily-with-end-date previews could not be reproduced as broken; tests pin them. An edit part-way through previews the payments still to make. |
+
+**UX and cosmetic notes, all fixed:**
+- validation messages for zero or negative amounts;
+- review steps show the semi-monthly days and the installment total, count and last payment;
+- end dates replace "Ongoing" for fixed-term plans;
+- one wording throughout ("Pay on Friday if weekend", "Semi-monthly");
+- the card wizard warns about the minimum-payment trap;
+- the preview notes weekend moves;
+- human category labels everywhere, and the reset dialog has no internal type names;
+- zero amounts are neutral, and the empty chart's axis is readable;
+- the page header stacks on phones;
+- the landing page's "See How It Works" scrolls to How It Works;
+- no Recharts width warning;
+- sign-up has a confirm password and a 6-character minimum, and the E2E fake enforces it;
+- Google-only users aren't offered a password change;
+- the Delete Account dialog stays open on a wrong password;
+- the AI prompt flags the card trap;
+- paying early defaults Actual Date to today;
+- the sidebar signs sit inline with their amounts;
+- screen-reader drag announcements use names, not IDs.
+
+**Not changed (decisions still open):**
+- the different weekend defaults for income and expenses;
+- whether skipping a debt payment defers or forgives it.
+
 ---
 
 ## Issues

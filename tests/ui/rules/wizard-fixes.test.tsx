@@ -113,8 +113,8 @@ describe("M7: a loan has ONE first-payment date", () => {
     expect(screen.queryByLabelText(/Loan Start Date/)).toBeNull();
     await d.fillExpenseDetails(app, { kind: "Loan", principal: "1200", rate: "0", term: "12", start: "2026-03-20" });
     // the amortisation table's first payment IS the date typed
-    expect(amortDates()[0]).toBe("3/20/2026");
-    expect(amortDates()[1]).toBe("4/20/2026");
+    expect(amortDates()[0]).toBe("03/20/2026"); // REWRITTEN (MANUAL-L5): dates print in the Date Format preference, zero-padded (MM/DD/YYYY)
+    expect(amortDates()[1]).toBe("04/20/2026");
 
     // the next step shows the SAME date, and its preview starts there
     await d.next(app);
@@ -134,7 +134,7 @@ describe("M7: a loan has ONE first-payment date", () => {
     await d.fillExpenseToSchedule(app, { kind: "Loan", principal: "1200", rate: "0", term: "12", start: "2026-03-20" });
     await d.applyExpenseSchedule(app, { start: "2026-04-05" });
     await app.user.click(screen.getByRole("button", { name: "Back" }));
-    expect(amortDates()[0]).toBe("4/5/2026");
+    expect(amortDates()[0]).toBe("04/05/2026");
   });
 });
 
@@ -298,21 +298,21 @@ describe("(b)(c)(d) review steps and detail cards", () => {
     expect(field("Total Amount")).toMatch(/1,200\.00/);
     expect(field("Number of Payments")).toBe("12");
     // Feb 10 2026 + 11 months = Jan 10 2027
-    expect(field("Last Payment")).toBe("1/10/2027");
+    expect(field("Last Payment")).toBe("01/10/2027");
     expect(field("Schedule")).toBe("On the 10th of each month");
   });
 
   it("an installment plan's detail card ends on its last payment date, not 'Ongoing'", async () => {
     const app = await renderApp({ route: "/expenses", today: TODAY });
     await d.createExpense(app, { kind: "Installment", total: "1200", count: "12", start: "2026-02-10", weekend: "none" });
-    expect(field("End Date")).toBe("1/10/2027");
-    expect(field("First Payment Date")).toBe("2/10/2026");
+    expect(field("End Date")).toBe("01/10/2027");
+    expect(field("First Payment Date")).toBe("02/10/2026");
   });
 
   it("a loan's detail card ends on its last scheduled payment too (24 months from Feb 10 2026 = Jan 10 2028)", async () => {
     const app = await renderApp({ route: "/expenses", today: TODAY });
     await d.createExpense(app, { kind: "Loan", principal: "12000", rate: "12", term: "24", start: "2026-02-10", weekend: "none" });
-    expect(field("End Date")).toBe("1/10/2028");
+    expect(field("End Date")).toBe("01/10/2028");
   });
 });
 

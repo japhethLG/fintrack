@@ -5,7 +5,6 @@ import {
   screen,
   within,
   waitFor,
-  knownDefect,
   moneyNear,
   makeExpenseRule,
   makeManualTransaction,
@@ -233,9 +232,8 @@ describe("low-balance threshold drives the calendar status colours", () => {
 });
 
 describe("week start and date format preferences (both offered in Settings)", () => {
-  knownDefect(
-    "UI-BAL-26",
-    "Start of Week = Monday does not change the calendar (columns still start on Sunday)",
+  it(
+    "UI-BAL-26 (fixed, MANUAL-L5): Start of Week = Monday starts the calendar's columns on Monday",
     async () => {
       // observed: header order Sun Mon Tue Wed Thu Fri Sat regardless of preferences.startOfWeek
       await renderApp({

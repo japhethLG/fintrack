@@ -436,7 +436,7 @@ describe("cash loan wizard: schedule behaviour", () => {
       expect((screen.getByLabelText(/^First Payment Date/) as HTMLInputElement).value).toBe("01/15/2026"); // precondition
       const rows = amortRows();
       expect(rows.length).toBeGreaterThan(0);
-      expect(rows[0].date).toBe("1/15/2026");
+      expect(rows[0].date).toBe("01/15/2026"); // REWRITTEN (MANUAL-L5): dates print in the Date Format preference, zero-padded (MM/DD/YYYY)
     }
   );
 });

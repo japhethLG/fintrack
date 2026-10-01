@@ -771,7 +771,7 @@ describe("income wizard: dates rendered on the Review step and detail card in a 
       await d.next(app);
       await screen.findByText("Review & Confirm");
       const startCell = screen.getByText("Start Date").nextElementSibling!;
-      expect(startCell.textContent).toBe("2/10/2026");
+      expect(startCell.textContent).toBe("02/10/2026"); // REWRITTEN (MANUAL-L5): dates print in the Date Format preference, zero-padded (MM/DD/YYYY)
     }
   );
 

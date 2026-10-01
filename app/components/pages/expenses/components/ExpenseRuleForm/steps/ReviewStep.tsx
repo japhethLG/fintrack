@@ -6,9 +6,9 @@ import { Card, Badge } from "@/components/common";
 import { FormInput } from "@/components/formElements";
 import { EXPENSE_CATEGORY_LABELS } from "@/lib/constants";
 import { useCurrency } from "@/lib/hooks/useCurrency";
+import { useDatePreferences } from "@/lib/hooks/useDatePreferences";
 import { categoryLabel } from "@/lib/utils/categoryLabel";
 import { frequencyLabel, weekendAdjustmentLabel } from "@/lib/utils/ruleLabels";
-import { parseDate } from "@/lib/utils/dateUtils";
 import { describeSchedule, lastMonthlyPaymentDate } from "@/lib/logic/ruleSchedule";
 import { EXPENSE_TYPE_LABELS } from "../../../constants";
 import MinimumPaymentWarning from "../components/MinimumPaymentWarning";
@@ -27,6 +27,7 @@ interface IProps {
 
 const ReviewStep: React.FC<IProps> = ({ error }) => {
   const { formatCurrency } = useCurrency();
+  const { formatDate: formatDisplayDate } = useDatePreferences();
   const { control } = useFormContext<ExpenseRuleFormValues>();
 
   // The same values, resolved the same way, as the document the wizard saves
@@ -58,7 +59,8 @@ const ReviewStep: React.FC<IProps> = ({ error }) => {
     values.startDate,
     frequencyLabel(frequency)
   );
-  const showDate = (iso: string) => parseDate(iso).toLocaleDateString();
+  // Dates print in the Date Format preference (MANUAL-L5)
+  const showDate = (date: string | Date) => formatDisplayDate(date);
   // An installment plan ends with its last payment, placed as the engine places it
   const installmentCount = Number(values.installmentCount);
   const installmentTotal = Number(values.installmentTotal);
@@ -185,7 +187,7 @@ const ReviewStep: React.FC<IProps> = ({ error }) => {
               <div>
                 <p className="text-xs text-gray-400">Last Payment</p>
                 <p className="text-white font-medium">
-                  {lastInstallment.toLocaleDateString()}
+                  {showDate(lastInstallment)}
                 </p>
               </div>
             )}
