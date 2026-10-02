@@ -77,9 +77,12 @@ Every issue below is fixed on `claude/financial-projections-engine-g5fgkv`. Each
 - the sidebar signs sit inline with their amounts;
 - screen-reader drag announcements use names, not IDs.
 
-**Not changed (decisions still open):**
-- the different weekend defaults for income and expenses;
-- whether skipping a debt payment defers or forgives it.
+**Decided 2026-10-02:**
+- **Weekend defaults stay different.** Income starts on "Pay on Friday if weekend" and bills on "No adjustment". Each wizard now explains its default under the field.
+- **Debt payments can't be skipped.** Loan, credit card and installment payments are owed, so the transaction dialog offers no Skip for them. Instead, the user drags the payment to the day they'll pay, or leaves it unpaid, and it shows as overdue.
+  - Why: a skip used to hide money still owed. A 6-payment loan showed 5 payments after one skip, and the leftover never reappeared.
+  - The write path also refuses a debt skip.
+  - A one-time migration at login turns existing skipped debt payments back into unpaid ones.
 
 ---
 
