@@ -188,6 +188,10 @@ const ScheduleStep: React.FC<IProps> = ({ totalSteps }) => {
                 label: o.label,
               }))}
             />
+            <p className="text-xs text-gray-500 mt-1">
+              Bills start on &quot;No adjustment&quot;: a payment is shown on its due date, even on a weekend.
+              Choose Friday or Monday if you pay it on the nearest working day.
+            </p>
           </div>
         )}
       </div>

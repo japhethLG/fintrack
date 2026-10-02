@@ -26,6 +26,11 @@ export interface UserProfile {
    * engine ignored; the one-time migration sets it to the start date's day so nothing moves.
    */
   scheduleModelVersion?: number;
+  /**
+   * From version 1 on, no loan / card / installment payment is skipped (they are owed: moved or left
+   * overdue). The one-time migration turned the skipped debt payments of older profiles back to unpaid.
+   */
+  debtSkipModelVersion?: number;
   preferences: {
     currency: string;
     dateFormat: string;

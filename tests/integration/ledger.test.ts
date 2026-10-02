@@ -39,6 +39,7 @@ import {
   makeUserProfile,
 } from "../helpers/builders";
 import { freezeToday } from "../helpers/time";
+import { DebtSkipError, debtRuleOf } from "@/lib/utils/debtRules";
 
 /**
  * THE LEDGER: one atomic write path for a stored row, the realized balance, loan / card /
@@ -274,6 +275,14 @@ async function apply(model: Model, target: Transaction, g: Gesture, amount: numb
       model.completed.set(key, { amount, sign: signedOf(target) as 1 | -1, source: sourceOf(target) });
       break;
     case "skip":
+      // REWRITTEN (decision 2026-10-02): a loan / card / installment payment is owed and cannot be
+      // skipped; the attempt is refused and changes nothing (the model is left as it was).
+      if (!manual && debtRuleOf(target, rules())) {
+        await expect(markTransactionSkippedAction(target.id, undefined, USER, incomes(), rules())).rejects.toBeInstanceOf(
+          DebtSkipError
+        );
+        break;
+      }
       if (manual) await updateManualTransactionAction(target.id, { status: "skipped" }, USER);
       else await markTransactionSkippedAction(target.id, undefined, USER, incomes(), rules());
       model.completed.delete(key);
@@ -362,21 +371,24 @@ describe("state machine: every gesture keeps balance, debt progress and rows con
     expect(balance()).toBe(9_250);
     check("installment paid twice");
 
-    // 5. Skip the completed loan payment: everything it did is undone.
-    //    loan back to 1,200 / 0 payments; balance 9,250 + 150 = 9,400; the row carries no actual.
-    await apply(model, find((t) => keyOf(t) === keyOf(jan)), "skip", 0, "");
+    // 5. REWRITTEN (decision 2026-10-02: debt payments are owed, never skipped). Skipping the completed
+    //    loan payment is refused and changes nothing; REVERTING it undoes everything it did:
+    //    loan back to 1,200 / 0 payments; balance 9,250 + 150 = 9,400; no stored loan row is left.
+    const paidJan = find((t) => keyOf(t) === keyOf(jan));
+    await expect(skip(paidJan.id)).rejects.toBeInstanceOf(DebtSkipError);
+    expect(rule("loan").loanConfig).toMatchObject({ paymentsMade: 1 });
+    expect(balance()).toBe(9_250);
+    await apply(model, paidJan, "revert", 0, "");
     expect(rule("loan").loanConfig).toMatchObject({ currentBalance: 1_200, paymentsMade: 0 });
     expect(balance()).toBe(9_400);
-    const skipped = rows().find((t) => t.sourceId === "loan")!;
-    expect(skipped.status).toBe("skipped");
-    expect("actualAmount" in skipped).toBe(false);
-    check("loan skipped");
+    expect(rows().filter((t) => t.sourceId === "loan")).toHaveLength(0);
+    check("loan reverted");
 
-    // 6. Pay the skipped loan payment again (100): counts once, balance 9,300.
+    // 6. Pay the loan payment again (100): counts once, balance 9,300.
     await apply(model, find((t) => keyOf(t) === keyOf(jan)), "complete", 100, "");
     expect(rule("loan").loanConfig).toMatchObject({ currentBalance: 1_100, paymentsMade: 1 });
     expect(balance()).toBe(9_300);
-    check("skipped loan paid");
+    check("loan paid again");
 
     // 7. Revert the card payment: row deleted, card 1,000 again, balance 9,300 + 400 = 9,700.
     await apply(model, find((t) => keyOf(t) === keyOf(cardJan)), "revert", 0, "");

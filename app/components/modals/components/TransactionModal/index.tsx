@@ -11,6 +11,7 @@ import { Form, FormInput, FormDatePicker, FormSelect } from "@/components/formEl
 import { cn } from "@/lib/utils/cn";
 import { useCurrency } from "@/lib/hooks/useCurrency";
 import { useDatePreferences } from "@/lib/hooks/useDatePreferences";
+import { DEBT_PAYMENT_HINT, debtRuleOf } from "@/lib/utils/debtRules";
 import { useFinancial } from "@/contexts/FinancialContext";
 import { useModal } from "@/components/modals";
 import {
@@ -44,6 +45,7 @@ const TransactionModal: React.FC<IProps> = ({ closeModal, modalData }) => {
     revertTransactionToProjected,
     updateManualTransaction,
     deleteManualTransaction,
+    expenseRules,
   } = useFinancial();
   const { openModal } = useModal();
   const { formatCurrencyWithSign, currencySymbol } = useCurrency();
@@ -62,6 +64,8 @@ const TransactionModal: React.FC<IProps> = ({ closeModal, modalData }) => {
   const actualAmount = watch("actualAmount");
 
   const isIncome = transaction.type === "income";
+  // A loan / card / installment payment is owed: it is moved or left overdue, never skipped
+  const isDebtPayment = !!debtRuleOf(transaction, expenseRules);
   const variance = parseFloat(actualAmount || "0") - transaction.projectedAmount;
   const hasVariance = variance !== 0;
   const statusVariant: Record<
@@ -304,15 +308,17 @@ const TransactionModal: React.FC<IProps> = ({ closeModal, modalData }) => {
             <Icon name="check_circle" size="sm" className="mr-2" />
             Complete
           </Button>
-          <Button
-            type="button"
-            variant={mode === "skip" ? "secondary" : "ghost"}
-            className="flex-1"
-            onClick={() => setValue("mode", "skip")}
-          >
-            <Icon name="skip_next" size="sm" className="mr-2" />
-            Skip
-          </Button>
+          {!isDebtPayment && (
+            <Button
+              type="button"
+              variant={mode === "skip" ? "secondary" : "ghost"}
+              className="flex-1"
+              onClick={() => setValue("mode", "skip")}
+            >
+              <Icon name="skip_next" size="sm" className="mr-2" />
+              Skip
+            </Button>
+          )}
           {canRevert && (
             <Button
               type="button"
@@ -325,6 +331,10 @@ const TransactionModal: React.FC<IProps> = ({ closeModal, modalData }) => {
             </Button>
           )}
         </div>
+
+        {isDebtPayment && transaction.status !== "completed" && (
+          <p className="text-xs text-gray-400 mb-4">{DEBT_PAYMENT_HINT}</p>
+        )}
 
         {/* Scrollable Form Fields */}
         <div className="overflow-y-auto max-h-[300px] pr-1">

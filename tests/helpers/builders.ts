@@ -57,6 +57,7 @@ export const makeUserProfile = (overrides: Partial<UserProfile> = {}): UserProfi
   // fixtures are already on the current balance model (legacy-migration tests override this)
   balanceModelVersion: 1,
   scheduleModelVersion: 1,
+  debtSkipModelVersion: 1,
   preferences: {
     currency: "USD",
     // the real default (a brand-new profile gets it too): the date pickers and numeric dates print in it

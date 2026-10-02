@@ -23,6 +23,7 @@ import type { OccurrenceBase } from "@/lib/firebase/firestore";
 import { generateProjections } from "@/lib/logic/projectionEngine";
 import { generateOccurrenceId } from "@/lib/logic/projectionEngine/occurrenceIdGenerator";
 import { parseDate } from "@/lib/utils/dateUtils";
+import { DebtSkipError, debtRuleOf, isDebtRule } from "@/lib/utils/debtRules";
 
 /**
  * The write path of the financial context, one function per user gesture.
@@ -181,9 +182,13 @@ export async function markTransactionSkippedAction(
   expenseRules: ExpenseRule[]
 ): Promise<void> {
   if (id.startsWith("proj_")) {
-    const { base, parsedOccurrenceId } = resolveOccurrence(id, incomeSources, expenseRules);
+    const { base, parsedOccurrenceId, source, isIncome } = resolveOccurrence(id, incomeSources, expenseRules);
+    // A debt payment is owed: it can be moved or left overdue, never skipped
+    if (!isIncome && isDebtRule(source as ExpenseRule)) throw new DebtSkipError();
     await skipOccurrence(userId, base, notes, { removeOverride: !!parsedOccurrenceId });
   } else {
+    const existing = await getTransaction(id);
+    if (existing && debtRuleOf(existing, expenseRules)) throw new DebtSkipError();
     await skipTransaction(id, notes, userId);
   }
 }

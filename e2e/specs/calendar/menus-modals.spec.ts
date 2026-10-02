@@ -3,7 +3,7 @@
  * Fixture: currentBalance 1000, Payday +500 monthly on the 13th (Fri 3/13, start 3/13), today Tue 2026-03-10.
  * There is no per-transaction context menu: right-click exists only on day cells (Add Transaction / Income / Expense).
  */
-import { test, expect, seedAndLogin, userProfile, incomeSource, fixedExpense } from "../../index";
+import { test, expect, seedAndLogin, userProfile, incomeSource, fixedExpense, cashLoan } from "../../index";
 import {
   completeInDialog,
   monthCell,
@@ -148,4 +148,21 @@ test.describe("transaction dialog", () => {
     await expect(txnDialog(page)).toBeHidden();
     expect((await storedTxns(page)).map((t) => t.status)).toEqual(["skipped"]);
   });
+});
+
+// Decision 2026-10-02: a loan / card / installment payment is owed. Its dialog offers no Skip; the user
+// drags it to the day they'll pay, or leaves it unpaid and it shows as overdue.
+test("a loan payment's dialog offers no Skip and says to move it or leave it overdue", async ({ page }) => {
+  await seedAndLogin(
+    page,
+    {
+      user: userProfile({ currentBalance: 1000, initialBalance: 1000 }),
+      expenseRules: [cashLoan({ id: "loan", name: "Car Loan", startDate: "2026-03-15" }, { loanStartDate: "2026-03-15", firstPaymentDate: "2026-03-15" })],
+    },
+    { path: "/calendar" }
+  );
+  await openTxnFromCell(page, monthCell(page, "2026-03", "2026-03-15"), "Car Loan");
+  await expect(txnDialog(page).getByRole("button", { name: /Mark Complete/ })).toBeVisible();
+  await expect(txnDialog(page).getByRole("button", { name: /Skip$/ })).toHaveCount(0);
+  await expect(txnDialog(page)).toContainText("Can't pay on this date? Drag it to the day you'll pay.");
 });

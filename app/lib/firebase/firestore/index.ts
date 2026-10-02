@@ -120,5 +120,6 @@ export {
   ResetIncompleteError,
   migrateToInitialBalance,
   migrateLoanInstallmentDayOfMonth,
+  migrateSkippedDebtPayments,
   migratePendingToOverrides,
 } from "./migrations";

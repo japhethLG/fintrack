@@ -2,7 +2,6 @@ import { describe, expect, it } from "vitest";
 import {
   screen,
   within,
-  knownDefect,
   makeCreditRule,
   makeInstallmentRule,
   makeLoanRule,
@@ -22,7 +21,6 @@ import {
   paymentNo,
   revertTx,
   rowMoney,
-  skipTx,
   storedRule,
   storedTxs,
   type App,
@@ -235,7 +233,15 @@ describe("cash loan: payment number depends on the viewport", () => {
   );
 });
 
-describe("cash loan: paymentsMade counter under skip / revert cycles", () => {
+/** The dialog of a debt payment offers no Skip (decision 2026-10-02: owed payments are moved or left overdue). */
+const offersSkip = async (app: Parameters<typeof openTx>[0], id: string): Promise<boolean> => {
+  const dialog = await openTx(app, id);
+  const found = within(dialog).queryAllByRole("button", { name: /^skip_nextSkip$/ }).length > 0;
+  await app.user.click(within(dialog).getByRole("button", { name: /Cancel/ }));
+  return found;
+};
+
+describe("cash loan: paymentsMade counter under revert cycles", () => {
   it("complete -> revert -> complete is idempotent: paymentsMade 1 -> 0 -> 1, balance 8,974.88 -> 10,000 -> 8,974.88", async () => {
     const app = await mountTx({ expenseRules: [loanRule()] });
     const id0 = () => loanRows(app)[0].id;
@@ -253,35 +259,19 @@ describe("cash loan: paymentsMade counter under skip / revert cycles", () => {
     expectInvariants(app, ["complete", "revert", "complete"]);
   }, T);
 
-  it(
-    "UI-LIFE-18 — skipping a COMPLETED loan payment reverses the cash but leaves paymentsMade at 1",
-    async () => {
-      // observed: balance back to 10,000, paymentsMade still 1 => the plan believes a payment was made.
-      const app = await mountTx({ expenseRules: [loanRule()] });
-      await completeTx(app, loanRows(app)[0].id);
-      await skipTx(app, loanRows(app)[0].id);
-      expect(balanceOf(app)).toBeCloseTo(10_000, 2); // precondition: the cash was reversed
-      expect(storedTxs(app)[0].status).toBe("skipped");
-      expect(storedRule(app, "loan").loanConfig!.paymentsMade).toBe(0);
-    },
-    T
-  );
-
-  it(
-    "UI-LIFE-19 — paying a previously SKIPPED loan payment does not count it: paymentsMade stays 1 after two payments",
-    async () => {
-      // pay #1, skip #2, then change your mind and pay #2 (stored-row path). observed: 1, not 2.
-      const app = await mountTx({ expenseRules: [loanRule()] });
-      await completeTx(app, loanRows(app)[0].id);
-      const feb = () => loanRows(app).find((t) => t.scheduledDate === "2026-02-10")!;
-      await skipTx(app, feb().id);
-      expect(feb().status).toBe("skipped");
-      await completeTx(app, feb().id, { amount: 1_025.12 });
-      expect(loanRows(app).filter((t) => t.status === "completed")).toHaveLength(2);
-      expect(storedRule(app, "loan").loanConfig!.paymentsMade).toBe(2);
-    },
-    T
-  );
+  // REWRITTEN (decision 2026-10-02): UI-LIFE-18/19 checked the counters through a SKIP of a loan payment.
+  // A debt payment can no longer be skipped (it is owed: moved, or left unpaid and overdue), so the
+  // dialog offers no Skip, Revert is how a payment is undone (the test above), and each payment counts.
+  it("a loan payment, paid or not, offers no Skip; a second payment counts as the second", async () => {
+    const app = await mountTx({ expenseRules: [loanRule()] });
+    expect(await offersSkip(app, loanRows(app)[0].id)).toBe(false);
+    await completeTx(app, loanRows(app)[0].id);
+    expect(await offersSkip(app, loanRows(app).find((t) => t.status === "completed")!.id)).toBe(false);
+    const feb = () => loanRows(app).find((t) => t.scheduledDate === "2026-02-10")!;
+    await completeTx(app, feb().id, { amount: 1_025.12 });
+    expect(loanRows(app).filter((t) => t.status === "completed")).toHaveLength(2);
+    expect(storedRule(app, "loan").loanConfig!.paymentsMade).toBe(2);
+  }, T);
 });
 
 // ---------------------------------------------------------------------------
@@ -462,52 +452,20 @@ describe("installments", () => {
     T
   );
 
-  it(
-    "UI-LIFE-23 — skipping a COMPLETED installment reverses the cash but leaves installmentsPaid at 1",
-    async () => {
-      const app = await mountTx({ expenseRules: [instRule()] });
-      await completeTx(app, instRows(app)[0].id);
-      await skipTx(app, instRows(app).find((t) => t.status === "completed")!.id);
-      expect(balanceOf(app)).toBe(10_000); // precondition
-      expect(storedTxs(app)[0].status).toBe("skipped");
-      expect(paid(app)).toBe(0);
-    },
-    T
-  );
-
-  it("paying a previously skipped installment counts it once and revert takes it back", async () => {
+  // REWRITTEN (decision 2026-10-02): UI-LIFE-23, "paying a previously skipped installment" and UI-LIFE-24
+  // went through a SKIP of an instalment. Instalments are owed and can no longer be skipped; UI-LIFE-24's
+  // path (a skipped last instalment paid, then reverted) cannot arise. Pay -> revert is what remains.
+  it("an instalment offers no Skip; paying one counts it once and revert takes it back", async () => {
     const app = await mountTx({ expenseRules: [instRule()] });
-    await skipTx(app, instRows(app)[0].id);
-    expect(paid(app)).toBe(0);
+    expect(await offersSkip(app, instRows(app)[0].id)).toBe(false);
     await completeTx(app, instRows(app)[0].id);
     expect(paid(app)).toBe(1);
     expect(balanceOf(app)).toBe(9_800);
     await revertTx(app, instRows(app)[0].id);
     expect(paid(app)).toBe(0);
     expect(balanceOf(app)).toBe(10_000);
-    expectInvariants(app, ["skip", "pay", "revert"]);
+    expectInvariants(app, ["pay", "revert"]);
   }, T);
-
-  it(
-    "UI-LIFE-24 — reverting the LAST instalment (after it was paid from Skipped) makes it vanish: the plan is deactivated and never re-projects it",
-    async () => {
-      // 2 x 200 plan. pay #1, skip #2, pay #2 (stored-row path -> rule flips isActive=false because
-      // paid >= count), then Revert #2. observed: no projected row for #2 (rule inactive), so a
-      // real, unpaid 200 instalment is no longer shown anywhere. Correct: it is projected again.
-      const app = await mountTx({
-        expenseRules: [instRule({}, { installmentCount: 2, totalAmount: 400 })],
-      });
-      await completeTx(app, instRows(app)[0].id);
-      const second = () => instRows(app).find((t) => t.scheduledDate === "2026-02-10")!;
-      await skipTx(app, second().id);
-      await completeTx(app, second().id);
-      expect(balanceOf(app)).toBe(9_600); // precondition: both instalments paid
-      await revertTx(app, second().id);
-      expect(balanceOf(app)).toBe(9_800); // precondition: only #1 remains paid
-      expect(instRows(app).find((t) => t.scheduledDate === "2026-02-10")?.status).toBe("projected");
-    },
-    T
-  );
 
   it("the last instalment paid straight from the projection keeps the plan active (so revert works)", async () => {
     const app = await mountTx({
@@ -523,7 +481,7 @@ describe("installments", () => {
 });
 
 describe("debt progress: things that stay undecided", () => {
-  it.todo("DECISION: does skipping an instalment/loan payment defer it (extend the plan by one month) or forgive it?");
+  // DECIDED 2026-10-02: neither. A loan / card / instalment payment cannot be skipped; it is moved or left overdue.
   it.todo("DECISION: is a loan's currentBalance the principal owed BEFORE or AFTER this month's payment once it is completed early?");
   it.todo("DECISION: should completing a loan payment on a date other than its due date shift the remaining schedule?");
 });

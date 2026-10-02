@@ -12,11 +12,13 @@ import {
   runTransaction,
   writeBatch,
   Timestamp,
+  deleteField,
 } from "firebase/firestore";
 import type { DocumentReference } from "firebase/firestore";
 import { db } from "../config";
 import { DeletableDataType, ExpenseRule, Transaction } from "@/lib/types";
-import { BALANCE_MODEL_VERSION, SCHEDULE_MODEL_VERSION, getUserProfile } from "./users";
+import { BALANCE_MODEL_VERSION, DEBT_SKIP_MODEL_VERSION, SCHEDULE_MODEL_VERSION, getUserProfile } from "./users";
+import { isDebtRule } from "@/lib/utils/debtRules";
 import { getCompletedTransactions } from "./balance";
 import {
   getIncomeSource,
@@ -404,6 +406,73 @@ export const migrateLoanInstallmentDayOfMonth = async (userId: string): Promise<
     )
   );
   return changes.length;
+};
+
+/**
+ * One-time, versioned step: a skipped loan / credit card / installment payment becomes an ordinary
+ * UNPAID payment again (decision 2026-10-02: debt payments are owed, so they are moved or left
+ * overdue, never skipped). A skip used to hide a payment that was still owed: the plan's remaining
+ * schedule could no longer clear its balance.
+ *
+ * - A stored `skipped` row of a debt rule is deleted. It never moved the balance or the plan's
+ *   progress (only completed rows do), so nothing else changes; the occurrence regenerates as a
+ *   projection on its date and, once that date has passed, shows as overdue.
+ * - A legacy `skipped: true` occurrence override on a debt rule is removed (the whole override when
+ *   that was all it held, otherwise just the flag, so a moved date or amount is kept).
+ *
+ * `debtSkipModelVersion` on the profile makes it run once. The writes and the stamp go out together
+ * (the stamp rides in the last batch, so a stopped run is simply re-run). Every change is logged.
+ *
+ * @returns the number of skipped debt payments restored
+ */
+export const migrateSkippedDebtPayments = async (userId: string): Promise<number> => {
+  const profile = await getUserProfile(userId);
+  if (!profile) return 0;
+  if ((profile.debtSkipModelVersion ?? 0) >= DEBT_SKIP_MODEL_VERSION) return 0;
+
+  const rulesSnap = await getDocs(query(collection(db, "expense_rules"), where("userId", "==", userId)));
+  const debtRules = rulesSnap.docs.filter((d) => isDebtRule(d.data() as ExpenseRule));
+  const debtIds = new Set(debtRules.map((d) => d.id));
+
+  type Write = { describe: string; apply: (batch: ReturnType<typeof writeBatch>) => void };
+  const writes: Write[] = [];
+
+  if (debtIds.size > 0) {
+    const txSnap = await getDocs(query(collection(db, "transactions"), where("userId", "==", userId)));
+    txSnap.docs.forEach((d) => {
+      const t = d.data() as Transaction;
+      if (t.status !== "skipped" || t.sourceType !== "expense_rule" || !t.sourceId || !debtIds.has(t.sourceId)) return;
+      writes.push({
+        describe: `skipped row ${d.id} (${t.occurrenceId ?? t.scheduledDate}) of rule ${t.sourceId} removed`,
+        apply: (batch) => batch.delete(d.ref),
+      });
+    });
+    debtRules.forEach((d) => {
+      const overrides = (d.data() as ExpenseRule).occurrenceOverrides ?? {};
+      Object.entries(overrides).forEach(([occurrenceId, override]) => {
+        if (!override?.skipped) return;
+        const onlySkip = Object.keys(override).every((key) => key === "skipped");
+        const field = onlySkip ? `occurrenceOverrides.${occurrenceId}` : `occurrenceOverrides.${occurrenceId}.skipped`;
+        writes.push({
+          describe: `skip flag on ${occurrenceId} of rule ${d.id} removed`,
+          apply: (batch) => batch.update(d.ref, { [field]: deleteField(), updatedAt: Timestamp.now() }),
+        });
+      });
+    });
+  }
+
+  const userRef = doc(db, "users", userId);
+  const stamp = { debtSkipModelVersion: DEBT_SKIP_MODEL_VERSION, updatedAt: Timestamp.now() };
+  const perBatch = MAX_BATCH_OPERATIONS - 1;
+  for (let i = 0; i < Math.max(writes.length, 1); i += perBatch) {
+    const batch = writeBatch(db);
+    writes.slice(i, i + perBatch).forEach((w) => w.apply(batch));
+    if (i + perBatch >= writes.length) batch.update(userRef, stamp);
+    await batch.commit();
+  }
+
+  writes.forEach((w) => console.info(`[debt-skip] ${userId}: ${w.describe} (debt payments are owed, not skipped)`));
+  return writes.length;
 };
 
 /**

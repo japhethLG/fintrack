@@ -23,6 +23,7 @@ import {
   subscribeToUserProfile,
   migrateToInitialBalance,
   migrateLoanInstallmentDayOfMonth,
+  migrateSkippedDebtPayments,
 } from "@/lib/firebase/firestore";
 
 export interface DeleteAccountCredentials {
@@ -115,6 +116,8 @@ export const AuthProvider: React.FC<AuthProviderProps> = ({ children }) => {
           await migrateToInitialBalance(user.uid);
           // pin legacy loan / installment days so the engine's dayOfMonth moves nothing
           await migrateLoanInstallmentDayOfMonth(user.uid);
+          // debt payments are owed: skipped ones from before become unpaid again
+          await migrateSkippedDebtPayments(user.uid);
         } catch (error) {
           console.error("Error creating user profile or running migration:", error);
         }

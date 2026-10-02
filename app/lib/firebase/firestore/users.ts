@@ -23,6 +23,9 @@ export const BALANCE_MODEL_VERSION = 1;
 /** The schedule-data model new profiles are created on (see UserProfile.scheduleModelVersion). */
 export const SCHEDULE_MODEL_VERSION = 1;
 
+/** Profiles from this version on carry no skipped debt payment (see UserProfile.debtSkipModelVersion). */
+export const DEBT_SKIP_MODEL_VERSION = 1;
+
 export const createUserProfile = async (
   uid: string,
   email: string,
@@ -45,6 +48,7 @@ export const createUserProfile = async (
       balanceLastUpdatedAt: getTodayKey(),
       balanceModelVersion: BALANCE_MODEL_VERSION,
       scheduleModelVersion: SCHEDULE_MODEL_VERSION,
+      debtSkipModelVersion: DEBT_SKIP_MODEL_VERSION,
       preferences: {
         currency: "PHP",
         dateFormat: "MM/DD/YYYY",

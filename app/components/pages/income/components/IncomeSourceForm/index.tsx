@@ -418,7 +418,7 @@ const IncomeSourceForm: React.FC<IProps> = ({
                 <p className="text-xs text-gray-500 mt-1">
                   {frequency === "daily"
                     ? "A daily schedule pays every day, so this has no effect."
-                    : "What happens if a payment date falls on a weekend?"}
+                    : "Income starts on \"Pay on Friday if weekend\": payroll that falls on a weekend is usually paid the Friday before. Change it if yours is paid on Monday or on the day itself."}
                 </p>
               </div>
             </div>

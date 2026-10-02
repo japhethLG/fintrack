@@ -17,6 +17,7 @@ import {
   deleteSelectiveUserData,
   migrateLoanInstallmentDayOfMonth,
   migratePendingToOverrides,
+  migrateSkippedDebtPayments,
   migrateToInitialBalance,
   normalizePartialTransactions,
 } from "@/lib/firebase/firestore/migrations";
@@ -1325,5 +1326,94 @@ describe("migrateLoanInstallmentDayOfMonth", () => {
     await expect(migrateLoanInstallmentDayOfMonth(USER)).resolves.toBe(0);
     expect(store.__opsFor("expense_rules")).toHaveLength(0);
     expect(rawProfile(USER).scheduleModelVersion).toBe(1);
+  });
+});
+
+// ============================================================================
+// migrateSkippedDebtPayments (versioned, runs once at login)
+//
+// Decision 2026-10-02: a loan / card / installment payment is owed, so it is moved or left overdue,
+// never skipped. A skip used to hide a payment still owed; older profiles get theirs back as unpaid.
+// ============================================================================
+
+describe("migrateSkippedDebtPayments", () => {
+  const legacyUser = (): void => {
+    const p: Record<string, unknown> = { ...makeUserProfile({ uid: USER }) };
+    delete p.debtSkipModelVersion;
+    store.__seed("users", USER, p);
+  };
+  const rowsOf = (sourceId: string) =>
+    (store.__all<Transaction>("transactions") as Transaction[]).filter((t) => t.sourceId === sourceId);
+  const storedRule = (id: string) => store.__get<ExpenseRule>("expense_rules", id)!;
+  const skippedRow = (id: string, sourceId: string, occurrenceId: string, scheduledDate: string) =>
+    makeSkippedTransaction({ id, userId: USER, sourceType: "expense_rule", sourceId, occurrenceId, scheduledDate });
+
+  it("turns skipped loan, card and installment payments back into unpaid ones, and only those", async () => {
+    legacyUser();
+    store.__seedEntities("expense_rules", [
+      makeLoanRule({ id: "loan-a", userId: USER, startDate: "2026-01-01" }),
+      makeCreditRule({ id: "card-a", userId: USER, startDate: "2026-01-01" }),
+      makeInstallmentRule({ id: "plan-a", userId: USER, startDate: "2026-01-05" }),
+      makeExpenseRule({ id: "gym", userId: USER, startDate: "2026-01-10" }),
+    ]);
+    store.__seedEntities("transactions", [
+      skippedRow("s-loan", "loan-a", "loan-a_2026-02", "2026-02-01"),
+      skippedRow("s-card", "card-a", "card-a_2026-02", "2026-02-15"),
+      skippedRow("s-plan", "plan-a", "plan-a_2026-02", "2026-02-05"),
+      skippedRow("s-gym", "gym", "gym_2026-02", "2026-02-10"),
+      makeCompletedTransaction({ id: "c-loan", userId: USER, sourceType: "expense_rule", sourceId: "loan-a", occurrenceId: "loan-a_2026-01", scheduledDate: "2026-01-01" }),
+    ]);
+    const balanceBefore = rawProfile(USER).currentBalance;
+    const infoSpy = vi.spyOn(console, "info").mockImplementation(() => {});
+    try {
+      await expect(migrateSkippedDebtPayments(USER)).resolves.toBe(3);
+    } finally {
+      infoSpy.mockRestore();
+    }
+
+    expect(rowsOf("loan-a").map((t) => t.id)).toEqual(["c-loan"]); // the skip is gone, the payment kept
+    expect(rowsOf("card-a")).toEqual([]);
+    expect(rowsOf("plan-a")).toEqual([]);
+    expect(rowsOf("gym").map((t) => t.status)).toEqual(["skipped"]); // an ordinary bill may still be skipped
+    expect(rawProfile(USER).currentBalance).toBe(balanceBefore); // a skip never moved the balance
+    expect(rawProfile(USER).debtSkipModelVersion).toBe(1);
+    // February's loan payment is owed again: it is projected on its date
+    const feb = generateProjections([], [storedRule("loan-a")], d("2026-02-01"), d("2026-02-28"));
+    expect(feb.map((t) => t.occurrenceId)).toEqual(["loan-a_2026-02"]);
+  });
+
+  it("removes a legacy skip flag on a debt rule's override, keeping a moved date", async () => {
+    legacyUser();
+    store.__seedEntities("expense_rules", [
+      makeLoanRule({
+        id: "loan-a",
+        userId: USER,
+        startDate: "2026-01-01",
+        occurrenceOverrides: {
+          "loan-a_2026-02": { skipped: true },
+          "loan-a_2026-03": { skipped: true, scheduledDate: "2026-03-20" },
+        },
+      }),
+      makeExpenseRule({ id: "gym", userId: USER, occurrenceOverrides: { "gym_2026-02": { skipped: true } } }),
+    ]);
+    vi.spyOn(console, "info").mockImplementation(() => {});
+
+    await expect(migrateSkippedDebtPayments(USER)).resolves.toBe(2);
+
+    expect(storedRule("loan-a").occurrenceOverrides).toEqual({ "loan-a_2026-03": { scheduledDate: "2026-03-20" } });
+    expect(storedRule("gym").occurrenceOverrides).toEqual({ "gym_2026-02": { skipped: true } });
+    vi.restoreAllMocks();
+  });
+
+  it("runs once: a profile on the model (every new profile) is left alone", async () => {
+    store.__seed("users", USER, { ...makeUserProfile({ uid: USER }) });
+    store.__seedEntities("expense_rules", [makeLoanRule({ id: "loan-a", userId: USER })]);
+    store.__seedEntities("transactions", [skippedRow("s-loan", "loan-a", "loan-a_2026-02", "2026-02-01")]);
+    const ops = store.__ops.length;
+
+    await expect(migrateSkippedDebtPayments(USER)).resolves.toBe(0);
+
+    expect(store.__ops.length).toBe(ops);
+    expect(rowsOf("loan-a")).toHaveLength(1);
   });
 });
